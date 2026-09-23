@@ -535,6 +535,8 @@
               <button id="registerSale" class="btn">Venda</button>
 
               <button id="registerLoss" class="btn red">Registrar perda</button>
+
+              <button id="adjustStock" class="btn">Ajustar inventário</button>
             </div>
           </div>
 
@@ -985,6 +987,70 @@
 
             <button id="saveLoss" class="btn red" type="submit">
               Registrar perda
+            </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <dialog id="adjustDialog">
+      <div class="modal">
+        <h2>Ajustar inventário</h2>
+
+        <div class="muted">
+          Informe a quantidade física encontrada. O sistema calcula a diferença
+          automaticamente.
+        </div>
+
+        <form id="adjustForm" class="modalform">
+          <div class="field">
+            <label for="adjustLot">Produto / lote</label>
+            <select id="adjustLot" required></select>
+          </div>
+
+          <div class="field">
+            <label for="adjustLocation">Local</label>
+
+            <select id="adjustLocation">
+              <option value="stock">Estoque</option>
+              <option value="fridge">Geladeira</option>
+            </select>
+          </div>
+
+          <div id="adjustBalance" class="muted"></div>
+
+          <div class="field">
+            <label for="adjustQuantity">Quantidade física encontrada</label>
+
+            <input
+              id="adjustQuantity"
+              type="number"
+              min="0"
+              value="0"
+              required
+            />
+          </div>
+
+          <div class="field">
+            <label for="adjustNote">Motivo / observação</label>
+
+            <textarea
+              id="adjustNote"
+              maxlength="1000"
+              required
+              placeholder="Ex.: conferência física de fechamento"
+            ></textarea>
+          </div>
+
+          <div id="adjustMessage" class="formmsg"></div>
+
+          <div class="modalactions">
+            <button type="button" class="btn" data-close="adjustDialog">
+              Cancelar
+            </button>
+
+            <button id="saveAdjust" class="btn red" type="submit">
+              Aplicar ajuste
             </button>
           </div>
         </form>

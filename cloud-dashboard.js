@@ -1705,6 +1705,174 @@ async function registerLossOperation(event) {
 }
 
 // ============================================================
+// AJUSTE DE INVENTÁRIO
+// ============================================================
+
+function populateAdjustLots() {
+
+  const select = el('adjustLot');
+
+  select.replaceChildren();
+
+  const available =
+    lots
+      .filter(lot => lotBalances.has(lot.id))
+      .sort((a, b) => a.expiry.localeCompare(b.expiry));
+
+  if (!available.length) {
+
+    const option =
+      document.createElement('option');
+
+    option.value = '';
+
+    option.textContent =
+      'Nenhum lote disponível';
+
+    select.append(option);
+
+    el('saveAdjust').disabled = true;
+
+    updateAdjustBalance();
+
+    return;
+  }
+
+  for (const lot of available) {
+
+    const balance =
+      lotBalances.get(lot.id);
+
+    const option =
+      document.createElement('option');
+
+    option.value = lot.id;
+
+    option.textContent =
+      `${lotLabel(lot)} · estoque ${balance.stock} / geladeira ${balance.fridge}`;
+
+    select.append(option);
+  }
+
+  el('saveAdjust').disabled = false;
+
+  updateAdjustBalance();
+}
+
+
+function updateAdjustBalance() {
+
+  const balance =
+    lotBalances.get(
+      el('adjustLot').value
+    );
+
+  const location =
+    el('adjustLocation').value;
+
+  const current =
+    balance
+      ? balance[location]
+      : 0;
+
+  el('adjustBalance').textContent =
+    balance
+      ? `Saldo atual no sistema: ${current} unidade(s).`
+      : '';
+
+  el('adjustQuantity').value =
+    current;
+}
+
+
+async function adjustStockOperation(event) {
+
+  event.preventDefault();
+
+  formMessage('adjustMessage');
+
+  const button =
+    el('saveAdjust');
+
+  button.disabled = true;
+
+  try {
+
+    const {
+      data,
+      error
+    } = await client.rpc(
+      'guigs_adjust_stock',
+      {
+        p_shop_id:
+          shop.shop_id,
+
+        p_lot_id:
+          el('adjustLot').value,
+
+        p_location:
+          el('adjustLocation').value,
+
+        p_new_quantity:
+          Number(
+            el('adjustQuantity').value
+          ),
+
+        p_note:
+          el('adjustNote')
+            .value
+            .trim()
+      }
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    if (data.changed === false) {
+
+      formMessage(
+        'adjustMessage',
+        'Nenhuma diferença encontrada. O saldo já estava correto.',
+        true
+      );
+
+    } else {
+
+      formMessage(
+        'adjustMessage',
+        `Ajuste aplicado: ${data.delta > 0 ? '+' : ''}${data.delta} unidade(s).`,
+        true
+      );
+    }
+
+    await refresh();
+
+    setTimeout(
+      () => {
+        el('adjustDialog').close();
+        el('adjustForm').reset();
+      },
+      500
+    );
+
+  }
+  catch (e) {
+
+    formMessage(
+      'adjustMessage',
+      e.message
+      || 'Não foi possível ajustar o inventário.'
+    );
+
+  }
+  finally {
+
+    button.disabled = false;
+  }
+}
+
+// ============================================================
 // EVENTOS DE INTERFACE
 // ============================================================
 
@@ -1968,6 +2136,41 @@ el('lossForm')
   .addEventListener(
     'submit',
     registerLossOperation
+  );
+
+el('adjustStock')
+  .addEventListener(
+    'click',
+    () => {
+
+      formMessage('adjustMessage');
+
+      populateAdjustLots();
+
+      el('adjustDialog')
+        .showModal();
+    }
+  );
+
+
+el('adjustLot')
+  .addEventListener(
+    'change',
+    updateAdjustBalance
+  );
+
+
+el('adjustLocation')
+  .addEventListener(
+    'change',
+    updateAdjustBalance
+  );
+
+
+el('adjustForm')
+  .addEventListener(
+    'submit',
+    adjustStockOperation
   );
 
 // ============================================================
