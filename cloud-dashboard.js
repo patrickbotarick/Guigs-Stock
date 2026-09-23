@@ -11,6 +11,7 @@ let shop = null;
 let products = [];
 let lots = [];
 let moves = [];
+let lotBalances = new Map();
 
 let historyPage = 0;
 let query = '';
@@ -436,6 +437,7 @@ function render() {
       += m.delta;
   }
 
+  lotBalances = balance;
 
   if (
     [...balance.values()]
@@ -1198,6 +1200,509 @@ async function receiveStock(event) {
   }
 }
 
+// ============================================================
+// OPERAÇÕES DE MOVIMENTAÇÃO
+// ============================================================
+
+function productById(id) {
+  return products.find(p => p.id === id);
+}
+
+function lotLabel(lot) {
+
+  const product =
+    productById(lot.product_id);
+
+  return `${product?.name || 'Produto'} · ${lot.code}`;
+}
+
+
+function populateTransferLots() {
+
+  const select = el('transferLot');
+
+  select.replaceChildren();
+
+  const direction =
+    el('transferDirection').value;
+
+  const source =
+    direction === 'stock-fridge'
+      ? 'stock'
+      : 'fridge';
+
+  const available =
+    lots
+      .filter(lot => {
+        const balance =
+          lotBalances.get(lot.id);
+
+        return balance
+          && balance[source] > 0;
+      })
+      .sort(
+        (a, b) =>
+          a.expiry.localeCompare(b.expiry)
+      );
+
+  if (!available.length) {
+
+    const option =
+      document.createElement('option');
+
+    option.value = '';
+
+    option.textContent =
+      'Nenhum lote disponível';
+
+    select.append(option);
+
+    el('saveTransfer').disabled = true;
+
+    updateTransferBalance();
+
+    return;
+  }
+
+  for (const lot of available) {
+
+    const balance =
+      lotBalances.get(lot.id);
+
+    const option =
+      document.createElement('option');
+
+    option.value = lot.id;
+
+    option.textContent =
+      `${lotLabel(lot)} · ${balance[source]} un.`;
+
+    select.append(option);
+  }
+
+  el('saveTransfer').disabled = false;
+
+  updateTransferBalance();
+}
+
+
+function updateTransferBalance() {
+
+  const lotId =
+    el('transferLot').value;
+
+  const direction =
+    el('transferDirection').value;
+
+  const source =
+    direction === 'stock-fridge'
+      ? 'stock'
+      : 'fridge';
+
+  const balance =
+    lotBalances.get(lotId);
+
+  el('transferBalance').textContent =
+    balance
+      ? `Disponível na origem: ${balance[source]} unidade(s).`
+      : '';
+}
+
+
+async function transferStockOperation(event) {
+
+  event.preventDefault();
+
+  formMessage('transferMessage');
+
+  const button =
+    el('saveTransfer');
+
+  button.disabled = true;
+
+  try {
+
+    const direction =
+      el('transferDirection').value;
+
+    const from =
+      direction === 'stock-fridge'
+        ? 'stock'
+        : 'fridge';
+
+    const to =
+      direction === 'stock-fridge'
+        ? 'fridge'
+        : 'stock';
+
+    const {
+      data,
+      error
+    } = await client.rpc(
+      'guigs_transfer_stock',
+      {
+        p_shop_id:
+          shop.shop_id,
+
+        p_lot_id:
+          el('transferLot').value,
+
+        p_from_location:
+          from,
+
+        p_to_location:
+          to,
+
+        p_quantity:
+          Number(
+            el('transferQuantity').value
+          ),
+
+        p_note:
+          el('transferNote')
+            .value
+            .trim()
+      }
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    formMessage(
+      'transferMessage',
+      `Movimentação concluída: ${data.quantity} unidade(s).`,
+      true
+    );
+
+    await refresh();
+
+    setTimeout(
+      () => {
+        el('transferDialog').close();
+        el('transferForm').reset();
+      },
+      500
+    );
+
+  }
+  catch (e) {
+
+    formMessage(
+      'transferMessage',
+      e.message
+      || 'Não foi possível realizar a movimentação.'
+    );
+
+  }
+  finally {
+
+    button.disabled = false;
+  }
+}
+
+
+// ============================================================
+// VENDA
+// ============================================================
+
+function populateSaleLots() {
+
+  const select =
+    el('saleLot');
+
+  select.replaceChildren();
+
+  const available =
+    lots
+      .filter(lot => {
+
+        const balance =
+          lotBalances.get(lot.id);
+
+        return balance
+          && balance.fridge > 0
+          && dayDifference(lot.expiry) >= 0;
+      })
+      .sort(
+        (a, b) =>
+          a.expiry.localeCompare(b.expiry)
+      );
+
+  if (!available.length) {
+
+    const option =
+      document.createElement('option');
+
+    option.value = '';
+
+    option.textContent =
+      'Nenhum lote disponível na geladeira';
+
+    select.append(option);
+
+    el('saveSale').disabled = true;
+
+    updateSaleBalance();
+
+    return;
+  }
+
+  for (const lot of available) {
+
+    const balance =
+      lotBalances.get(lot.id);
+
+    const option =
+      document.createElement('option');
+
+    option.value = lot.id;
+
+    option.textContent =
+      `${lotLabel(lot)} · ${balance.fridge} un.`;
+
+    select.append(option);
+  }
+
+  el('saveSale').disabled = false;
+
+  updateSaleBalance();
+}
+
+
+function updateSaleBalance() {
+
+  const balance =
+    lotBalances.get(
+      el('saleLot').value
+    );
+
+  el('saleBalance').textContent =
+    balance
+      ? `Disponível na geladeira: ${balance.fridge} unidade(s).`
+      : '';
+}
+
+
+async function registerSaleOperation(event) {
+
+  event.preventDefault();
+
+  formMessage('saleMessage');
+
+  const button =
+    el('saveSale');
+
+  button.disabled = true;
+
+  try {
+
+    const {
+      data,
+      error
+    } = await client.rpc(
+      'guigs_register_sale',
+      {
+        p_shop_id:
+          shop.shop_id,
+
+        p_lot_id:
+          el('saleLot').value,
+
+        p_quantity:
+          Number(
+            el('saleQuantity').value
+          ),
+
+        p_note:
+          el('saleNote')
+            .value
+            .trim()
+      }
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    formMessage(
+      'saleMessage',
+      `Venda registrada: ${data.quantity} unidade(s).`,
+      true
+    );
+
+    await refresh();
+
+    setTimeout(
+      () => {
+        el('saleDialog').close();
+        el('saleForm').reset();
+      },
+      500
+    );
+
+  }
+  catch (e) {
+
+    formMessage(
+      'saleMessage',
+      e.message
+      || 'Não foi possível registrar a venda.'
+    );
+
+  }
+  finally {
+
+    button.disabled = false;
+  }
+}
+
+
+// ============================================================
+// PERDA
+// ============================================================
+
+function populateLossLots() {
+
+  const select =
+    el('lossLot');
+
+  select.replaceChildren();
+
+  for (
+    const lot
+    of [...lots]
+      .sort(
+        (a, b) =>
+          a.expiry.localeCompare(b.expiry)
+      )
+  ) {
+
+    const balance =
+      lotBalances.get(lot.id);
+
+    if (
+      !balance
+      ||
+      (
+        balance.stock <= 0
+        &&
+        balance.fridge <= 0
+      )
+    ) {
+      continue;
+    }
+
+    const option =
+      document.createElement('option');
+
+    option.value = lot.id;
+
+    option.textContent =
+      lotLabel(lot);
+
+    select.append(option);
+  }
+
+  el('saveLoss').disabled =
+    !select.value;
+
+  updateLossBalance();
+}
+
+
+function updateLossBalance() {
+
+  const balance =
+    lotBalances.get(
+      el('lossLot').value
+    );
+
+  const location =
+    el('lossLocation').value;
+
+  el('lossBalance').textContent =
+    balance
+      ? `Disponível neste local: ${balance[location]} unidade(s).`
+      : '';
+}
+
+
+async function registerLossOperation(event) {
+
+  event.preventDefault();
+
+  formMessage('lossMessage');
+
+  const button =
+    el('saveLoss');
+
+  button.disabled = true;
+
+  try {
+
+    const {
+      data,
+      error
+    } = await client.rpc(
+      'guigs_register_loss',
+      {
+        p_shop_id:
+          shop.shop_id,
+
+        p_lot_id:
+          el('lossLot').value,
+
+        p_location:
+          el('lossLocation').value,
+
+        p_quantity:
+          Number(
+            el('lossQuantity').value
+          ),
+
+        p_note:
+          el('lossNote')
+            .value
+            .trim()
+      }
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    formMessage(
+      'lossMessage',
+      `Perda registrada: ${data.quantity} unidade(s).`,
+      true
+    );
+
+    await refresh();
+
+    setTimeout(
+      () => {
+        el('lossDialog').close();
+        el('lossForm').reset();
+      },
+      500
+    );
+
+  }
+  catch (e) {
+
+    formMessage(
+      'lossMessage',
+      e.message
+      || 'Não foi possível registrar a perda.'
+    );
+
+  }
+  finally {
+
+    button.disabled = false;
+  }
+}
 
 // ============================================================
 // EVENTOS DE INTERFACE
@@ -1365,6 +1870,105 @@ el('receiveForm')
     receiveStock
   );
 
+el('transferStock')
+  .addEventListener(
+    'click',
+    () => {
+
+      formMessage('transferMessage');
+
+      populateTransferLots();
+
+      el('transferDialog')
+        .showModal();
+    }
+  );
+
+
+el('registerSale')
+  .addEventListener(
+    'click',
+    () => {
+
+      formMessage('saleMessage');
+
+      populateSaleLots();
+
+      el('saleDialog')
+        .showModal();
+    }
+  );
+
+
+el('registerLoss')
+  .addEventListener(
+    'click',
+    () => {
+
+      formMessage('lossMessage');
+
+      populateLossLots();
+
+      el('lossDialog')
+        .showModal();
+    }
+  );
+
+
+el('transferDirection')
+  .addEventListener(
+    'change',
+    populateTransferLots
+  );
+
+
+el('transferLot')
+  .addEventListener(
+    'change',
+    updateTransferBalance
+  );
+
+
+el('saleLot')
+  .addEventListener(
+    'change',
+    updateSaleBalance
+  );
+
+
+el('lossLot')
+  .addEventListener(
+    'change',
+    updateLossBalance
+  );
+
+
+el('lossLocation')
+  .addEventListener(
+    'change',
+    updateLossBalance
+  );
+
+
+el('transferForm')
+  .addEventListener(
+    'submit',
+    transferStockOperation
+  );
+
+
+el('saleForm')
+  .addEventListener(
+    'submit',
+    registerSaleOperation
+  );
+
+
+el('lossForm')
+  .addEventListener(
+    'submit',
+    registerLossOperation
+  );
 
 // ============================================================
 // INICIALIZAÇÃO
