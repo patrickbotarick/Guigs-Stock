@@ -1,4 +1,47 @@
-1.2C.1: autenticação no painel + leitura da nuvem (ENTREGUE, precisa validar no Supabase real).
-1.2C.2: escrita segura/RPC transacional e política de permissões (PENDENTE).
-1.2C.3: interface de operações conectadas e concorrência (PENDENTE).
-1.2C.4/1.2D: migração, testes práticos, distribuição (PENDENTE).
+GUIG'S STOCK — ROADMAP 1.2
+
+1.2A — Ambiente de testes
+STATUS: CONCLUÍDO
+- Servidor local
+- Porta configurável
+- Cloudflare Tunnel
+- Testes de acesso remoto/mobile
+
+1.2B — Supabase e autenticação
+STATUS: CONCLUÍDO
+- Projeto Supabase
+- Login
+- Recuperação de senha
+- Vínculos de usuários
+- Papéis owner e attendant
+
+1.2C — Integração completa em nuvem
+STATUS: CONCLUÍDO
+- Painel protegido
+- Leitura do Supabase
+- Cadastro de produtos
+- Edição e ativação/inativação de produtos
+- Recebimento de estoque
+- Controle de lotes e validade
+- Transferência estoque ↔ geladeira
+- Registro de vendas
+- Registro de perdas
+- Ajuste de inventário
+- Histórico em nuvem
+- Proteção contra saldo negativo
+- Permissões owner / attendant
+- Sincronização entre sessões
+- Proteção contra operações concorrentes
+- Validação de lotes vencidos
+- Validação de nomes duplicados
+
+1.2D — Fechamento da versão 1.2
+STATUS: CONCLUÍDO
+- Documentação atualizada
+- Revisão de segurança concluída
+- Testes finais de regressão concluídos
+- Iniciador local corrigido e validado
+- Preparação da versão concluída
+
+VERSÃO FINAL:
+v1.2.0
