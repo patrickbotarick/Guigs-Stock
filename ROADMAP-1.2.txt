@@ -1,0 +1,4 @@
+1.2C.1: autenticação no painel + leitura da nuvem (ENTREGUE, precisa validar no Supabase real).
+1.2C.2: escrita segura/RPC transacional e política de permissões (PENDENTE).
+1.2C.3: interface de operações conectadas e concorrência (PENDENTE).
+1.2C.4/1.2D: migração, testes práticos, distribuição (PENDENTE).

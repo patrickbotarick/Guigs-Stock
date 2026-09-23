@@ -1,0 +1,11 @@
+﻿GUIG'S STOCK 1.2C.1 - HOME FIX
+
+Este pacote substitui o iniciador Cloudflare por uma versao com diagnostico visivel.
+1. Copie seu config.js configurado para esta pasta.
+2. Execute Iniciar Guigs Stock + Cloudflare.bat.
+3. Para manter a configuracao atual do Supabase, use a porta 8082.
+4. O iniciador informa explicitamente se o problema estiver no Python, servidor local ou Cloudflare.
+
+Se quiser testar manualmente apenas o servidor local:
+  py -3 -m http.server 8082 --bind 127.0.0.1
+Depois abra: http://localhost:8082/

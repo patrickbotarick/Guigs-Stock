@@ -1,0 +1,16 @@
+GUIG'S STOCK 1.2B — ESQUEMA E LOGIN ISOLADO (NÃO É SINCRONIZAÇÃO)
+
+1. Extraia o ZIP. Abra o iniciador Cloudflare da 1.2A para escolher a porta e obter um novo link temporário. Não é possível fornecer link estático antecipadamente.
+2. Crie um projeto de TESTES no Supabase. No painel SQL Editor, execute supabase/001_schema_rls.sql.
+3. No Auth > Users, crie manualmente a conta da proprietária. Desative cadastro público / signup na configuração do Auth. Não use senhas de teste compartilhadas.
+4. Edite supabase/002_bootstrap_owner_EXEMPLO.sql, substitua o UUID zerado pelo auth.users.id da proprietária e execute UMA VEZ no SQL Editor.
+5. Crie contas das atendentes em Auth > Users; edite/executa 003_add_attendant_EXEMPLO.sql usando shop_id criado e UUID da conta.
+6. Em config.js informe SOMENTE Project URL e chave publishable sb_publishable_... do Supabase. Nunca usar chave secret / service_role.
+7. Abra auth-preview.html pelo servidor local; autentique e confira o perfil (proprietária/atendente). A página principal index.html permanece totalmente LOCAL e NÃO é protegida pelo login nesta etapa.
+8. Não migre backups nem lance dados reais nessa versão. 1.2C vai implementar gravação atômica, migração, regras de função e sincronização; 1.2D fará testes de permissões com usuários reais.
+
+SEGURANÇA: todas as tabelas têm RLS; anon sem GRANT; authenticated só SELECT condicionado ao vínculo. Nenhuma escrita de estoque, usuários ou perfil pelo navegador. A criação de usuários / vínculos acontece via painel e SQL Editor administrativo. O túnel Cloudflare é público: use APENAS dados fictícios nesta fase.
+
+TESTES A EXECUTAR NO SUPABASE ANTES DE PRODUÇÃO: verificar que anon não lê tabelas, membro lê sua loja, usuário sem vínculo não lê, outras lojas isoladas, atendente não edita estoque e somente perfil próprio visível. Não foram executados contra Supabase real neste pacote.
+
+ATUALIZAÇÃO RECUPERAÇÃO: consulte LEIA-ME-RECUPERACAO.txt.

@@ -1,0 +1,19 @@
+GUIG'S STOCK 1.2A - PREVIEW / INICIO DA MIGRACAO
+
+1. Extraia o ZIP inteiro para uma pasta (nao rode dentro do ZIP).
+2. Instale Python 3 se nao tiver (com PATH ativado): https://www.python.org/downloads/windows/
+3. Instale cloudflared: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+   Coloque cloudflared.exe nesta pasta ou configure o PATH.
+4. Clique duas vezes em "Iniciar Guigs Stock + Cloudflare.bat".
+5. Digite a porta (Enter = 8080). O aplicativo abre como janela propria no navegador.
+6. Aguarde a URL https://...trycloudflare.com aparecer na janela. O link e copiado e gravado temporariamente em LINK-CLOUDFLARE-ATUAL.txt.
+7. Abra a URL no celular para VER O LAYOUT. Mantenha a janela do iniciador aberta.
+8. Enter na janela do iniciador encerra o servidor e o tunel. A URL deixa de funcionar.
+
+IMPORTANTISSIMO:
+- Esta build NAO possui Supabase configurado nem sincronizacao: banco em nuvem sera integrado nas proximas subetapas.
+- O computador e o celular terao armazenamentos de navegador DIFERENTES.
+- A origem http://127.0.0.1:PORT e diferente de file:// e de outras portas. O estoque anterior pode nao aparecer. Exporte o backup JSON no aplicativo antigo antes de migrar e importe se necessario.
+- O Quick Tunnel e PUBLICO, sem login; use APENAS dados ficticios. Nunca exponha dados reais dos clientes ou estoque.
+- O nome da URL muda a cada inicio. Nao e possivel fornecer uma URL valida antes de voce iniciar o tunel no seu Windows.
+- Abertura e sintaxe do script precisam ser validadas no seu Windows com Python e cloudflared instalados.

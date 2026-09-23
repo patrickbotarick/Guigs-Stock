@@ -1,0 +1,12 @@
+GUIG’S STOCK 1.2B — CORREÇÃO DO FLUXO DE RECUPERAÇÃO
+
+1. Extraia este pacote inteiro. Copie do seu projeto anterior o config.js que você já preencheu (somente URL e chave PUBLICÁVEL) para a pasta extraída; o config.js deste ZIP vem vazio para não distribuir sua configuração.
+2. Execute o iniciador e selecione a porta 8082. Confirme http://localhost:8082/auth-preview.html no navegador.
+3. No Supabase Authentication > URL Configuration, mantenha a Redirect URL http://localhost:8082/**. O app solicita explicitamente redirecionamento para http://localhost:8082/reset-password.html.
+4. Na tela de login digite seu e-mail, clique em Esqueci minha senha. Não use Reset password no painel durante este teste: ele usa o Site URL como destino padrão, que está na tela de login, não na página de alteração.
+5. Se surgir email rate limit exceeded, aguarde a liberação da cota. Não repita solicitações seguidas. Abra SOMENTE o e-mail mais recente, no mesmo PC, com o servidor em execução na porta 8082.
+6. Crie e confirme senha exclusiva com pelo menos 12 caracteres e salve. Volte ao login.
+7. O estoque em index.html continua LOCAL e NÃO protegido pela autenticação; use só dados fictícios no túnel. Não envie links de recuperação ou senhas a ninguém.
+8. A biblioteca JS é carregada de esm.sh: é necessário acesso à internet para o teste de autenticação.
+
+DIAGNÓSTICO: links antigos expirados não podem ser reaproveitados; mudar Site URL não revalida e-mails anteriores. A página de recuperação aceita a sessão gerada pelo link do Supabase e chama auth.updateUser({password}).

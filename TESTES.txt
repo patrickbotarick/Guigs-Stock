@@ -1,0 +1,1 @@
+Guig’s Stock 1.1 Final: verificar sintaxe JavaScript, integridade ZIP, paginação e filtro de histórico. Testes completos de interface, BAT/PowerShell e persistência precisam ser executados no Windows da pizzaria. Não declarar homologação de produção.

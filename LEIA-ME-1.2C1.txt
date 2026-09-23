@@ -1,0 +1,28 @@
+GUIG'S STOCK 1.2C.1 — PRIMEIRA ENTREGA DA ETAPA 1.2C (PAINEL NUVEM / SOMENTE LEITURA)
+
+O QUE ESTA IMPLEMENTADO
+- index.html: novo painel em nuvem com login obrigatório, validação de vínculo ativo e leitura de produtos, lotes e movimentações via Supabase.
+- Saldo por lote e localização calculado com movimentações completas; impede mostrar resultado parcial se leitura falhar/exceder limite.
+- Histórico em páginas de 20 registros, busca local, alertas de validade, atualização manual e saída.
+- auth-preview.html: login e botão Abrir painel em nuvem após confirmar vínculo.
+- preview-local.html: protótipo antigo LOCAL, ISOLADO. Nunca representa dados da nuvem; não use como estoque real compartilhado.
+- Nenhuma função de cadastro, transferência, venda, importação ou escrita na nuvem foi habilitada. Não há migração automática de dados locais.
+
+CONFIGURACAO
+1. Extraia todo o ZIP. Copie APENAS o config.js já configurado da versão anterior, contendo URL e sb_publishable_... (NUNCA sb_secret_ ou service_role).
+2. Inicie pelo .bat de Cloudflare, ou execute py -m http.server 8082 --bind 127.0.0.1 nesta pasta.
+3. Abra http://localhost:8082/auth-preview.html; faça login e clique Abrir painel em nuvem. A raiz / abre o painel que redireciona ao login sem sessão.
+4. Sem dados cadastrados no Supabase, o painel exibirá ZERO. Isso é correto. Os 12 produtos demonstrativos do protótipo LOCAL NÃO foram enviados.
+5. O link temporário Cloudflare aparece SOMENTE ao iniciar o túnel no seu PC. Não há link fixo; compartilhe apenas para testar com contas autorizadas.
+6. Execute opcionalmente supabase/004_verificar_permissoes_leitura.sql no SQL Editor. Esperado: RLS ligado, anon sem SELECT, authenticated SELECT e SEM INSERT/UPDATE/DELETE em todas as cinco tabelas.
+
+CUIDADOS
+- Esta é uma prévia técnica para dados FICTÍCIOS. Teste com 2 contas e confirme isolamento de acesso antes de implantação.
+- Login de frontend não substitui políticas RLS. As políticas originais permanecem essenciais.
+- O CDN esm.sh requer internet no navegador. Se falhar, a aplicação mostra erro, não usa dados locais como substitutos.
+- Não execute novamente o SQL inicial sem necessidade e não importe backup local via SQL.
+- Não é possível acessar seu projeto Supabase daqui: os testes de autenticação/RLS reais devem ser feitos no seu ambiente.
+- O e-mail de recuperação pode continuar sujeito aos limites de envio do Supabase.
+
+PROXIMOS PASSOS 1.2C.2 / 1.2C.3
+Criar funções de escrita transacionais no banco, autorização owner/attendant, lock contra saldo negativo, idempotência, testes de concorrência e migração explícita de dados fictícios. Só então habilitar formulários no painel.

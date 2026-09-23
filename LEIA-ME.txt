@@ -1,0 +1,34 @@
+GUIG’S STOCK 1.1 FINAL — PACOTE DE TESTE PARA A PIZZARIA GUIG’S
+===============================================================
+REQUISITOS: Windows 10/11 e Microsoft Edge ou Google Chrome instalado.
+
+COMO INICIAR
+1. Baixe o ZIP e clique com o botão direito > Extrair tudo. Não execute dentro do ZIP.
+2. Mova a pasta extraída para um lugar definitivo, por exemplo Documentos\Guigs Stock.
+3. Dentro da pasta, dê dois cliques em "Abrir Guigs Stock.bat".
+4. Edge/Chrome deverá abrir em uma janela exclusiva do aplicativo (modo --app).
+5. Se o Windows bloquear o iniciador, peça ajuda a quem administra o computador. Alternativamente, abra index.html diretamente no navegador (em uma aba comum). Não altere as configurações de segurança sem orientação.
+6. Mantenha index.html, logo-guigs.png, arquivos BAT e PS1 juntos. Não mova apenas o atalho/HTML.
+
+DADOS E BACKUP — MUITO IMPORTANTE
+- Os dados ficam somente no armazenamento local do navegador/perfil e origem usados naquele computador. Não há servidor ou login.
+- Use sempre a mesma pasta, navegador e perfil. A troca de local/ambiente pode fazer os dados parecerem vazios; não presuma que foram apagados.
+- Antes de atualizar, trocar de computador ou navegador, exporte backup JSON em Configurações, confira o arquivo em Downloads e salve outra cópia externa (ex.: Google Drive manualmente).
+- Faça backup ao fim de cada expediente de testes. Restaure importando o JSON em Configurações se necessário.
+- Não limpe os dados do navegador; não abra várias janelas para operar ao mesmo tempo.
+- Produtos, quantidades mínimas e demonstração são FICTÍCIOS. Não use como estoque real sem contagem inicial e conferência de validade.
+- Não existe caixa integrado: vendas devem ser registradas manualmente; divergências de inventário não equivalem automaticamente a vendas.
+
+HISTÓRICO
+- É acumulativo e não é apagado a cada dia: necessário para calcular saldos e rastrear lotes.
+- Agora possui filtro de período, busca e paginação de 20 registros por página. CSV exporta o histórico completo.
+- Não há botão de apagar lançamentos reais deliberadamente: exclusões isoladas quebrariam os saldos. Faça backups e use filtros.
+- Esta versão ainda usa localStorage: armazenamento limitado e sem garantia contra perda do computador. Evite utilizar como sistema definitivo até a etapa de banco na nuvem e piloto operacional.
+
+CELULAR
+- Se enviar o ZIP ao celular, pode extrair e abrir index.html em navegadores que permitam arquivos locais. Compatibilidade e gravação variam. Isso cria dados independentes e NÃO mostra o estoque do computador.
+- Para simples visualização remota do estoque do computador, exporte CSV e compartilhe a cópia, ou envie capturas do painel. Não publique este HTML com dados comerciais em hospedagem pública: sem login/servidor não há sincronização nem controle de acesso.
+- Sincronização real entre computador/celular e instalação via URL ficam para a versão com servidor/Supabase.
+
+PILOTO
+Testar com dados fictícios primeiro: recebimento > abastecimento > venda > perda > conferência > backup > restauração. Depois substituir catálogo e fazer contagem real.

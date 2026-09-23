@@ -1,0 +1,14 @@
+# Configuração local do Supabase
+config.js
+
+# Links temporários do Cloudflare
+LINK-CLOUDFLARE-ATUAL.txt
+
+# Logs / arquivos temporários
+*.log
+__pycache__/
+.DS_Store
+Thumbs.db
+
+# VS Code local
+.vscode/
