@@ -265,18 +265,18 @@ async function bootstrap() {
 
   if (shop.role !== 'owner') {
 
-  el('newProduct')
-  .classList
-  .add('hidden');
+    el('newProduct')
+      .classList
+      .add('hidden');
 
-el('editProduct')
-  .classList
-  .add('hidden');
+    el('editProduct')
+      .classList
+      .add('hidden');
 
-el('adjustStock')
-  .classList
-  .add('hidden');
-}
+    el('adjustStock')
+      .classList
+      .add('hidden');
+  }
 
 
   el('refresh').disabled = false;
@@ -717,9 +717,8 @@ function render() {
 
 
   el('updated').textContent =
-    `Atualizado em ${
-      new Date()
-        .toLocaleString('pt-BR')
+    `Atualizado em ${new Date()
+      .toLocaleString('pt-BR')
     }.`;
 
 
@@ -2211,7 +2210,7 @@ el('newProduct')
     }
   );
 
-  el('editProduct')
+el('editProduct')
   .addEventListener(
     'click',
     () => {
@@ -2296,9 +2295,11 @@ el('receiveForm')
 el('transferStock')
   .addEventListener(
     'click',
-    () => {
+    async () => {
 
       formMessage('transferMessage');
+
+      await refresh();
 
       populateTransferLots();
 
@@ -2311,9 +2312,11 @@ el('transferStock')
 el('registerSale')
   .addEventListener(
     'click',
-    () => {
+    async () => {
 
       formMessage('saleMessage');
+
+      await refresh();
 
       populateSaleLots();
 
@@ -2326,9 +2329,11 @@ el('registerSale')
 el('registerLoss')
   .addEventListener(
     'click',
-    () => {
+    async () => {
 
       formMessage('lossMessage');
+
+      await refresh();
 
       populateLossLots();
 
@@ -2396,9 +2401,11 @@ el('lossForm')
 el('adjustStock')
   .addEventListener(
     'click',
-    () => {
+    async () => {
 
       formMessage('adjustMessage');
+
+      await refresh();
 
       populateAdjustLots();
 
