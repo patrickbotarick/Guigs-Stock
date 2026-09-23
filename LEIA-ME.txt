@@ -1,34 +1,415 @@
-GUIG’S STOCK 1.1 FINAL — PACOTE DE TESTE PARA A PIZZARIA GUIG’S
-===============================================================
-REQUISITOS: Windows 10/11 e Microsoft Edge ou Google Chrome instalado.
+GUIG'S STOCK 1.2 — GUIA DE USO E INSTALAÇÃO
+===========================================
+
+VISÃO GERAL
+-----------
+O Guig's Stock é o sistema de controle de bebidas da Pizzaria Guig's.
+
+A versão 1.2 utiliza Supabase para autenticação, sincronização entre usuários e armazenamento em nuvem.
+
+Principais recursos:
+- Cadastro e edição de produtos
+- Recebimento de estoque
+- Controle por lotes e validade
+- Transferência entre estoque e geladeira
+- Registro de vendas
+- Registro de perdas
+- Ajuste de inventário
+- Histórico de movimentações
+- Controle de permissões por usuário
+- Sincronização entre computadores/sessões
+- Proteção contra saldo negativo
+- Proteção contra operações concorrentes
+
+
+REQUISITOS
+----------
+- Windows 10 ou 11
+- Google Chrome ou Microsoft Edge
+- Conexão com a internet
+- Conta cadastrada no Supabase
+- Arquivo config.js configurado localmente
+
+
+ESTRUTURA DE USUÁRIOS
+---------------------
+
+OWNER / PROPRIETÁRIO
+Pode:
+- cadastrar produtos
+- editar produtos
+- ativar/inativar produtos
+- receber estoque
+- transferir estoque ↔ geladeira
+- registrar vendas
+- registrar perdas
+- ajustar inventário
+- consultar histórico
+
+ATTENDANT / ATENDENTE
+Pode:
+- receber estoque
+- transferir estoque ↔ geladeira
+- registrar vendas
+- registrar perdas
+- consultar histórico
+
+Não pode:
+- cadastrar produtos
+- editar produtos
+- ajustar inventário
+
+
+CONFIGURAÇÃO INICIAL
+--------------------
+
+1. Clone ou copie a pasta do Guig's Stock para o computador.
+
+2. Na pasta do projeto, copie:
+
+config.example.js
+
+e crie:
+
+config.js
+
+3. Preencha apenas:
+
+- URL do projeto Supabase
+- Publishable Key
+
+IMPORTANTE:
+Nunca coloque no config.js:
+- service_role
+- secret key
+- qualquer chave administrativa do Supabase
+
+O config.js não deve ser enviado ao GitHub.
+
 
 COMO INICIAR
-1. Baixe o ZIP e clique com o botão direito > Extrair tudo. Não execute dentro do ZIP.
-2. Mova a pasta extraída para um lugar definitivo, por exemplo Documentos\Guigs Stock.
-3. Dentro da pasta, dê dois cliques em "Abrir Guigs Stock.bat".
-4. Edge/Chrome deverá abrir em uma janela exclusiva do aplicativo (modo --app).
-5. Se o Windows bloquear o iniciador, peça ajuda a quem administra o computador. Alternativamente, abra index.html diretamente no navegador (em uma aba comum). Não altere as configurações de segurança sem orientação.
-6. Mantenha index.html, logo-guigs.png, arquivos BAT e PS1 juntos. Não mova apenas o atalho/HTML.
+------------
 
-DADOS E BACKUP — MUITO IMPORTANTE
-- Os dados ficam somente no armazenamento local do navegador/perfil e origem usados naquele computador. Não há servidor ou login.
-- Use sempre a mesma pasta, navegador e perfil. A troca de local/ambiente pode fazer os dados parecerem vazios; não presuma que foram apagados.
-- Antes de atualizar, trocar de computador ou navegador, exporte backup JSON em Configurações, confira o arquivo em Downloads e salve outra cópia externa (ex.: Google Drive manualmente).
-- Faça backup ao fim de cada expediente de testes. Restaure importando o JSON em Configurações se necessário.
-- Não limpe os dados do navegador; não abra várias janelas para operar ao mesmo tempo.
-- Produtos, quantidades mínimas e demonstração são FICTÍCIOS. Não use como estoque real sem contagem inicial e conferência de validade.
-- Não existe caixa integrado: vendas devem ser registradas manualmente; divergências de inventário não equivalem automaticamente a vendas.
+Forma recomendada:
+
+1. Abra a pasta do Guig's Stock.
+2. Execute:
+
+Abrir Guigs Stock.bat
+
+O sistema deve iniciar o servidor local e abrir o navegador.
+
+A porta utilizada normalmente é:
+
+8082
+
+Caso o iniciador padrão não funcione, também existem arquivos PowerShell de inicialização.
+
+
+LOGIN
+-----
+
+Ao abrir o sistema, faça login com um usuário previamente cadastrado no Supabase.
+
+O usuário também precisa estar vinculado à Pizzaria Guig's na tabela de memberships.
+
+Se o usuário estiver autenticado mas sem vínculo ativo, o acesso ao estoque será bloqueado.
+
+
+CADASTRO DE PRODUTOS
+--------------------
+
+Disponível apenas para OWNER.
+
+No painel:
+
+Novo produto
+
+Informe:
+- nome
+- categoria
+- estoque mínimo total
+- estoque alvo total
+- mínimo da geladeira
+- alvo da geladeira
+
+Produtos com o mesmo nome não podem ser duplicados.
+
+
+EDIÇÃO DE PRODUTOS
+------------------
+
+Disponível apenas para OWNER.
+
+É possível alterar:
+- nome
+- categoria
+- mínimos
+- metas
+- situação do produto
+
+Produtos podem ser marcados como:
+
+Ativo
+Inativo
+
+Produtos inativos continuam no histórico e mantêm seus saldos, mas não aparecem para novos recebimentos.
+
+
+RECEBIMENTO DE ESTOQUE
+----------------------
+
+Abra:
+
+Receber estoque
+
+Informe:
+- produto
+- código do lote
+- validade
+- quantidade
+- observação opcional
+
+Todo recebimento entra inicialmente no:
+
+ESTOQUE
+
+Não é permitido cadastrar lote já vencido.
+
+
+TRANSFERÊNCIA
+-------------
+
+Abra:
+
+Movimentar
+
+Escolha:
+- lote
+- direção
+- quantidade
+
+Direções disponíveis:
+
+Estoque → Geladeira
+Geladeira → Estoque
+
+O sistema verifica o saldo real no banco antes de concluir a operação.
+
+Não é permitido criar saldo negativo.
+
+
+VENDA
+-----
+
+Abra:
+
+Venda
+
+A venda sempre retira unidades da:
+
+GELADEIRA
+
+Lotes vencidos não podem ser vendidos.
+
+O sistema bloqueia vendas acima do saldo disponível.
+
+
+PERDA
+-----
+
+Abra:
+
+Registrar perda
+
+Informe:
+- lote
+- local
+- quantidade
+- motivo
+
+A perda pode acontecer tanto no estoque quanto na geladeira.
+
+
+AJUSTE DE INVENTÁRIO
+--------------------
+
+Disponível apenas para OWNER.
+
+Use quando a contagem física for diferente do valor mostrado no sistema.
+
+Exemplo:
+
+Sistema:
+15 unidades
+
+Contagem física:
+13 unidades
+
+Ao informar 13, o sistema cria automaticamente:
+
+Ajuste -2
+
+Se o valor informado for igual ao saldo atual, nenhuma movimentação é criada.
+
 
 HISTÓRICO
-- É acumulativo e não é apagado a cada dia: necessário para calcular saldos e rastrear lotes.
-- Agora possui filtro de período, busca e paginação de 20 registros por página. CSV exporta o histórico completo.
-- Não há botão de apagar lançamentos reais deliberadamente: exclusões isoladas quebrariam os saldos. Faça backups e use filtros.
-- Esta versão ainda usa localStorage: armazenamento limitado e sem garantia contra perda do computador. Evite utilizar como sistema definitivo até a etapa de banco na nuvem e piloto operacional.
+---------
 
-CELULAR
-- Se enviar o ZIP ao celular, pode extrair e abrir index.html em navegadores que permitam arquivos locais. Compatibilidade e gravação variam. Isso cria dados independentes e NÃO mostra o estoque do computador.
-- Para simples visualização remota do estoque do computador, exporte CSV e compartilhe a cópia, ou envie capturas do painel. Não publique este HTML com dados comerciais em hospedagem pública: sem login/servidor não há sincronização nem controle de acesso.
-- Sincronização real entre computador/celular e instalação via URL ficam para a versão com servidor/Supabase.
+Todas as operações ficam registradas na nuvem.
 
-PILOTO
-Testar com dados fictícios primeiro: recebimento > abastecimento > venda > perda > conferência > backup > restauração. Depois substituir catálogo e fazer contagem real.
+Tipos de movimentação:
+- receipt
+- transfer
+- return
+- sale
+- loss
+- adjust
+
+Transferências geram duas linhas:
+- saída da origem
+- entrada no destino
+
+As duas linhas compartilham o mesmo identificador de evento.
+
+
+SINCRONIZAÇÃO ENTRE USUÁRIOS
+----------------------------
+
+Todos os usuários conectados à mesma pizzaria consultam o mesmo banco de dados.
+
+Se um usuário fizer uma operação, outro usuário poderá visualizar a alteração ao atualizar o painel.
+
+Antes de abrir operações importantes, o sistema também atualiza os dados para reduzir o risco de trabalhar com saldo antigo.
+
+
+CONCORRÊNCIA
+------------
+
+O banco protege as movimentações contra operações simultâneas.
+
+Exemplo:
+
+Saldo disponível:
+2 unidades
+
+Usuário A tenta retirar:
+2 unidades
+
+Usuário B também tenta retirar:
+2 unidades
+
+Se o usuário A concluir primeiro, a operação do usuário B será bloqueada.
+
+Isso impede saldo negativo mesmo que as duas interfaces mostrem dados antigos.
+
+
+SEGURANÇA
+---------
+
+A segurança principal fica no Supabase.
+
+O navegador não possui permissão direta para inserir, atualizar ou excluir registros das tabelas principais.
+
+As operações de escrita utilizam funções RPC controladas pelo banco.
+
+As permissões também são verificadas no banco:
+
+OWNER:
+acesso administrativo
+
+ATTENDANT:
+operações de estoque limitadas
+
+Esconder um botão na interface não é considerado a proteção principal.
+
+Mesmo uma chamada manual indevida deve ser rejeitada pelo banco.
+
+
+BACKUP
+------
+
+Os dados operacionais da versão 1.2 ficam no Supabase.
+
+O GitHub contém o código do sistema, não o banco de estoque.
+
+Recomenda-se manter:
+- repositório GitHub atualizado
+- migrations SQL versionadas
+- acesso administrativo ao projeto Supabase protegido
+
+
+ARQUIVOS IMPORTANTES
+---------------------
+
+index.html
+Interface principal
+
+cloud-dashboard.js
+Lógica principal do painel em nuvem
+
+auth-preview.html
+Tela de login
+
+auth-preview.js
+Autenticação
+
+reset-password.html
+Tela de redefinição de senha
+
+reset-password.js
+Fluxo de recuperação
+
+config.example.js
+Modelo de configuração
+
+config.js
+Configuração real local
+NÃO VERSIONAR
+
+supabase/migrations/
+Estrutura e operações do banco de dados
+
+
+GITHUB
+------
+
+Repositório:
+
+patrickbotarick/Guigs-Stock
+
+Branch principal:
+
+main
+
+Fluxo recomendado de desenvolvimento:
+
+1. criar branch específica
+2. desenvolver
+3. testar
+4. fazer commit
+5. push
+6. merge para main
+7. criar tag quando uma versão for fechada
+
+
+VERSÃO
+------
+
+Guig's Stock
+Versão 1.2
+
+Status:
+Fechamento e validação final
+
+
+PRÓXIMOS PASSOS
+---------------
+
+Após a versão 1.2:
+
+1.3
+Refinamento de UX/UI
+
+1.4
+PWA / aplicativo instalável

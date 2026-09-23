@@ -1,1 +1,57 @@
-Guig’s Stock 1.1 Final: verificar sintaxe JavaScript, integridade ZIP, paginação e filtro de histórico. Testes completos de interface, BAT/PowerShell e persistência precisam ser executados no Windows da pizzaria. Não declarar homologação de produção.
+GUIG'S STOCK 1.2 — TESTES VALIDADOS
+
+AUTENTICAÇÃO
+[OK] Login owner
+[OK] Login attendant
+[OK] Conta sem vínculo não recebe acesso
+[OK] Sessões independentes em navegadores diferentes
+
+PRODUTOS
+[OK] Cadastro de produto por owner
+[OK] Edição de produto
+[OK] Produto inativo não aparece em recebimentos
+[OK] Nome duplicado é bloqueado
+[OK] Attendant não possui acesso ao cadastro/edição
+
+ESTOQUE
+[OK] Recebimento de lote
+[OK] Validade obrigatória
+[OK] Recebimento de lote vencido bloqueado
+[OK] Transferência estoque → geladeira
+[OK] Transferência geladeira → estoque
+[OK] Venda retira saldo da geladeira
+[OK] Registro de perda
+[OK] Ajuste físico de inventário
+[OK] Ajuste sem diferença não gera movimentação
+[OK] Saldo insuficiente é bloqueado
+
+PERMISSÕES
+[OK] Owner: acesso administrativo
+[OK] Attendant: recebimento
+[OK] Attendant: transferência
+[OK] Attendant: venda
+[OK] Attendant: perda
+[OK] Attendant sem cadastro/edição de produtos
+[OK] Attendant sem ajuste de inventário
+
+SINCRONIZAÇÃO E CONCORRÊNCIA
+[OK] Operação de um usuário aparece para outro após atualização
+[OK] Operação não é duplicada
+[OK] Banco usa saldo real mesmo com interface desatualizada
+[OK] Segunda operação concorrente é bloqueada quando saldo termina
+[OK] Saldo negativo não é permitido
+
+HISTÓRICO
+[OK] Recebimentos registrados
+[OK] Transferências registradas com saída e entrada
+[OK] Vendas registradas
+[OK] Perdas registradas
+[OK] Ajustes registrados
+[OK] Saldos permanecem coerentes após as movimentações
+
+PENDENTE PARA FECHAMENTO 1.2D
+[ ] Revisão final dos arquivos de configuração
+[ ] Revisão de segurança do repositório
+[ ] Teste final de inicialização em Windows
+[ ] Atualização do guia principal
+[ ] Tag v1.2.0
