@@ -265,10 +265,14 @@ async function bootstrap() {
 
   if (shop.role !== 'owner') {
 
-    el('newProduct')
-      .classList
-      .add('hidden');
-  }
+  el('newProduct')
+    .classList
+    .add('hidden');
+
+  el('adjustStock')
+    .classList
+    .add('hidden');
+}
 
 
   el('refresh').disabled = false;
