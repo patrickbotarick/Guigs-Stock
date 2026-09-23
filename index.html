@@ -526,6 +526,8 @@
             <div class="actions">
               <button id="newProduct" class="btn">+ Novo produto</button>
 
+              <button id="editProduct" class="btn">Editar produto</button>
+
               <button id="receiveStock" class="btn green">
                 ↓ Receber estoque
               </button>
@@ -743,6 +745,90 @@
 
             <button id="saveProduct" class="btn red" type="submit">
               Cadastrar produto
+            </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- EDITAR PRODUTO -->
+
+    <dialog id="editProductDialog">
+      <div class="modal">
+        <h2>Editar produto</h2>
+
+        <div class="muted">Altere os dados do produto selecionado.</div>
+
+        <form id="editProductForm" class="modalform">
+          <div class="field">
+            <label for="editProductSelect">Produto</label>
+            <select id="editProductSelect" required></select>
+          </div>
+
+          <div class="field">
+            <label for="editProductName">Nome</label>
+            <input id="editProductName" maxlength="160" required />
+          </div>
+
+          <div class="field">
+            <label for="editProductCategory">Categoria</label>
+
+            <select id="editProductCategory">
+              <option>Refrigerante</option>
+              <option>Cerveja</option>
+              <option>Água</option>
+              <option>Suco</option>
+              <option>Energético</option>
+              <option>Outro</option>
+            </select>
+          </div>
+
+          <div class="twocol">
+            <div class="field">
+              <label for="editMinTotal">Estoque mínimo total</label>
+
+              <input id="editMinTotal" type="number" min="0" required />
+            </div>
+
+            <div class="field">
+              <label for="editTargetTotal">Estoque alvo total</label>
+
+              <input id="editTargetTotal" type="number" min="0" required />
+            </div>
+          </div>
+
+          <div class="twocol">
+            <div class="field">
+              <label for="editMinFridge">Mínimo na geladeira</label>
+
+              <input id="editMinFridge" type="number" min="0" required />
+            </div>
+
+            <div class="field">
+              <label for="editTargetFridge">Alvo na geladeira</label>
+
+              <input id="editTargetFridge" type="number" min="0" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="editProductActive">Situação</label>
+
+            <select id="editProductActive">
+              <option value="true">Ativo</option>
+              <option value="false">Inativo</option>
+            </select>
+          </div>
+
+          <div id="editProductMessage" class="formmsg"></div>
+
+          <div class="modalactions">
+            <button type="button" class="btn" data-close="editProductDialog">
+              Cancelar
+            </button>
+
+            <button id="saveProductEdit" class="btn red" type="submit">
+              Salvar alterações
             </button>
           </div>
         </form>

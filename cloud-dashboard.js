@@ -266,12 +266,16 @@ async function bootstrap() {
   if (shop.role !== 'owner') {
 
   el('newProduct')
-    .classList
-    .add('hidden');
+  .classList
+  .add('hidden');
 
-  el('adjustStock')
-    .classList
-    .add('hidden');
+el('editProduct')
+  .classList
+  .add('hidden');
+
+el('adjustStock')
+  .classList
+  .add('hidden');
 }
 
 
@@ -1094,6 +1098,224 @@ async function createProduct(event) {
   }
 }
 
+// ============================================================
+// EDITAR PRODUTO
+// ============================================================
+
+function populateEditProducts() {
+
+  const select =
+    el('editProductSelect');
+
+  select.replaceChildren();
+
+  const ordered =
+    [...products]
+      .sort(
+        (a, b) =>
+          a.name.localeCompare(
+            b.name,
+            'pt-BR'
+          )
+      );
+
+  if (!ordered.length) {
+
+    const option =
+      document.createElement('option');
+
+    option.value = '';
+
+    option.textContent =
+      'Nenhum produto cadastrado';
+
+    select.append(option);
+
+    el('saveProductEdit').disabled =
+      true;
+
+    return;
+  }
+
+
+  for (const product of ordered) {
+
+    const option =
+      document.createElement('option');
+
+    option.value =
+      product.id;
+
+    option.textContent =
+      product.name;
+
+    select.append(option);
+  }
+
+
+  el('saveProductEdit').disabled =
+    false;
+
+
+  fillEditProductForm();
+}
+
+
+function fillEditProductForm() {
+
+  const product =
+    products.find(
+      p =>
+        p.id ===
+        el('editProductSelect').value
+    );
+
+
+  if (!product) {
+    return;
+  }
+
+
+  el('editProductName').value =
+    product.name;
+
+
+  el('editProductCategory').value =
+    product.category || 'Outro';
+
+
+  el('editMinTotal').value =
+    product.min_total;
+
+
+  el('editTargetTotal').value =
+    product.target_total;
+
+
+  el('editMinFridge').value =
+    product.min_fridge;
+
+
+  el('editTargetFridge').value =
+    product.target_fridge;
+
+
+  el('editProductActive').value =
+    String(product.active);
+}
+
+
+async function updateProductOperation(event) {
+
+  event.preventDefault();
+
+
+  formMessage(
+    'editProductMessage'
+  );
+
+
+  const button =
+    el('saveProductEdit');
+
+
+  button.disabled = true;
+
+
+  try {
+
+    const {
+      data,
+      error
+    } = await client.rpc(
+      'guigs_update_product',
+      {
+
+        p_shop_id:
+          shop.shop_id,
+
+        p_product_id:
+          el('editProductSelect').value,
+
+        p_name:
+          el('editProductName')
+            .value
+            .trim(),
+
+        p_category:
+          el('editProductCategory')
+            .value,
+
+        p_min_total:
+          Number(
+            el('editMinTotal').value
+          ),
+
+        p_target_total:
+          Number(
+            el('editTargetTotal').value
+          ),
+
+        p_min_fridge:
+          Number(
+            el('editMinFridge').value
+          ),
+
+        p_target_fridge:
+          Number(
+            el('editTargetFridge').value
+          ),
+
+        p_active:
+          el('editProductActive').value
+          === 'true'
+
+      }
+    );
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    formMessage(
+      'editProductMessage',
+      data
+        ? 'Produto atualizado com sucesso.'
+        : 'Nenhuma alteração realizada.',
+      true
+    );
+
+
+    await refresh();
+
+
+    setTimeout(
+      () => {
+
+        el('editProductDialog')
+          .close();
+
+      },
+      500
+    );
+
+  }
+  catch (e) {
+
+    formMessage(
+      'editProductMessage',
+      e.message
+      || 'Não foi possível atualizar o produto.'
+    );
+
+  }
+  finally {
+
+    button.disabled = false;
+  }
+}
 
 // ============================================================
 // RECEBIMENTO
@@ -1989,6 +2211,35 @@ el('newProduct')
     }
   );
 
+  el('editProduct')
+  .addEventListener(
+    'click',
+    () => {
+
+      formMessage(
+        'editProductMessage'
+      );
+
+      populateEditProducts();
+
+      el('editProductDialog')
+        .showModal();
+    }
+  );
+
+
+el('editProductSelect')
+  .addEventListener(
+    'change',
+    fillEditProductForm
+  );
+
+
+el('editProductForm')
+  .addEventListener(
+    'submit',
+    updateProductOperation
+  );
 
 el('receiveStock')
   .addEventListener(
