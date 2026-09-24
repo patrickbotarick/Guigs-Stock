@@ -551,17 +551,55 @@ function render() {
   }
 
 
-  el('total').textContent =
-    stock + fridge;
+    const productsAttention =
+    products.filter(
+      p => {
+
+        if (!p.active) {
+          return false;
+        }
+
+
+        const b =
+          ps.get(p.id);
+
+
+        const total =
+          b.stock + b.fridge;
+
+
+        return (
+          total === 0
+          ||
+          total < p.min_total
+          ||
+          b.fridge < p.min_fridge
+        );
+      }
+    ).length;
+
+
+  const criticalLots =
+    lotList.filter(
+      l =>
+        l.days <= 30
+    ).length;
+
 
   el('stock').textContent =
     stock;
 
+
   el('fridge').textContent =
     fridge;
 
-  el('expiring').textContent =
-    near;
+
+  el('productsAttention').textContent =
+    productsAttention;
+
+
+  el('criticalLots').textContent =
+    criticalLots;
 
       // ALERTAS OPERACIONAIS
 
