@@ -14,7 +14,11 @@ let moves = [];
 let lotBalances = new Map();
 
 let historyPage = 0;
+let historyTotal = 0;
+const historyPageSize = 20;
+
 let query = '';
+let historySearchTimer = null;
 
 let requestCounter = 0;
 
@@ -329,7 +333,7 @@ async function refresh() {
 
   try {
 
-    const [p, l, m] =
+    const [p, l, balanceResult] =
       await Promise.all([
 
         allRows(
@@ -342,10 +346,14 @@ async function refresh() {
           'id,product_id,code,expiry'
         ),
 
-        allRows(
-          'guigs_movements',
-          'id,lot_id,event_id,movement_type,location,delta,actor_id,note,created_at'
-        )
+        client.rpc(
+          'guigs_get_lot_balances',
+          {
+            p_shop: shop.shop_id
+          }
+        ),
+
+
 
       ]);
 
@@ -355,14 +363,35 @@ async function refresh() {
     }
 
 
+    if (balanceResult.error) {
+      throw balanceResult.error;
+    }
+
+
     products = p;
     lots = l;
-    moves = m;
+
+
+
+    lotBalances =
+      new Map(
+        (balanceResult.data || []).map(
+          row => [
+            row.lot_id,
+            {
+              stock: Number(row.stock),
+              fridge: Number(row.fridge)
+            }
+          ]
+        )
+      );
 
 
     render();
 
     populateReceiveProducts();
+
+    await loadHistory();
 
 
     el('content')
@@ -408,47 +437,8 @@ function render() {
       )
     );
 
-
-  const balance =
-    new Map(
-      lots.map(
-        l => [
-          l.id,
-          {
-            stock: 0,
-            fridge: 0
-          }
-        ]
-      )
-    );
-
-
-  for (const m of moves) {
-
-    if (
-      !balance.has(m.lot_id)
-      ||
-      !['stock', 'fridge']
-        .includes(m.location)
-      ||
-      !Number.isSafeInteger(m.delta)
-    ) {
-
-      throw Error(
-        'Movimentação inconsistente no banco de dados.'
-      );
-    }
-
-
-    balance
-      .get(m.lot_id)[m.location]
-      += m.delta;
-  }
-
-  lotBalances = balance;
-
   if (
-    [...balance.values()]
+    [...lotBalances.values()]
       .some(
         b =>
           b.stock < 0
@@ -493,7 +483,11 @@ function render() {
 
 
     const b =
-      balance.get(l.id);
+      lotBalances.get(l.id)
+      || {
+        stock: 0,
+        fridge: 0
+      };
 
 
     const q =
@@ -551,7 +545,7 @@ function render() {
   }
 
 
-    const productsAttention =
+  const productsAttention =
     products.filter(
       p => {
 
@@ -601,7 +595,7 @@ function render() {
   el('criticalLots').textContent =
     criticalLots;
 
-      // ALERTAS OPERACIONAIS
+  // ALERTAS OPERACIONAIS
 
   const alerts = [];
 
@@ -803,7 +797,7 @@ function render() {
       ps.get(p.id);
 
 
-        const r =
+    const r =
       pt.insertRow();
 
 
@@ -983,7 +977,7 @@ function render() {
     );
 
 
-        let expiryText =
+    let expiryText =
       'Normal';
 
 
@@ -1078,11 +1072,6 @@ function render() {
       .toLocaleString('pt-BR')
     }.`;
 
-
-  renderHistory(
-    lotMap,
-    productMap
-  );
 }
 
 
@@ -1090,79 +1079,80 @@ function render() {
 // HISTÓRICO
 // ============================================================
 
-function renderHistory(
-  lotMap =
-    new Map(
-      lots.map(
-        l => [l.id, l]
-      )
-    ),
-  productMap =
-    new Map(
-      products.map(
-        p => [p.id, p]
-      )
-    )
-) {
+async function loadHistory() {
 
-  const ordered =
-    [...moves]
-      .sort(
-        (a, b) =>
-          b.created_at.localeCompare(
-            a.created_at
-          )
-          ||
-          b.id.localeCompare(a.id)
-      );
+  if (!shop || !client) {
+    return;
+  }
 
 
-  const visible =
-    ordered.filter(
-      m => {
-
-        const l =
-          lotMap.get(m.lot_id);
+  const offset =
+    historyPage * historyPageSize;
 
 
-        const p =
-          productMap.get(
-            l?.product_id
-          );
+  const {
+    data,
+    error
+  } = await client.rpc(
+    'guigs_get_history',
+    {
+      p_shop: shop.shop_id,
+      p_limit: historyPageSize,
+      p_offset: offset,
+      p_product: null,
+      p_type: null,
+      p_actor: null,
+      p_date_from: null,
+      p_date_to: null,
+      p_search:
+        query.trim()
+          ? query.trim()
+          : null
+    }
+  );
 
 
-        return [
-          p?.name,
-          l?.code,
-          m.movement_type,
-          m.note
-        ].some(
-          v =>
-            String(v || '')
-              .toLocaleLowerCase(
-                'pt-BR'
-              )
-              .includes(query)
-        );
-      }
-    );
+  if (error) {
+    throw error;
+  }
 
 
+  moves =
+    data || [];
+
+
+  historyTotal =
+    moves.length
+      ? Number(moves[0].total_count)
+      : 0;
+
+
+  /*
+   * Se uma página deixou de existir após filtros ou alterações,
+   * volta automaticamente para a última página válida.
+   */
   const pages =
     Math.max(
       1,
       Math.ceil(
-        visible.length / 20
+        historyTotal / historyPageSize
       )
     );
 
 
-  historyPage =
-    Math.min(
-      historyPage,
-      pages - 1
-    );
+  if (historyPage > pages - 1) {
 
+    historyPage =
+      pages - 1;
+
+    return loadHistory();
+  }
+
+
+  renderHistory();
+}
+
+function renderHistory() {
 
   const ht =
     el('history');
@@ -1171,23 +1161,7 @@ function renderHistory(
   ht.replaceChildren();
 
 
-  for (
-    const m
-    of visible.slice(
-      historyPage * 20,
-      historyPage * 20 + 20
-    )
-  ) {
-
-    const l =
-      lotMap.get(m.lot_id);
-
-
-    const p =
-      productMap.get(
-        l?.product_id
-      );
-
+  for (const m of moves) {
 
     const r =
       ht.insertRow();
@@ -1201,13 +1175,13 @@ function renderHistory(
 
     cell(
       r,
-      (p?.name || 'Desconhecido')
+      (m.product_name || 'Desconhecido')
       + ' · '
-      + (l?.code || '—')
+      + (m.lot_code || '—')
     );
 
 
-        const movementLabels = {
+    const movementLabels = {
       receipt: 'Recebimento',
       transfer: 'Transferência',
       return: 'Retorno',
@@ -1244,7 +1218,7 @@ function renderHistory(
     );
 
 
-        const locationCell =
+    const locationCell =
       document.createElement('td');
 
 
@@ -1272,7 +1246,7 @@ function renderHistory(
     );
 
 
-        cell(
+    cell(
       r,
       (m.delta > 0 ? '+' : '')
       + m.delta,
@@ -1285,7 +1259,7 @@ function renderHistory(
   }
 
 
-  if (!visible.length) {
+  if (!moves.length) {
 
     empty(
       ht,
@@ -1295,9 +1269,18 @@ function renderHistory(
   }
 
 
+  const pages =
+    Math.max(
+      1,
+      Math.ceil(
+        historyTotal / historyPageSize
+      )
+    );
+
+
   el('page').textContent =
     `${historyPage + 1}/${pages}`
-    + ` · ${visible.length} lançamentos`;
+    + ` · ${historyTotal} lançamentos`;
 
 
   el('prev').disabled =
@@ -2564,14 +2547,36 @@ el('search')
       query =
         event
           .target
-          .value
-          .toLocaleLowerCase(
-            'pt-BR'
-          );
+          .value;
+
 
       historyPage = 0;
 
-      renderHistory();
+
+      clearTimeout(
+        historySearchTimer
+      );
+
+
+      historySearchTimer =
+        setTimeout(
+          async () => {
+
+            try {
+              await loadHistory();
+            }
+            catch (e) {
+
+              say(
+                'Não foi possível pesquisar o histórico: '
+                + (e.message || e),
+                'danger'
+              );
+            }
+
+          },
+          350
+        );
     }
   );
 
@@ -2579,11 +2584,29 @@ el('search')
 el('prev')
   .addEventListener(
     'click',
-    () => {
+    async () => {
+
+      if (historyPage <= 0) {
+        return;
+      }
+
 
       historyPage--;
 
-      renderHistory();
+
+      try {
+        await loadHistory();
+      }
+      catch (e) {
+
+        historyPage++;
+
+        say(
+          'Não foi possível carregar o histórico: '
+          + (e.message || e),
+          'danger'
+        );
+      }
     }
   );
 
@@ -2591,11 +2614,38 @@ el('prev')
 el('next')
   .addEventListener(
     'click',
-    () => {
+    async () => {
+
+      const pages =
+        Math.max(
+          1,
+          Math.ceil(
+            historyTotal / historyPageSize
+          )
+        );
+
+
+      if (historyPage >= pages - 1) {
+        return;
+      }
+
 
       historyPage++;
 
-      renderHistory();
+
+      try {
+        await loadHistory();
+      }
+      catch (e) {
+
+        historyPage--;
+
+        say(
+          'Não foi possível carregar o histórico: '
+          + (e.message || e),
+          'danger'
+        );
+      }
     }
   );
 
