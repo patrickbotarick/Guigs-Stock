@@ -713,6 +713,16 @@
   color: #a12830;
 }
 
+.modalicon.gold {
+  background: #fff0d2;
+  color: #8c5816;
+}
+
+.modalicon.gray {
+  background: #ecebed;
+  color: #646168;
+}
+
 .modalintro {
   min-width: 0;
 }
@@ -1074,11 +1084,17 @@
 
     <dialog id="productDialog">
       <div class="modal">
-        <h2>Novo produto</h2>
+       <div class="modalhead">
+  <div class="modalicon gold">+</div>
 
-        <div class="muted">
-          Cadastre uma bebida no catálogo da Pizzaria Guig's.
-        </div>
+  <div class="modalintro">
+    <h2>Novo produto</h2>
+
+    <div class="muted">
+      Cadastre uma nova bebida no catálogo da pizzaria.
+    </div>
+  </div>
+</div>
 
         <form id="productForm" class="modalform">
           <div class="field">
@@ -1106,12 +1122,12 @@
 
           <div class="twocol">
             <div class="field">
-              <label for="minTotal">Estoque mínimo total</label>
+              <label for="minTotal">Mínimo total</label>
               <input id="minTotal" type="number" min="0" value="6" required />
             </div>
 
             <div class="field">
-              <label for="targetTotal">Estoque alvo total</label>
+              <label for="targetTotal">Meta total</label>
               <input
                 id="targetTotal"
                 type="number"
@@ -1123,22 +1139,22 @@
           </div>
 
           <div class="twocol">
-            <div class="field">
-              <label for="minFridge">Mínimo na geladeira</label>
-              <input id="minFridge" type="number" min="0" value="4" required />
-            </div>
+  <div class="field">
+    <label for="minFridge">Mínimo na geladeira</label>
+    <input id="minFridge" type="number" min="0" value="4" required />
+  </div>
 
-            <div class="field">
-              <label for="targetFridge">Alvo na geladeira</label>
-              <input
-                id="targetFridge"
-                type="number"
-                min="0"
-                value="12"
-                required
-              />
-            </div>
-          </div>
+  <div class="field">
+    <label for="targetFridge">Meta na geladeira</label>
+    <input
+      id="targetFridge"
+      type="number"
+      min="0"
+      value="12"
+      required
+    />
+  </div>
+</div>
 
           <div id="productMessage" class="formmsg"></div>
 
@@ -1159,9 +1175,17 @@
 
     <dialog id="editProductDialog">
       <div class="modal">
-        <h2>Editar produto</h2>
+        <div class="modalhead">
+  <div class="modalicon gray">✎</div>
 
-        <div class="muted">Altere os dados do produto selecionado.</div>
+  <div class="modalintro">
+    <h2>Editar produto</h2>
+
+    <div class="muted">
+      Atualize os dados, metas e situação do produto.
+    </div>
+  </div>
+</div>
 
         <form id="editProductForm" class="modalform">
           <div class="field">
@@ -1189,13 +1213,13 @@
 
           <div class="twocol">
             <div class="field">
-              <label for="editMinTotal">Estoque mínimo total</label>
+              <label for="editMinTotal">Mínimo total</label>
 
               <input id="editMinTotal" type="number" min="0" required />
             </div>
 
             <div class="field">
-              <label for="editTargetTotal">Estoque alvo total</label>
+              <label for="editTargetTotal">Meta total</label>
 
               <input id="editTargetTotal" type="number" min="0" required />
             </div>
@@ -1209,7 +1233,7 @@
             </div>
 
             <div class="field">
-              <label for="editTargetFridge">Alvo na geladeira</label>
+              <label for="editTargetFridge">Mínimo na geladeira</label>
 
               <input id="editTargetFridge" type="number" min="0" required />
             </div>
@@ -1511,12 +1535,17 @@
 
     <dialog id="adjustDialog">
       <div class="modal">
-        <h2>Ajustar inventário</h2>
+        <div class="modalhead">
+  <div class="modalicon gold">≠</div>
 
-        <div class="muted">
-          Informe a quantidade física encontrada. O sistema calcula a diferença
-          automaticamente.
-        </div>
+  <div class="modalintro">
+    <h2>Ajustar inventário</h2>
+
+    <div class="muted">
+      Corrija o saldo do sistema com base na contagem física.
+    </div>
+  </div>
+</div>
 
         <form id="adjustForm" class="modalform">
           <div class="field">
@@ -1533,7 +1562,7 @@
             </select>
           </div>
 
-          <div id="adjustBalance" class="muted"></div>
+          <div id="adjustBalance" class="balancebox"></div>
 
           <div class="field">
             <label for="adjustQuantity">Quantidade física encontrada</label>
