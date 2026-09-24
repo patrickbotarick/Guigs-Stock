@@ -670,8 +670,66 @@
       }
 
       .modal h2 {
-        margin: 0 0 5px;
-      }
+  margin: 0;
+  font-size: 21px;
+}
+
+.modalhead {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.modalicon {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  background: #f2efec;
+  color: #5d5960;
+}
+
+.modalicon.green {
+  background: #e7f5ec;
+  color: #237048;
+}
+
+.modalicon.blue {
+  background: #e8eef8;
+  color: #3e5f91;
+}
+
+.modalicon.purple {
+  background: #f4e8f6;
+  color: #75437e;
+}
+
+.modalicon.red {
+  background: #f9dfe1;
+  color: #a12830;
+}
+
+.modalintro {
+  min-width: 0;
+}
+
+.modalintro .muted {
+  margin-top: 4px;
+}
+
+.balancebox {
+  background: #f7f6f4;
+  border: 1px solid #e7e3df;
+  border-radius: 11px;
+  padding: 10px 12px;
+  font-size: 11px;
+  color: #666269;
+  line-height: 1.5;
+}
 
       .modalform {
         display: grid;
@@ -1185,9 +1243,17 @@
 
     <dialog id="receiveDialog">
       <div class="modal">
-        <h2>Receber estoque</h2>
+        <div class="modalhead">
+  <div class="modalicon green">↓</div>
 
-        <div class="muted">Registre a entrada de um novo lote no estoque.</div>
+  <div class="modalintro">
+    <h2>Receber estoque</h2>
+
+    <div class="muted">
+      Registre a chegada de novas bebidas no estoque.
+    </div>
+  </div>
+</div>
 
         <form id="receiveForm" class="modalform">
           <div class="field">
@@ -1256,11 +1322,17 @@
 
     <dialog id="transferDialog">
       <div class="modal">
-        <h2>Movimentar bebidas</h2>
+        <div class="modalhead">
+  <div class="modalicon blue">⇄</div>
 
-        <div class="muted">
-          Transfira unidades entre o estoque e a geladeira.
-        </div>
+  <div class="modalintro">
+    <h2>Movimentar bebidas</h2>
+
+    <div class="muted">
+      Transfira unidades entre estoque e geladeira.
+    </div>
+  </div>
+</div>
 
         <form id="transferForm" class="modalform">
           <div class="field">
@@ -1290,7 +1362,7 @@
             />
           </div>
 
-          <div id="transferBalance" class="muted"></div>
+          <div id="transferBalance" class="balancebox"></div>
 
           <div class="field">
             <label for="transferNote">Observação</label>
@@ -1321,11 +1393,17 @@
 
     <dialog id="saleDialog">
       <div class="modal">
-        <h2>Registrar venda</h2>
+        <div class="modalhead">
+  <div class="modalicon purple">−</div>
 
-        <div class="muted">
-          A venda retira unidades diretamente da geladeira.
-        </div>
+  <div class="modalintro">
+    <h2>Registrar venda</h2>
+
+    <div class="muted">
+      Dê baixa nas unidades vendidas diretamente da geladeira.
+    </div>
+  </div>
+</div>
 
         <form id="saleForm" class="modalform">
           <div class="field">
@@ -1333,7 +1411,7 @@
             <select id="saleLot" required></select>
           </div>
 
-          <div id="saleBalance" class="muted"></div>
+          <div id="saleBalance" class="balancebox"></div>
 
           <div class="field">
             <label for="saleQuantity">Quantidade vendida</label>
@@ -1370,11 +1448,17 @@
 
     <dialog id="lossDialog">
       <div class="modal">
-        <h2>Registrar perda</h2>
+        <div class="modalhead">
+  <div class="modalicon red">!</div>
 
-        <div class="muted">
-          Utilize para quebra, vencimento, descarte ou divergência identificada.
-        </div>
+  <div class="modalintro">
+    <h2>Registrar perda</h2>
+
+    <div class="muted">
+      Registre quebra, vencimento, descarte ou outra perda identificada.
+    </div>
+  </div>
+</div>
 
         <form id="lossForm" class="modalform">
           <div class="field">
@@ -1391,7 +1475,7 @@
             </select>
           </div>
 
-          <div id="lossBalance" class="muted"></div>
+          <div id="lossBalance" class="balancebox"></div>
 
           <div class="field">
             <label for="lossQuantity">Quantidade</label>
