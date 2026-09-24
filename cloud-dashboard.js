@@ -563,6 +563,182 @@ function render() {
   el('expiring').textContent =
     near;
 
+      // ALERTAS OPERACIONAIS
+
+  const alerts = [];
+
+
+  for (const p of products) {
+
+    if (!p.active) {
+      continue;
+    }
+
+
+    const b =
+      ps.get(p.id);
+
+
+    const total =
+      b.stock + b.fridge;
+
+
+    if (total === 0) {
+
+      alerts.push({
+        level: 'danger',
+        title: `${p.name} está zerado`,
+        description:
+          'Não há unidades no estoque nem na geladeira.'
+      });
+
+      continue;
+    }
+
+
+    if (total < p.min_total) {
+
+      alerts.push({
+        level: 'warning',
+        title: `${p.name} abaixo do estoque mínimo`,
+        description:
+          `${total} unidades disponíveis · mínimo definido: ${p.min_total}.`
+      });
+    }
+
+
+    if (b.fridge < p.min_fridge) {
+
+      alerts.push({
+        level: 'warning',
+        title: `${p.name} com geladeira abaixo do mínimo`,
+        description:
+          `${b.fridge} unidades na geladeira · mínimo definido: ${p.min_fridge}.`
+      });
+    }
+  }
+
+
+  for (const l of lotList) {
+
+    if (l.days < 0) {
+
+      alerts.push({
+        level: 'danger',
+        title: `${l.product} possui lote vencido`,
+        description:
+          `Lote ${l.code} · ${l.qty} unidade(s) · validade ${dateBR(l.expiry)}.`
+      });
+
+    }
+    else if (l.days <= 15) {
+
+      alerts.push({
+        level: 'warning',
+        title: `${l.product} próximo do vencimento`,
+        description:
+          `Lote ${l.code} · vence em ${l.days} dia(s) · ${l.qty} unidade(s).`
+      });
+    }
+  }
+
+
+  const alertsPanel =
+    el('alertsPanel');
+
+
+  const alertsList =
+    el('operationalAlerts');
+
+
+  alertsList.replaceChildren();
+
+
+  if (!alerts.length) {
+
+    alertsPanel.classList.add(
+      'hidden'
+    );
+
+  }
+  else {
+
+    alertsPanel.classList.remove(
+      'hidden'
+    );
+
+
+    for (const alert of alerts) {
+
+      const item =
+        document.createElement('div');
+
+
+      item.className =
+        `operational-alert ${alert.level}`;
+
+
+      const text =
+        document.createElement('div');
+
+
+      const title =
+        document.createElement('strong');
+
+
+      title.textContent =
+        alert.title;
+
+
+      const description =
+        document.createElement('small');
+
+
+      description.textContent =
+        alert.description;
+
+
+      text.append(
+        title,
+        description
+      );
+
+
+      const level =
+        document.createElement('span');
+
+
+      level.className =
+        'alert-level';
+
+
+      level.textContent =
+        alert.level === 'danger'
+          ? 'Urgente'
+          : 'Atenção';
+
+
+      item.append(
+        text,
+        level
+      );
+
+
+      alertsList.append(
+        item
+      );
+    }
+
+
+    el('alertCount').textContent =
+      alerts.length
+      +
+      (
+        alerts.length === 1
+          ? ' alerta'
+          : ' alertas'
+      );
+  }
 
   // PRODUTOS
 

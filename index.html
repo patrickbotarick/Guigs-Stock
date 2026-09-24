@@ -311,6 +311,96 @@
       color: #999;
     }
 
+    .alerts-panel {
+  background: #fff;
+  border: 1px solid #e9e6e2;
+  border-radius: 17px;
+  padding: 20px;
+  margin-bottom: 18px;
+}
+
+.alerts-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.alerts-head h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.alerts-count {
+  background: #fff0df;
+  color: #8c5816;
+  border-radius: 30px;
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.alerts-list {
+  display: grid;
+  gap: 8px;
+}
+
+.operational-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #faf8f5;
+  border: 1px solid #ece7e1;
+}
+
+.operational-alert strong {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.operational-alert small {
+  display: block;
+  color: #77737a;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.alert-level {
+  flex: 0 0 auto;
+  border-radius: 30px;
+  padding: 5px 9px;
+  font-size: 9px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.operational-alert.warning {
+  background: #fffaf1;
+  border-color: #f0dfbf;
+}
+
+.operational-alert.warning .alert-level {
+  background: #fff0d2;
+  color: #8c5816;
+}
+
+.operational-alert.danger {
+  background: #fff5f5;
+  border-color: #efd4d6;
+}
+
+.operational-alert.danger .alert-level {
+  background: #f9dfe1;
+  color: #a12830;
+}
+
     .section {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -671,6 +761,21 @@
                 <small>Até 30 dias</small>
               </div>
             </section>
+
+            <div id="alertsPanel" class="alerts-panel hidden">
+  <div class="alerts-head">
+    <div>
+      <h2>Atenção operacional</h2>
+      <div class="muted">
+        Situações que podem precisar de ação.
+      </div>
+    </div>
+
+    <span id="alertCount" class="alerts-count">0 alertas</span>
+  </div>
+
+  <div id="operationalAlerts" class="alerts-list"></div>
+</div>
 
             <div class="section">
               <div class="panel">
