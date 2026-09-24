@@ -945,15 +945,77 @@ function render() {
     );
 
 
-    cell(
-      r,
-      l.days < 0
-        ? 'Vencido'
-        : l.days <= 15
-          ? 'Urgente'
-          : l.days <= 30
-            ? 'Atenção'
-            : 'Normal'
+        let expiryText =
+      'Normal';
+
+
+    let expiryClass =
+      'normal';
+
+
+    if (l.days < 0) {
+
+      expiryText =
+        'Vencido';
+
+      expiryClass =
+        'expired';
+
+      r.classList.add(
+        'expiry-row-expired'
+      );
+
+    }
+    else if (l.days <= 15) {
+
+      expiryText =
+        'Urgente';
+
+      expiryClass =
+        'urgent';
+
+      r.classList.add(
+        'expiry-row-urgent'
+      );
+
+    }
+    else if (l.days <= 30) {
+
+      expiryText =
+        'Atenção';
+
+      expiryClass =
+        'attention';
+
+      r.classList.add(
+        'expiry-row-attention'
+      );
+    }
+
+
+    const expiryCell =
+      document.createElement('td');
+
+
+    const expiryBadge =
+      document.createElement('span');
+
+
+    expiryBadge.className =
+      `expiry-status ${expiryClass}`;
+
+
+    expiryBadge.textContent =
+      expiryText;
+
+
+    expiryCell.append(
+      expiryBadge
+    );
+
+
+    r.append(
+      expiryCell
     );
   }
 
