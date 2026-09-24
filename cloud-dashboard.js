@@ -1169,33 +1169,80 @@ function renderHistory(
     );
 
 
-    cell(
-      r,
-      {
-        receipt: 'Recebimento',
-        transfer: 'Transferência',
-        return: 'Devolução',
-        sale: 'Venda',
-        loss: 'Perda',
-        adjust: 'Ajuste'
-      }[m.movement_type]
-      || m.movement_type
+        const movementLabels = {
+      receipt: 'Recebimento',
+      transfer: 'Transferência',
+      return: 'Retorno',
+      sale: 'Venda',
+      loss: 'Perda',
+      adjust: 'Ajuste'
+    };
+
+
+    const typeCell =
+      document.createElement('td');
+
+
+    const typeBadge =
+      document.createElement('span');
+
+
+    typeBadge.className =
+      `movement-type ${m.movement_type}`;
+
+
+    typeBadge.textContent =
+      movementLabels[m.movement_type]
+      || m.movement_type;
+
+
+    typeCell.append(
+      typeBadge
     );
 
 
-    cell(
-      r,
+    r.append(
+      typeCell
+    );
+
+
+        const locationCell =
+      document.createElement('td');
+
+
+    const locationBadge =
+      document.createElement('span');
+
+
+    locationBadge.className =
+      'location-badge';
+
+
+    locationBadge.textContent =
       m.location === 'stock'
         ? 'Estoque'
-        : 'Geladeira'
+        : 'Geladeira';
+
+
+    locationCell.append(
+      locationBadge
     );
 
 
-    cell(
+    r.append(
+      locationCell
+    );
+
+
+        cell(
       r,
       (m.delta > 0 ? '+' : '')
       + m.delta,
-      'num'
+      m.delta > 0
+        ? 'num delta-positive'
+        : m.delta < 0
+          ? 'num delta-negative'
+          : 'num'
     );
   }
 
