@@ -765,19 +765,74 @@ function render() {
       ps.get(p.id);
 
 
-    const r =
+        const r =
       pt.insertRow();
+
+
+    const total =
+      b.stock + b.fridge;
+
+
+    let statusText =
+      'OK';
+
+
+    let statusClass =
+      'ok';
+
+
+    if (!p.active) {
+
+      statusText =
+        'Inativo';
+
+      statusClass =
+        'inactive';
+
+    }
+    else if (total === 0) {
+
+      statusText =
+        'Zerado';
+
+      statusClass =
+        'danger';
+
+      r.classList.add(
+        'product-row-danger'
+      );
+
+    }
+    else if (total < p.min_total) {
+
+      statusText =
+        'Estoque baixo';
+
+      statusClass =
+        'warning';
+
+      r.classList.add(
+        'product-row-warning'
+      );
+
+    }
+    else if (b.fridge < p.min_fridge) {
+
+      statusText =
+        'Geladeira baixa';
+
+      statusClass =
+        'warning';
+
+      r.classList.add(
+        'product-row-warning'
+      );
+    }
 
 
     cell(
       r,
       p.name
-      +
-      (
-        p.active
-          ? ''
-          : ' (inativo)'
-      )
     );
 
 
@@ -797,8 +852,34 @@ function render() {
 
     cell(
       r,
-      b.stock + b.fridge,
+      total,
       'num'
+    );
+
+
+    const statusCell =
+      document.createElement('td');
+
+
+    const statusBadge =
+      document.createElement('span');
+
+
+    statusBadge.className =
+      `product-status ${statusClass}`;
+
+
+    statusBadge.textContent =
+      statusText;
+
+
+    statusCell.append(
+      statusBadge
+    );
+
+
+    r.append(
+      statusCell
     );
   }
 
@@ -808,7 +889,7 @@ function render() {
     empty(
       pt,
       'Nenhuma bebida cadastrada.',
-      4
+      5
     );
   }
 

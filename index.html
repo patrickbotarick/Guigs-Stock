@@ -1,1295 +1,1397 @@
 <!doctype html>
 <html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#161618" />
 
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#161618" />
+    <title>Guig’s Stock 1.2C · Estoque em nuvem</title>
 
-  <title>Guig’s Stock 1.2C · Estoque em nuvem</title>
+    <style>
+      :root {
+        font-family:
+          Inter,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        color: #252327;
+        background: #f6f5f2;
+      }
 
-  <style>
-    :root {
-      font-family:
-        Inter,
-        system-ui,
-        -apple-system,
-        "Segoe UI",
-        sans-serif;
-      color: #252327;
-      background: #f6f5f2;
-    }
+      * {
+        box-sizing: border-box;
+      }
 
-    * {
-      box-sizing: border-box;
-    }
+      body {
+        margin: 0;
+      }
 
-    body {
-      margin: 0;
-    }
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
 
-    button,
-    input,
-    select,
-    textarea {
-      font: inherit;
-    }
+      button {
+        cursor: pointer;
+      }
 
-    button {
-      cursor: pointer;
-    }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
 
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+      .layout {
+        display: grid;
+        grid-template-columns: 225px minmax(0, 1fr);
+        min-height: 100vh;
+      }
 
-    .layout {
-      display: grid;
-      grid-template-columns: 225px minmax(0, 1fr);
-      min-height: 100vh;
-    }
+      .side {
+        background: #19191c;
+        color: white;
+        padding: 24px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
 
-    .side {
-      background: #19191c;
-      color: white;
-      padding: 24px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
+      .brand {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
 
-    .brand {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
+      .brand img {
+        width: 54px;
+        height: 54px;
+        object-fit: contain;
+        background: #29292d;
+        border-radius: 11px;
+      }
 
-    .brand img {
-      width: 54px;
-      height: 54px;
-      object-fit: contain;
-      background: #29292d;
-      border-radius: 11px;
-    }
+      .brand strong {
+        display: block;
+        font-size: 21px;
+      }
 
-    .brand strong {
-      display: block;
-      font-size: 21px;
-    }
+      .brand small {
+        font-size: 11px;
+        color: #e8bf83;
+        letter-spacing: 1px;
+      }
 
-    .brand small {
-      font-size: 11px;
-      color: #e8bf83;
-      letter-spacing: 1px;
-    }
+      .menu {
+        padding: 13px;
+        border-radius: 12px;
+        background: #ab2933;
+        font-weight: 750;
+      }
 
-    .menu {
-      padding: 13px;
-      border-radius: 12px;
-      background: #ab2933;
-      font-weight: 750;
-    }
+      .side p {
+        color: #bbb;
+        font-size: 12px;
+        line-height: 1.6;
+      }
 
-    .side p {
-      color: #bbb;
-      font-size: 12px;
-      line-height: 1.6;
-    }
+      .side footer {
+        margin-top: auto;
+        color: #999;
+        font-size: 11px;
+        line-height: 1.6;
+      }
 
-    .side footer {
-      margin-top: auto;
-      color: #999;
-      font-size: 11px;
-      line-height: 1.6;
-    }
+      .main {
+        padding: 35px clamp(15px, 4vw, 55px);
+        max-width: 1500px;
+        width: 100%;
+        margin: auto;
+        min-width: 0;
+      }
 
-    .main {
-      padding: 35px clamp(15px, 4vw, 55px);
-      max-width: 1500px;
-      width: 100%;
-      margin: auto;
-      min-width: 0;
-    }
+      .top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
 
-    .top {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 18px;
-      flex-wrap: wrap;
-    }
+      .eyebrow {
+        color: #a42b32;
+        text-transform: uppercase;
+        font-size: 11px;
+        font-weight: 850;
+        letter-spacing: 1.4px;
+        margin: 0;
+      }
 
-    .eyebrow {
-      color: #a42b32;
-      text-transform: uppercase;
-      font-size: 11px;
-      font-weight: 850;
-      letter-spacing: 1.4px;
-      margin: 0;
-    }
+      .top h1 {
+        font-size: clamp(25px, 3vw, 34px);
+        margin: 5px 0 6px;
+        letter-spacing: -1px;
+      }
 
-    .top h1 {
-      font-size: clamp(25px, 3vw, 34px);
-      margin: 5px 0 6px;
-      letter-spacing: -1px;
-    }
+      .muted {
+        color: #77767c;
+        font-size: 13px;
+        line-height: 1.6;
+      }
 
-    .muted {
-      color: #77767c;
-      font-size: 13px;
-      line-height: 1.6;
-    }
+      .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
 
-    .actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
+      .btn {
+        background: white;
+        border: 1px solid #e4e0dc;
+        color: #272629;
+        border-radius: 11px;
+        font-size: 12px;
+        font-weight: 750;
+        padding: 11px 15px;
+      }
 
-    .btn {
-      background: white;
-      border: 1px solid #e4e0dc;
-      color: #272629;
-      border-radius: 11px;
-      font-size: 12px;
-      font-weight: 750;
-      padding: 11px 15px;
-    }
+      .btn.red {
+        color: white;
+        background: #ab2933;
+        border-color: #ab2933;
+      }
 
-    .btn.red {
-      color: white;
-      background: #ab2933;
-      border-color: #ab2933;
-    }
+      .btn.green {
+        color: white;
+        background: #237b4b;
+        border-color: #237b4b;
+      }
 
-    .btn.green {
-      color: white;
-      background: #237b4b;
-      border-color: #237b4b;
-    }
+      .notice {
+        background: #fff1dd;
+        border: 1px solid #f3d7ac;
+        border-radius: 13px;
+        color: #865417;
+        padding: 13px 17px;
+        margin: 22px 0;
+        font-size: 12px;
+        line-height: 1.6;
+      }
 
-    .notice {
-      background: #fff1dd;
-      border: 1px solid #f3d7ac;
-      border-radius: 13px;
-      color: #865417;
-      padding: 13px 17px;
-      margin: 22px 0;
-      font-size: 12px;
-      line-height: 1.6;
-    }
+      .notice.danger {
+        background: #fff0f1;
+        border-color: #eacbd0;
+        color: #a12830;
+      }
 
-    .notice.danger {
-      background: #fff0f1;
-      border-color: #eacbd0;
-      color: #a12830;
-    }
+      .notice.good {
+        background: #e8f7ef;
+        border-color: #c4ead4;
+        color: #17623d;
+      }
 
-    .notice.good {
-      background: #e8f7ef;
-      border-color: #c4ead4;
-      color: #17623d;
-    }
+      .operationbar {
+        background: #fff;
+        border: 1px solid #e9e6e2;
+        border-radius: 20px;
+        padding: 22px;
+        margin-bottom: 18px;
+      }
 
-    .operationbar {
-      background: #fff;
-      border: 1px solid #e9e6e2;
-      border-radius: 20px;
-      padding: 22px;
-      margin-bottom: 18px;
-    }
+      .operationhead {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
 
-    .operationhead {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 16px;
-      margin-bottom: 18px;
-    }
+      .operationbar h2 {
+        margin: 0 0 4px;
+        font-size: 18px;
+      }
 
-    .operationbar h2 {
-      margin: 0 0 4px;
-      font-size: 18px;
-    }
+      .quickactions {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
 
-    .quickactions {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-    }
+      .quickaction {
+        min-height: 88px;
+        border: 1px solid #e6e2de;
+        border-radius: 14px;
+        background: #faf9f7;
+        color: #29272a;
+        padding: 15px;
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 10px;
+        transition:
+          transform 0.15s ease,
+          border-color 0.15s ease,
+          background 0.15s ease;
+      }
 
-    .quickaction {
-      min-height: 88px;
-      border: 1px solid #e6e2de;
-      border-radius: 14px;
-      background: #faf9f7;
-      color: #29272a;
-      padding: 15px;
-      text-align: left;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 10px;
-      transition:
-        transform 0.15s ease,
-        border-color 0.15s ease,
-        background 0.15s ease;
-    }
+      .quickaction:hover {
+        transform: translateY(-1px);
+        border-color: #cfc8c1;
+        background: #fff;
+      }
 
-    .quickaction:hover {
-      transform: translateY(-1px);
-      border-color: #cfc8c1;
-      background: #fff;
-    }
+      .quickaction strong {
+        font-size: 13px;
+      }
 
-    .quickaction strong {
-      font-size: 13px;
-    }
+      .quickaction small {
+        color: #858187;
+        font-size: 11px;
+        line-height: 1.4;
+      }
 
-    .quickaction small {
-      color: #858187;
-      font-size: 11px;
-      line-height: 1.4;
-    }
+      .quickaction.primary {
+        background: #ab2933;
+        border-color: #ab2933;
+        color: #fff;
+      }
 
-    .quickaction.primary {
-      background: #ab2933;
-      border-color: #ab2933;
-      color: #fff;
-    }
+      .quickaction.primary small {
+        color: #f3d8da;
+      }
 
-    .quickaction.primary small {
-      color: #f3d8da;
-    }
+      .quickaction.loss {
+        color: #a12830;
+        background: #fff6f6;
+        border-color: #edd7d9;
+      }
 
-    .quickaction.loss {
-      color: #a12830;
-      background: #fff6f6;
-      border-color: #edd7d9;
-    }
+      .managementactions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding-top: 14px;
+        margin-top: 14px;
+        border-top: 1px solid #efedea;
+      }
 
-    .managementactions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      padding-top: 14px;
-      margin-top: 14px;
-      border-top: 1px solid #efedea;
-    }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 13px;
+        margin: 21px 0;
+      }
 
-    .metrics {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 13px;
-      margin: 21px 0;
-    }
+      .metric,
+      .panel {
+        background: #fff;
+        border: 1px solid #e9e6e2;
+        border-radius: 17px;
+        padding: 21px;
+      }
 
-    .metric,
-    .panel {
-      background: #fff;
-      border: 1px solid #e9e6e2;
-      border-radius: 17px;
-      padding: 21px;
-    }
+      .metric span {
+        font-size: 12px;
+        color: #777;
+      }
 
-    .metric span {
-      font-size: 12px;
-      color: #777;
-    }
+      .metric b {
+        display: block;
+        font-size: 33px;
+        letter-spacing: -1px;
+        margin: 12px 0 5px;
+        font-variant-numeric: tabular-nums;
+      }
 
-    .metric b {
-      display: block;
-      font-size: 33px;
-      letter-spacing: -1px;
-      margin: 12px 0 5px;
-      font-variant-numeric: tabular-nums;
-    }
+      .metric small {
+        font-size: 11px;
+        color: #999;
+      }
 
-    .metric small {
-      font-size: 11px;
-      color: #999;
-    }
+      .alerts-panel {
+        background: #fff;
+        border: 1px solid #e9e6e2;
+        border-radius: 17px;
+        padding: 20px;
+        margin-bottom: 18px;
+      }
 
-    .alerts-panel {
-  background: #fff;
-  border: 1px solid #e9e6e2;
-  border-radius: 17px;
-  padding: 20px;
-  margin-bottom: 18px;
-}
+      .alerts-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+      }
 
-.alerts-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
+      .alerts-head h2 {
+        margin: 0 0 4px;
+        font-size: 17px;
+      }
 
-.alerts-head h2 {
-  margin: 0 0 4px;
-  font-size: 17px;
-}
+      .alerts-count {
+        background: #fff0df;
+        color: #8c5816;
+        border-radius: 30px;
+        padding: 6px 10px;
+        font-size: 10px;
+        font-weight: 800;
+      }
 
-.alerts-count {
-  background: #fff0df;
-  color: #8c5816;
-  border-radius: 30px;
-  padding: 6px 10px;
-  font-size: 10px;
-  font-weight: 800;
-}
+      .alerts-list {
+        display: grid;
+        gap: 8px;
+      }
 
-.alerts-list {
-  display: grid;
-  gap: 8px;
-}
+      .operational-alert {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: #faf8f5;
+        border: 1px solid #ece7e1;
+      }
 
-.operational-alert {
-  display: flex;
+      .operational-alert strong {
+        display: block;
+        font-size: 12px;
+        margin-bottom: 3px;
+      }
+
+      .operational-alert small {
+        display: block;
+        color: #77737a;
+        font-size: 11px;
+        line-height: 1.4;
+      }
+
+      .alert-level {
+        flex: 0 0 auto;
+        border-radius: 30px;
+        padding: 5px 9px;
+        font-size: 9px;
+        font-weight: 850;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .operational-alert.warning {
+        background: #fffaf1;
+        border-color: #f0dfbf;
+      }
+
+      .operational-alert.warning .alert-level {
+        background: #fff0d2;
+        color: #8c5816;
+      }
+
+      .operational-alert.danger {
+        background: #fff5f5;
+        border-color: #efd4d6;
+      }
+
+      .operational-alert.danger .alert-level {
+        background: #f9dfe1;
+        color: #a12830;
+      }
+
+      .section {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+
+      .panel {
+        min-width: 0;
+        margin-bottom: 18px;
+      }
+
+      .panel h2 {
+        font-size: 17px;
+        margin: 0 0 6px;
+      }
+
+      .panelhead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 15px;
+      }
+
+      .badge {
+        font-size: 10px;
+        font-weight: 800;
+        border-radius: 30px;
+        padding: 6px 10px;
+        background: #eee;
+        color: #555;
+      }
+
+      .badge.green {
+        background: #e5f5eb;
+        color: #287848;
+      }
+
+      .badge.amber {
+        background: #fff1d9;
+        color: #915b12;
+      }
+
+      .tablewrap {
+        overflow-x: auto;
+      }
+
+      .table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 560px;
+      }
+
+      .table th,
+      .table td {
+        padding: 12px 8px;
+        text-align: left;
+        border-bottom: 1px solid #efeeeb;
+        font-size: 12px;
+      }
+
+      .table th {
+        font-size: 10px;
+        letter-spacing: 0.7px;
+        color: #8b8990;
+        text-transform: uppercase;
+      }
+
+      .table tr:last-child td {
+        border: 0;
+      }
+
+      .num {
+        text-align: right !important;
+        font-weight: 750;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .product-status {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: #faf8f5;
-  border: 1px solid #ece7e1;
-}
-
-.operational-alert strong {
-  display: block;
-  font-size: 12px;
-  margin-bottom: 3px;
-}
-
-.operational-alert small {
-  display: block;
-  color: #77737a;
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.alert-level {
-  flex: 0 0 auto;
+  white-space: nowrap;
   border-radius: 30px;
   padding: 5px 9px;
   font-size: 9px;
   font-weight: 850;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
 }
 
-.operational-alert.warning {
-  background: #fffaf1;
-  border-color: #f0dfbf;
+.product-status.ok {
+  background: #e7f5ec;
+  color: #237048;
 }
 
-.operational-alert.warning .alert-level {
+.product-status.warning {
   background: #fff0d2;
   color: #8c5816;
 }
 
-.operational-alert.danger {
-  background: #fff5f5;
-  border-color: #efd4d6;
-}
-
-.operational-alert.danger .alert-level {
+.product-status.danger {
   background: #f9dfe1;
   color: #a12830;
 }
 
-    .section {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 18px;
-    }
+.product-status.inactive {
+  background: #ecebed;
+  color: #6e6b72;
+}
 
-    .panel {
-      min-width: 0;
-      margin-bottom: 18px;
-    }
+.product-row-warning td {
+  background: #fffdf7;
+}
 
-    .panel h2 {
-      font-size: 17px;
-      margin: 0 0 6px;
-    }
+.product-row-danger td {
+  background: #fff9f9;
+}
 
-    .panelhead {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 15px;
-    }
-
-    .badge {
-      font-size: 10px;
-      font-weight: 800;
-      border-radius: 30px;
-      padding: 6px 10px;
-      background: #eee;
-      color: #555;
-    }
-
-    .badge.green {
-      background: #e5f5eb;
-      color: #287848;
-    }
-
-    .badge.amber {
-      background: #fff1d9;
-      color: #915b12;
-    }
-
-    .tablewrap {
-      overflow-x: auto;
-    }
-
-    .table {
-      border-collapse: collapse;
-      width: 100%;
-      min-width: 560px;
-    }
-
-    .table th,
-    .table td {
-      padding: 12px 8px;
-      text-align: left;
-      border-bottom: 1px solid #efeeeb;
-      font-size: 12px;
-    }
-
-    .table th {
-      font-size: 10px;
-      letter-spacing: 0.7px;
-      color: #8b8990;
-      text-transform: uppercase;
-    }
-
-    .table tr:last-child td {
-      border: 0;
-    }
-
-    .num {
-      text-align: right !important;
-      font-weight: 750;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .filters {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .filters input {
-      border: 1px solid #e0deda;
-      border-radius: 9px;
-      padding: 10px;
-      max-width: 100%;
-      font-size: 12px;
-    }
-
-    .empty {
-      color: #85818a;
-      font-size: 12px;
-      padding: 25px;
-      text-align: center;
-    }
-
-    .foot {
-      font-size: 11px;
-      color: #89858b;
-      margin-top: 16px;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    /* MODAIS */
-
-    dialog {
-      border: 0;
-      border-radius: 20px;
-      padding: 0;
-      width: min(520px, calc(100% - 30px));
-      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.28);
-    }
-
-    dialog::backdrop {
-      background: rgba(15, 15, 18, 0.65);
-    }
-
-    .modal {
-      padding: 25px;
-    }
-
-    .modal h2 {
-      margin: 0 0 5px;
-    }
-
-    .modalform {
-      display: grid;
-      gap: 14px;
-      margin-top: 20px;
-    }
-
-    .field {
-      display: grid;
-      gap: 6px;
-    }
-
-    .field label {
-      font-size: 12px;
-      font-weight: 750;
-    }
-
-    .field input,
-    .field select,
-    .field textarea {
-      width: 100%;
-      border: 1px solid #dcd8d3;
-      border-radius: 10px;
-      padding: 11px 12px;
-      background: white;
-    }
-
-    .field textarea {
-      min-height: 80px;
-      resize: vertical;
-    }
-
-    .twocol {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .modalactions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 8px;
-    }
-
-    .formmsg {
-      font-size: 12px;
-      line-height: 1.5;
-      min-height: 18px;
-      color: #a12830;
-    }
-
-    .formmsg.good {
-      color: #17623d;
-    }
-
-    @media (max-width: 950px) {
-      .quickactions {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+      .filters {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
       }
 
-      .layout {
-        grid-template-columns: 1fr;
+      .filters input {
+        border: 1px solid #e0deda;
+        border-radius: 9px;
+        padding: 10px;
+        max-width: 100%;
+        font-size: 12px;
       }
 
-      .side {
-        padding: 15px;
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
+      .empty {
+        color: #85818a;
+        font-size: 12px;
+        padding: 25px;
+        text-align: center;
       }
 
-      .side p,
-      .side footer,
-      .side .menu {
-        display: none;
+      .foot {
+        font-size: 11px;
+        color: #89858b;
+        margin-top: 16px;
       }
 
-      .main {
-        padding: 18px 14px;
+      .hidden {
+        display: none !important;
       }
 
-      .metrics {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+      /* MODAIS */
+
+      dialog {
+        border: 0;
+        border-radius: 20px;
+        padding: 0;
+        width: min(520px, calc(100% - 30px));
+        box-shadow: 0 25px 80px rgba(0, 0, 0, 0.28);
       }
 
-      .section {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 500px) {
-      .quickactions {
-        grid-template-columns: 1fr;
+      dialog::backdrop {
+        background: rgba(15, 15, 18, 0.65);
       }
 
-      .quickaction {
-        min-height: 76px;
+      .modal {
+        padding: 25px;
+      }
+
+      .modal h2 {
+        margin: 0 0 5px;
+      }
+
+      .modalform {
+        display: grid;
+        gap: 14px;
+        margin-top: 20px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+
+      .field label {
+        font-size: 12px;
+        font-weight: 750;
+      }
+
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        border: 1px solid #dcd8d3;
+        border-radius: 10px;
+        padding: 11px 12px;
+        background: white;
+      }
+
+      .field textarea {
+        min-height: 80px;
+        resize: vertical;
       }
 
       .twocol {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 400px) {
-      .metric {
-        padding: 14px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
       }
 
-      .metric b {
-        font-size: 27px;
+      .modalactions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 8px;
       }
 
-      .btn {
-        padding: 10px 12px;
+      .formmsg {
+        font-size: 12px;
+        line-height: 1.5;
+        min-height: 18px;
+        color: #a12830;
       }
-    }
-  </style>
-</head>
 
-<body>
-  <div class="layout">
-    <aside class="side">
-      <div class="brand">
-        <img src="logo-guigs.png" alt="Logo Guig's" />
-        <div>
-          <strong>Guig's Stock</strong>
-          <small>NUVEM · 1.2C</small>
+      .formmsg.good {
+        color: #17623d;
+      }
+
+      @media (max-width: 950px) {
+        .quickactions {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .side {
+          padding: 15px;
+          flex-direction: row;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .side p,
+        .side footer,
+        .side .menu {
+          display: none;
+        }
+
+        .main {
+          padding: 18px 14px;
+        }
+
+        .metrics {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .section {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 500px) {
+        .quickactions {
+          grid-template-columns: 1fr;
+        }
+
+        .quickaction {
+          min-height: 76px;
+        }
+
+        .twocol {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 400px) {
+        .metric {
+          padding: 14px;
+        }
+
+        .metric b {
+          font-size: 27px;
+        }
+
+        .btn {
+          padding: 10px 12px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="layout">
+      <aside class="side">
+        <div class="brand">
+          <img src="logo-guigs.png" alt="Logo Guig's" />
+          <div>
+            <strong>Guig's Stock</strong>
+            <small>NUVEM · 1.2C</small>
+          </div>
         </div>
-      </div>
 
-      <div class="menu">◫ Visão geral</div>
+        <div class="menu">◫ Visão geral</div>
 
-      <p>
-        Estoque conectado ao Supabase. Cadastros e recebimentos são
-        registrados diretamente na nuvem.
-      </p>
+        <p>
+          Estoque conectado ao Supabase. Cadastros e recebimentos são
+          registrados diretamente na nuvem.
+        </p>
 
-      <footer>
-        Acesso exige login e vínculo ativo. Não compartilhe o túnel com
-        pessoas não autorizadas.
-      </footer>
-    </aside>
+        <footer>
+          Acesso exige login e vínculo ativo. Não compartilhe o túnel com
+          pessoas não autorizadas.
+        </footer>
+      </aside>
 
-    <main class="main">
-      <header class="top">
-        <div>
-          <p class="eyebrow">Pizzaria Guig's • versão de desenvolvimento</p>
-          <h1>Painel do estoque</h1>
-          <div id="identity" class="muted">Verificando autenticação…</div>
+      <main class="main">
+        <header class="top">
+          <div>
+            <p class="eyebrow">Pizzaria Guig's • versão de desenvolvimento</p>
+            <h1>Painel do estoque</h1>
+            <div id="identity" class="muted">Verificando autenticação…</div>
+          </div>
+
+          <div class="actions">
+            <button id="refresh" class="btn" disabled>↻ Atualizar</button>
+            <button id="signout" class="btn">Sair</button>
+          </div>
+        </header>
+
+        <div class="notice" id="status" role="status" aria-live="polite">
+          Iniciando conexão segura…
         </div>
 
-        <div class="actions">
-          <button id="refresh" class="btn" disabled>↻ Atualizar</button>
-          <button id="signout" class="btn">Sair</button>
-        </div>
-      </header>
-
-      <div class="notice" id="status" role="status" aria-live="polite">
-        Iniciando conexão segura…
-      </div>
-
-      <section id="content" class="hidden">
-        <div class="operationbar">
-  <div class="operationhead">
-    <div>
-      <h2>O que você precisa fazer?</h2>
-      <div class="muted">
-        Acesse rapidamente as operações mais usadas no dia a dia.
-      </div>
-    </div>
-  </div>
-
-  <div class="quickactions">
-    <button id="receiveStock" class="quickaction primary">
-      <strong>↓ Receber estoque</strong>
-      <small>Registrar a chegada de novas bebidas</small>
-    </button>
-
-    <button id="transferStock" class="quickaction">
-      <strong>⇄ Movimentar</strong>
-      <small>Estoque ↔ geladeira</small>
-    </button>
-
-    <button id="registerSale" class="quickaction">
-      <strong>Venda</strong>
-      <small>Dar baixa em bebidas vendidas</small>
-    </button>
-
-    <button id="registerLoss" class="quickaction loss">
-      <strong>Registrar perda</strong>
-      <small>Quebra, vencimento ou descarte</small>
-    </button>
-  </div>
-
-  <div class="managementactions">
-    <button id="newProduct" class="btn">+ Novo produto</button>
-    <button id="editProduct" class="btn">Editar produto</button>
-    <button id="adjustStock" class="btn">Ajustar inventário</button>
-  </div>
-</div>
-
-            <section class="metrics">
-              <div class="metric">
-                <span>Unidades registradas</span>
-                <b id="total">—</b>
-                <small>Saldo por movimentações</small>
-              </div>
-
-              <div class="metric">
-                <span>Estoque</span>
-                <b id="stock">—</b>
-                <small>Unidades armazenadas</small>
-              </div>
-
-              <div class="metric">
-                <span>Geladeira</span>
-                <b id="fridge">—</b>
-                <small>Unidades expostas</small>
-              </div>
-
-              <div class="metric">
-                <span>Próximas do vencimento</span>
-                <b id="expiring">—</b>
-                <small>Até 30 dias</small>
-              </div>
-            </section>
-
-            <div id="alertsPanel" class="alerts-panel hidden">
-  <div class="alerts-head">
-    <div>
-      <h2>Atenção operacional</h2>
-      <div class="muted">
-        Situações que podem precisar de ação.
-      </div>
-    </div>
-
-    <span id="alertCount" class="alerts-count">0 alertas</span>
-  </div>
-
-  <div id="operationalAlerts" class="alerts-list"></div>
-</div>
-
-            <div class="section">
-              <div class="panel">
-                <div class="panelhead">
-                  <div>
-                    <h2>Bebidas e localização</h2>
-                    <div class="muted">Saldo atual por produto</div>
-                  </div>
-
-                  <span class="badge green" id="productCount"> 0 produtos </span>
-                </div>
-
-                <div class="tablewrap">
-                  <table class="table">
-                    <thead>
-                      <tr>
-                        <th>Produto</th>
-                        <th class="num">Estoque</th>
-                        <th class="num">Geladeira</th>
-                        <th class="num">Total</th>
-                      </tr>
-                    </thead>
-
-                    <tbody id="products"></tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div class="panel">
-                <div class="panelhead">
-                  <div>
-                    <h2>Validades</h2>
-                    <div class="muted">Lotes com unidades restantes</div>
-                  </div>
-
-                  <span class="badge amber" id="lotCount"> 0 lotes </span>
-                </div>
-
-                <div class="tablewrap">
-                  <table class="table">
-                    <thead>
-                      <tr>
-                        <th>Bebida · lote</th>
-                        <th>Validade</th>
-                        <th class="num">Un.</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-
-                    <tbody id="lots"></tbody>
-                  </table>
+        <section id="content" class="hidden">
+          <div class="operationbar">
+            <div class="operationhead">
+              <div>
+                <h2>O que você precisa fazer?</h2>
+                <div class="muted">
+                  Acesse rapidamente as operações mais usadas no dia a dia.
                 </div>
               </div>
             </div>
 
+            <div class="quickactions">
+              <button id="receiveStock" class="quickaction primary">
+                <strong>↓ Receber estoque</strong>
+                <small>Registrar a chegada de novas bebidas</small>
+              </button>
+
+              <button id="transferStock" class="quickaction">
+                <strong>⇄ Movimentar</strong>
+                <small>Estoque ↔ geladeira</small>
+              </button>
+
+              <button id="registerSale" class="quickaction">
+                <strong>Venda</strong>
+                <small>Dar baixa em bebidas vendidas</small>
+              </button>
+
+              <button id="registerLoss" class="quickaction loss">
+                <strong>Registrar perda</strong>
+                <small>Quebra, vencimento ou descarte</small>
+              </button>
+            </div>
+
+            <div class="managementactions">
+              <button id="newProduct" class="btn">+ Novo produto</button>
+              <button id="editProduct" class="btn">Editar produto</button>
+              <button id="adjustStock" class="btn">Ajustar inventário</button>
+            </div>
+          </div>
+
+          <section class="metrics">
+            <div class="metric">
+              <span>Unidades registradas</span>
+              <b id="total">—</b>
+              <small>Saldo por movimentações</small>
+            </div>
+
+            <div class="metric">
+              <span>Estoque</span>
+              <b id="stock">—</b>
+              <small>Unidades armazenadas</small>
+            </div>
+
+            <div class="metric">
+              <span>Geladeira</span>
+              <b id="fridge">—</b>
+              <small>Unidades expostas</small>
+            </div>
+
+            <div class="metric">
+              <span>Próximas do vencimento</span>
+              <b id="expiring">—</b>
+              <small>Até 30 dias</small>
+            </div>
+          </section>
+
+          <div id="alertsPanel" class="alerts-panel hidden">
+            <div class="alerts-head">
+              <div>
+                <h2>Atenção operacional</h2>
+                <div class="muted">Situações que podem precisar de ação.</div>
+              </div>
+
+              <span id="alertCount" class="alerts-count">0 alertas</span>
+            </div>
+
+            <div id="operationalAlerts" class="alerts-list"></div>
+          </div>
+
+          <div class="section">
             <div class="panel">
               <div class="panelhead">
                 <div>
-                  <h2>Histórico na nuvem</h2>
-                  <div class="muted">Movimentações mais recentes.</div>
+                  <h2>Bebidas e localização</h2>
+                  <div class="muted">Saldo atual por produto</div>
                 </div>
 
-                <div class="filters">
-                  <input id="search" type="search" placeholder="Buscar bebida, lote, tipo…" />
-
-                  <button id="prev" class="btn">←</button>
-
-                  <span id="page" class="badge"> 1/1 </span>
-
-                  <button id="next" class="btn">→</button>
-                </div>
+                <span class="badge green" id="productCount"> 0 produtos </span>
               </div>
 
               <div class="tablewrap">
                 <table class="table">
                   <thead>
                     <tr>
-                      <th>Data</th>
-                      <th>Produto / lote</th>
-                      <th>Tipo</th>
-                      <th>Local</th>
-                      <th class="num">Variação</th>
+                      <th>Produto</th>
+                      <th class="num">Estoque</th>
+                      <th class="num">Geladeira</th>
+                      <th class="num">Total</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
 
-                  <tbody id="history"></tbody>
+                  <tbody id="products"></tbody>
                 </table>
               </div>
             </div>
 
-            <div class="foot" id="updated"></div>
-      </section>
-    </main>
-  </div>
+            <div class="panel">
+              <div class="panelhead">
+                <div>
+                  <h2>Validades</h2>
+                  <div class="muted">Lotes com unidades restantes</div>
+                </div>
 
-  <!-- NOVO PRODUTO -->
+                <span class="badge amber" id="lotCount"> 0 lotes </span>
+              </div>
 
-  <dialog id="productDialog">
-    <div class="modal">
-      <h2>Novo produto</h2>
+              <div class="tablewrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Bebida · lote</th>
+                      <th>Validade</th>
+                      <th class="num">Un.</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
 
-      <div class="muted">
-        Cadastre uma bebida no catálogo da Pizzaria Guig's.
+                  <tbody id="lots"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panelhead">
+              <div>
+                <h2>Histórico na nuvem</h2>
+                <div class="muted">Movimentações mais recentes.</div>
+              </div>
+
+              <div class="filters">
+                <input
+                  id="search"
+                  type="search"
+                  placeholder="Buscar bebida, lote, tipo…"
+                />
+
+                <button id="prev" class="btn">←</button>
+
+                <span id="page" class="badge"> 1/1 </span>
+
+                <button id="next" class="btn">→</button>
+              </div>
+            </div>
+
+            <div class="tablewrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Produto / lote</th>
+                    <th>Tipo</th>
+                    <th>Local</th>
+                    <th class="num">Variação</th>
+                  </tr>
+                </thead>
+
+                <tbody id="history"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="foot" id="updated"></div>
+        </section>
+      </main>
+    </div>
+
+    <!-- NOVO PRODUTO -->
+
+    <dialog id="productDialog">
+      <div class="modal">
+        <h2>Novo produto</h2>
+
+        <div class="muted">
+          Cadastre uma bebida no catálogo da Pizzaria Guig's.
+        </div>
+
+        <form id="productForm" class="modalform">
+          <div class="field">
+            <label for="productName">Nome</label>
+            <input
+              id="productName"
+              maxlength="160"
+              required
+              placeholder="Ex.: Coca-Cola 2 L"
+            />
+          </div>
+
+          <div class="field">
+            <label for="productCategory">Categoria</label>
+
+            <select id="productCategory">
+              <option>Refrigerante</option>
+              <option>Cerveja</option>
+              <option>Água</option>
+              <option>Suco</option>
+              <option>Energético</option>
+              <option>Outro</option>
+            </select>
+          </div>
+
+          <div class="twocol">
+            <div class="field">
+              <label for="minTotal">Estoque mínimo total</label>
+              <input id="minTotal" type="number" min="0" value="6" required />
+            </div>
+
+            <div class="field">
+              <label for="targetTotal">Estoque alvo total</label>
+              <input
+                id="targetTotal"
+                type="number"
+                min="0"
+                value="24"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="twocol">
+            <div class="field">
+              <label for="minFridge">Mínimo na geladeira</label>
+              <input id="minFridge" type="number" min="0" value="4" required />
+            </div>
+
+            <div class="field">
+              <label for="targetFridge">Alvo na geladeira</label>
+              <input
+                id="targetFridge"
+                type="number"
+                min="0"
+                value="12"
+                required
+              />
+            </div>
+          </div>
+
+          <div id="productMessage" class="formmsg"></div>
+
+          <div class="modalactions">
+            <button type="button" class="btn" data-close="productDialog">
+              Cancelar
+            </button>
+
+            <button id="saveProduct" class="btn red" type="submit">
+              Cadastrar produto
+            </button>
+          </div>
+        </form>
       </div>
+    </dialog>
 
-      <form id="productForm" class="modalform">
-        <div class="field">
-          <label for="productName">Nome</label>
-          <input id="productName" maxlength="160" required placeholder="Ex.: Coca-Cola 2 L" />
-        </div>
+    <!-- EDITAR PRODUTO -->
 
-        <div class="field">
-          <label for="productCategory">Categoria</label>
+    <dialog id="editProductDialog">
+      <div class="modal">
+        <h2>Editar produto</h2>
 
-          <select id="productCategory">
-            <option>Refrigerante</option>
-            <option>Cerveja</option>
-            <option>Água</option>
-            <option>Suco</option>
-            <option>Energético</option>
-            <option>Outro</option>
-          </select>
-        </div>
+        <div class="muted">Altere os dados do produto selecionado.</div>
 
-        <div class="twocol">
+        <form id="editProductForm" class="modalform">
           <div class="field">
-            <label for="minTotal">Estoque mínimo total</label>
-            <input id="minTotal" type="number" min="0" value="6" required />
+            <label for="editProductSelect">Produto</label>
+            <select id="editProductSelect" required></select>
           </div>
 
           <div class="field">
-            <label for="targetTotal">Estoque alvo total</label>
-            <input id="targetTotal" type="number" min="0" value="24" required />
-          </div>
-        </div>
-
-        <div class="twocol">
-          <div class="field">
-            <label for="minFridge">Mínimo na geladeira</label>
-            <input id="minFridge" type="number" min="0" value="4" required />
+            <label for="editProductName">Nome</label>
+            <input id="editProductName" maxlength="160" required />
           </div>
 
           <div class="field">
-            <label for="targetFridge">Alvo na geladeira</label>
-            <input id="targetFridge" type="number" min="0" value="12" required />
+            <label for="editProductCategory">Categoria</label>
+
+            <select id="editProductCategory">
+              <option>Refrigerante</option>
+              <option>Cerveja</option>
+              <option>Água</option>
+              <option>Suco</option>
+              <option>Energético</option>
+              <option>Outro</option>
+            </select>
           </div>
-        </div>
 
-        <div id="productMessage" class="formmsg"></div>
+          <div class="twocol">
+            <div class="field">
+              <label for="editMinTotal">Estoque mínimo total</label>
 
-        <div class="modalactions">
-          <button type="button" class="btn" data-close="productDialog">
-            Cancelar
-          </button>
+              <input id="editMinTotal" type="number" min="0" required />
+            </div>
 
-          <button id="saveProduct" class="btn red" type="submit">
-            Cadastrar produto
-          </button>
-        </div>
-      </form>
-    </div>
-  </dialog>
+            <div class="field">
+              <label for="editTargetTotal">Estoque alvo total</label>
 
-  <!-- EDITAR PRODUTO -->
+              <input id="editTargetTotal" type="number" min="0" required />
+            </div>
+          </div>
 
-  <dialog id="editProductDialog">
-    <div class="modal">
-      <h2>Editar produto</h2>
+          <div class="twocol">
+            <div class="field">
+              <label for="editMinFridge">Mínimo na geladeira</label>
 
-      <div class="muted">Altere os dados do produto selecionado.</div>
+              <input id="editMinFridge" type="number" min="0" required />
+            </div>
 
-      <form id="editProductForm" class="modalform">
-        <div class="field">
-          <label for="editProductSelect">Produto</label>
-          <select id="editProductSelect" required></select>
-        </div>
+            <div class="field">
+              <label for="editTargetFridge">Alvo na geladeira</label>
 
-        <div class="field">
-          <label for="editProductName">Nome</label>
-          <input id="editProductName" maxlength="160" required />
-        </div>
-
-        <div class="field">
-          <label for="editProductCategory">Categoria</label>
-
-          <select id="editProductCategory">
-            <option>Refrigerante</option>
-            <option>Cerveja</option>
-            <option>Água</option>
-            <option>Suco</option>
-            <option>Energético</option>
-            <option>Outro</option>
-          </select>
-        </div>
-
-        <div class="twocol">
-          <div class="field">
-            <label for="editMinTotal">Estoque mínimo total</label>
-
-            <input id="editMinTotal" type="number" min="0" required />
+              <input id="editTargetFridge" type="number" min="0" required />
+            </div>
           </div>
 
           <div class="field">
-            <label for="editTargetTotal">Estoque alvo total</label>
+            <label for="editProductActive">Situação</label>
 
-            <input id="editTargetTotal" type="number" min="0" required />
-          </div>
-        </div>
-
-        <div class="twocol">
-          <div class="field">
-            <label for="editMinFridge">Mínimo na geladeira</label>
-
-            <input id="editMinFridge" type="number" min="0" required />
+            <select id="editProductActive">
+              <option value="true">Ativo</option>
+              <option value="false">Inativo</option>
+            </select>
           </div>
 
-          <div class="field">
-            <label for="editTargetFridge">Alvo na geladeira</label>
+          <div id="editProductMessage" class="formmsg"></div>
 
-            <input id="editTargetFridge" type="number" min="0" required />
+          <div class="modalactions">
+            <button type="button" class="btn" data-close="editProductDialog">
+              Cancelar
+            </button>
+
+            <button id="saveProductEdit" class="btn red" type="submit">
+              Salvar alterações
+            </button>
           </div>
-        </div>
-
-        <div class="field">
-          <label for="editProductActive">Situação</label>
-
-          <select id="editProductActive">
-            <option value="true">Ativo</option>
-            <option value="false">Inativo</option>
-          </select>
-        </div>
-
-        <div id="editProductMessage" class="formmsg"></div>
-
-        <div class="modalactions">
-          <button type="button" class="btn" data-close="editProductDialog">
-            Cancelar
-          </button>
-
-          <button id="saveProductEdit" class="btn red" type="submit">
-            Salvar alterações
-          </button>
-        </div>
-      </form>
-    </div>
-  </dialog>
-
-  <!-- RECEBIMENTO -->
-
-  <dialog id="receiveDialog">
-    <div class="modal">
-      <h2>Receber estoque</h2>
-
-      <div class="muted">Registre a entrada de um novo lote no estoque.</div>
-
-      <form id="receiveForm" class="modalform">
-        <div class="field">
-          <label for="receiveProduct"> Produto </label>
-
-          <select id="receiveProduct" required></select>
-        </div>
-
-        <div class="field">
-          <label for="lotCode"> Código do lote </label>
-
-          <input id="lotCode" maxlength="120" required placeholder="Ex.: LOTE-2309" />
-        </div>
-
-        <div class="twocol">
-          <div class="field">
-            <label for="expiry"> Validade </label>
-
-            <input id="expiry" type="date" required />
-          </div>
-
-          <div class="field">
-            <label for="receiveQuantity"> Quantidade </label>
-
-            <input id="receiveQuantity" type="number" min="1" value="1" required />
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="receiveNote"> Observação </label>
-
-          <textarea id="receiveNote" maxlength="1000" placeholder="Opcional"></textarea>
-        </div>
-
-        <div id="receiveMessage" class="formmsg"></div>
-
-        <div class="modalactions">
-          <button type="button" class="btn" data-close="receiveDialog">
-            Cancelar
-          </button>
-
-          <button id="saveReceipt" class="btn green" type="submit">
-            Registrar recebimento
-          </button>
-        </div>
-      </form>
-    </div>
-  </dialog>
-
-  <!-- MOVIMENTAÇÃO -->
-
-  <dialog id="transferDialog">
-    <div class="modal">
-      <h2>Movimentar bebidas</h2>
-
-      <div class="muted">
-        Transfira unidades entre o estoque e a geladeira.
+        </form>
       </div>
+    </dialog>
 
-      <form id="transferForm" class="modalform">
-        <div class="field">
-          <label for="transferLot">Produto / lote</label>
-          <select id="transferLot" required></select>
-        </div>
+    <!-- RECEBIMENTO -->
 
-        <div class="field">
-          <label for="transferDirection">Movimentação</label>
+    <dialog id="receiveDialog">
+      <div class="modal">
+        <h2>Receber estoque</h2>
 
-          <select id="transferDirection">
-            <option value="stock-fridge">Estoque → Geladeira</option>
+        <div class="muted">Registre a entrada de um novo lote no estoque.</div>
 
-            <option value="fridge-stock">Geladeira → Estoque</option>
-          </select>
-        </div>
+        <form id="receiveForm" class="modalform">
+          <div class="field">
+            <label for="receiveProduct"> Produto </label>
 
-        <div class="field">
-          <label for="transferQuantity">Quantidade</label>
+            <select id="receiveProduct" required></select>
+          </div>
 
-          <input id="transferQuantity" type="number" min="1" value="1" required />
-        </div>
+          <div class="field">
+            <label for="lotCode"> Código do lote </label>
 
-        <div id="transferBalance" class="muted"></div>
+            <input
+              id="lotCode"
+              maxlength="120"
+              required
+              placeholder="Ex.: LOTE-2309"
+            />
+          </div>
 
-        <div class="field">
-          <label for="transferNote">Observação</label>
+          <div class="twocol">
+            <div class="field">
+              <label for="expiry"> Validade </label>
 
-          <textarea id="transferNote" maxlength="1000" placeholder="Opcional"></textarea>
-        </div>
+              <input id="expiry" type="date" required />
+            </div>
 
-        <div id="transferMessage" class="formmsg"></div>
+            <div class="field">
+              <label for="receiveQuantity"> Quantidade </label>
 
-        <div class="modalactions">
-          <button type="button" class="btn" data-close="transferDialog">
-            Cancelar
-          </button>
+              <input
+                id="receiveQuantity"
+                type="number"
+                min="1"
+                value="1"
+                required
+              />
+            </div>
+          </div>
 
-          <button id="saveTransfer" class="btn green" type="submit">
-            Confirmar movimentação
-          </button>
-        </div>
-      </form>
-    </div>
-  </dialog>
+          <div class="field">
+            <label for="receiveNote"> Observação </label>
 
-  <!-- VENDA -->
+            <textarea
+              id="receiveNote"
+              maxlength="1000"
+              placeholder="Opcional"
+            ></textarea>
+          </div>
 
-  <dialog id="saleDialog">
-    <div class="modal">
-      <h2>Registrar venda</h2>
+          <div id="receiveMessage" class="formmsg"></div>
 
-      <div class="muted">
-        A venda retira unidades diretamente da geladeira.
+          <div class="modalactions">
+            <button type="button" class="btn" data-close="receiveDialog">
+              Cancelar
+            </button>
+
+            <button id="saveReceipt" class="btn green" type="submit">
+              Registrar recebimento
+            </button>
+          </div>
+        </form>
       </div>
+    </dialog>
 
-      <form id="saleForm" class="modalform">
-        <div class="field">
-          <label for="saleLot">Produto / lote</label>
-          <select id="saleLot" required></select>
+    <!-- MOVIMENTAÇÃO -->
+
+    <dialog id="transferDialog">
+      <div class="modal">
+        <h2>Movimentar bebidas</h2>
+
+        <div class="muted">
+          Transfira unidades entre o estoque e a geladeira.
         </div>
 
-        <div id="saleBalance" class="muted"></div>
+        <form id="transferForm" class="modalform">
+          <div class="field">
+            <label for="transferLot">Produto / lote</label>
+            <select id="transferLot" required></select>
+          </div>
 
-        <div class="field">
-          <label for="saleQuantity">Quantidade vendida</label>
+          <div class="field">
+            <label for="transferDirection">Movimentação</label>
 
-          <input id="saleQuantity" type="number" min="1" value="1" required />
-        </div>
+            <select id="transferDirection">
+              <option value="stock-fridge">Estoque → Geladeira</option>
 
-        <div class="field">
-          <label for="saleNote">Observação</label>
+              <option value="fridge-stock">Geladeira → Estoque</option>
+            </select>
+          </div>
 
-          <textarea id="saleNote" maxlength="1000" placeholder="Opcional"></textarea>
-        </div>
+          <div class="field">
+            <label for="transferQuantity">Quantidade</label>
 
-        <div id="saleMessage" class="formmsg"></div>
+            <input
+              id="transferQuantity"
+              type="number"
+              min="1"
+              value="1"
+              required
+            />
+          </div>
 
-        <div class="modalactions">
-          <button type="button" class="btn" data-close="saleDialog">
-            Cancelar
-          </button>
+          <div id="transferBalance" class="muted"></div>
 
-          <button id="saveSale" class="btn green" type="submit">
-            Registrar venda
-          </button>
-        </div>
-      </form>
-    </div>
-  </dialog>
+          <div class="field">
+            <label for="transferNote">Observação</label>
 
-  <!-- PERDA -->
+            <textarea
+              id="transferNote"
+              maxlength="1000"
+              placeholder="Opcional"
+            ></textarea>
+          </div>
 
-  <dialog id="lossDialog">
-    <div class="modal">
-      <h2>Registrar perda</h2>
+          <div id="transferMessage" class="formmsg"></div>
 
-      <div class="muted">
-        Utilize para quebra, vencimento, descarte ou divergência identificada.
+          <div class="modalactions">
+            <button type="button" class="btn" data-close="transferDialog">
+              Cancelar
+            </button>
+
+            <button id="saveTransfer" class="btn green" type="submit">
+              Confirmar movimentação
+            </button>
+          </div>
+        </form>
       </div>
+    </dialog>
 
-      <form id="lossForm" class="modalform">
-        <div class="field">
-          <label for="lossLot">Produto / lote</label>
-          <select id="lossLot" required></select>
+    <!-- VENDA -->
+
+    <dialog id="saleDialog">
+      <div class="modal">
+        <h2>Registrar venda</h2>
+
+        <div class="muted">
+          A venda retira unidades diretamente da geladeira.
         </div>
 
-        <div class="field">
-          <label for="lossLocation">Local da perda</label>
+        <form id="saleForm" class="modalform">
+          <div class="field">
+            <label for="saleLot">Produto / lote</label>
+            <select id="saleLot" required></select>
+          </div>
 
-          <select id="lossLocation">
-            <option value="stock">Estoque</option>
-            <option value="fridge">Geladeira</option>
-          </select>
-        </div>
+          <div id="saleBalance" class="muted"></div>
 
-        <div id="lossBalance" class="muted"></div>
+          <div class="field">
+            <label for="saleQuantity">Quantidade vendida</label>
 
-        <div class="field">
-          <label for="lossQuantity">Quantidade</label>
+            <input id="saleQuantity" type="number" min="1" value="1" required />
+          </div>
 
-          <input id="lossQuantity" type="number" min="1" value="1" required />
-        </div>
+          <div class="field">
+            <label for="saleNote">Observação</label>
 
-        <div class="field">
-          <label for="lossNote">Motivo / observação</label>
+            <textarea
+              id="saleNote"
+              maxlength="1000"
+              placeholder="Opcional"
+            ></textarea>
+          </div>
 
-          <textarea id="lossNote" maxlength="1000" required placeholder="Ex.: garrafa quebrada"></textarea>
-        </div>
+          <div id="saleMessage" class="formmsg"></div>
 
-        <div id="lossMessage" class="formmsg"></div>
+          <div class="modalactions">
+            <button type="button" class="btn" data-close="saleDialog">
+              Cancelar
+            </button>
 
-        <div class="modalactions">
-          <button type="button" class="btn" data-close="lossDialog">
-            Cancelar
-          </button>
-
-          <button id="saveLoss" class="btn red" type="submit">
-            Registrar perda
-          </button>
-        </div>
-      </form>
-    </div>
-  </dialog>
-
-  <dialog id="adjustDialog">
-    <div class="modal">
-      <h2>Ajustar inventário</h2>
-
-      <div class="muted">
-        Informe a quantidade física encontrada. O sistema calcula a diferença
-        automaticamente.
+            <button id="saveSale" class="btn green" type="submit">
+              Registrar venda
+            </button>
+          </div>
+        </form>
       </div>
+    </dialog>
 
-      <form id="adjustForm" class="modalform">
-        <div class="field">
-          <label for="adjustLot">Produto / lote</label>
-          <select id="adjustLot" required></select>
+    <!-- PERDA -->
+
+    <dialog id="lossDialog">
+      <div class="modal">
+        <h2>Registrar perda</h2>
+
+        <div class="muted">
+          Utilize para quebra, vencimento, descarte ou divergência identificada.
         </div>
 
-        <div class="field">
-          <label for="adjustLocation">Local</label>
+        <form id="lossForm" class="modalform">
+          <div class="field">
+            <label for="lossLot">Produto / lote</label>
+            <select id="lossLot" required></select>
+          </div>
 
-          <select id="adjustLocation">
-            <option value="stock">Estoque</option>
-            <option value="fridge">Geladeira</option>
-          </select>
+          <div class="field">
+            <label for="lossLocation">Local da perda</label>
+
+            <select id="lossLocation">
+              <option value="stock">Estoque</option>
+              <option value="fridge">Geladeira</option>
+            </select>
+          </div>
+
+          <div id="lossBalance" class="muted"></div>
+
+          <div class="field">
+            <label for="lossQuantity">Quantidade</label>
+
+            <input id="lossQuantity" type="number" min="1" value="1" required />
+          </div>
+
+          <div class="field">
+            <label for="lossNote">Motivo / observação</label>
+
+            <textarea
+              id="lossNote"
+              maxlength="1000"
+              required
+              placeholder="Ex.: garrafa quebrada"
+            ></textarea>
+          </div>
+
+          <div id="lossMessage" class="formmsg"></div>
+
+          <div class="modalactions">
+            <button type="button" class="btn" data-close="lossDialog">
+              Cancelar
+            </button>
+
+            <button id="saveLoss" class="btn red" type="submit">
+              Registrar perda
+            </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <dialog id="adjustDialog">
+      <div class="modal">
+        <h2>Ajustar inventário</h2>
+
+        <div class="muted">
+          Informe a quantidade física encontrada. O sistema calcula a diferença
+          automaticamente.
         </div>
 
-        <div id="adjustBalance" class="muted"></div>
+        <form id="adjustForm" class="modalform">
+          <div class="field">
+            <label for="adjustLot">Produto / lote</label>
+            <select id="adjustLot" required></select>
+          </div>
 
-        <div class="field">
-          <label for="adjustQuantity">Quantidade física encontrada</label>
+          <div class="field">
+            <label for="adjustLocation">Local</label>
 
-          <input id="adjustQuantity" type="number" min="0" value="0" required />
-        </div>
+            <select id="adjustLocation">
+              <option value="stock">Estoque</option>
+              <option value="fridge">Geladeira</option>
+            </select>
+          </div>
 
-        <div class="field">
-          <label for="adjustNote">Motivo / observação</label>
+          <div id="adjustBalance" class="muted"></div>
 
-          <textarea id="adjustNote" maxlength="1000" required
-            placeholder="Ex.: conferência física de fechamento"></textarea>
-        </div>
+          <div class="field">
+            <label for="adjustQuantity">Quantidade física encontrada</label>
 
-        <div id="adjustMessage" class="formmsg"></div>
+            <input
+              id="adjustQuantity"
+              type="number"
+              min="0"
+              value="0"
+              required
+            />
+          </div>
 
-        <div class="modalactions">
-          <button type="button" class="btn" data-close="adjustDialog">
-            Cancelar
-          </button>
+          <div class="field">
+            <label for="adjustNote">Motivo / observação</label>
 
-          <button id="saveAdjust" class="btn red" type="submit">
-            Aplicar ajuste
-          </button>
-        </div>
-      </form>
-    </div>
-  </dialog>
+            <textarea
+              id="adjustNote"
+              maxlength="1000"
+              required
+              placeholder="Ex.: conferência física de fechamento"
+            ></textarea>
+          </div>
 
-  <script src="config.js"></script>
+          <div id="adjustMessage" class="formmsg"></div>
 
-  <script type="module" src="cloud-dashboard.js"></script>
-</body>
+          <div class="modalactions">
+            <button type="button" class="btn" data-close="adjustDialog">
+              Cancelar
+            </button>
 
+            <button id="saveAdjust" class="btn red" type="submit">
+              Aplicar ajuste
+            </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <script src="config.js"></script>
+
+    <script type="module" src="cloud-dashboard.js"></script>
+  </body>
 </html>
