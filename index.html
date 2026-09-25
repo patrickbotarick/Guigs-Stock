@@ -620,36 +620,36 @@
         color: #a12830;
       }
 
-.historypaging {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+      .historypaging {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
 
-.historyfilters {
-  display: grid;
-  grid-template-columns:
-    minmax(150px, 1.2fr)
-    minmax(130px, 1fr)
-    minmax(130px, 0.8fr)
-    minmax(130px, 0.8fr)
-    minmax(170px, 1.2fr)
-    minmax(190px, 1.4fr)
-    auto;
-  gap: 8px;
-  margin-bottom: 15px;
-}
+      .historyfilters {
+        display: grid;
+        grid-template-columns:
+          minmax(150px, 1.2fr)
+          minmax(130px, 1fr)
+          minmax(130px, 0.8fr)
+          minmax(130px, 0.8fr)
+          minmax(170px, 1.2fr)
+          minmax(190px, 1.4fr)
+          auto;
+        gap: 8px;
+        margin-bottom: 15px;
+      }
 
-.historyfilters input,
-.historyfilters select {
-  width: 100%;
-  min-width: 0;
-  border: 1px solid #e0deda;
-  border-radius: 9px;
-  padding: 10px;
-  background: white;
-  font-size: 12px;
-}
+      .historyfilters input,
+      .historyfilters select {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid #e0deda;
+        border-radius: 9px;
+        padding: 10px;
+        background: white;
+        font-size: 12px;
+      }
 
       .filters {
         display: flex;
@@ -828,10 +828,9 @@
       }
 
       @media (max-width: 950px) {
-
         .historyfilters {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
 
         .quickactions {
           grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -869,15 +868,14 @@
       }
 
       @media (max-width: 500px) {
-
         .historyfilters {
-  grid-template-columns: 1fr;
-}
+          grid-template-columns: 1fr;
+        }
 
-.historypaging {
-  width: 100%;
-  justify-content: flex-end;
-}
+        .historypaging {
+          width: 100%;
+          justify-content: flex-end;
+        }
 
         .tablewrap {
           overflow-x: auto;
@@ -1033,60 +1031,7 @@
           grid-template-columns: 1fr;
         }
 
-        .top {
-          flex-direction: column;
-          align-items: stretch;
-          gap: 14px;
-        }
-
-        .top .actions {
-          width: 100%;
-        }
-
-        .top .actions .btn {
-          flex: 1;
-        }
-
-        .eyebrow {
-          font-size: 10px;
-        }
-
-        .top h1 {
-          font-size: 28px;
-        }
-
-        .operationbar {
-          padding: 18px;
-        }
-
-        .managementactions {
-          display: grid;
-          grid-template-columns: 1fr;
-        }
-
-        .managementactions .btn {
-          width: 100%;
-        }
-
-        .metrics {
-          gap: 10px;
-        }
-
-        .metric {
-          padding: 16px;
-        }
-
-        .alerts-panel {
-          padding: 16px;
-        }
-
-        .operational-alert {
-          align-items: flex-start;
-        }
-
-        .alert-level {
-          margin-top: 2px;
-        }
+        
 
         .quickaction {
           min-height: 76px;
@@ -1311,56 +1256,56 @@
               </div>
 
               <div class="historypaging">
-  <button id="prev" class="btn">←</button>
+                <button id="prev" class="btn">←</button>
 
-  <span id="page" class="badge">1/1</span>
+                <span id="page" class="badge">1/1</span>
 
-  <button id="next" class="btn">→</button>
-</div>
+                <button id="next" class="btn">→</button>
+              </div>
             </div>
-<div class="historyfilters">
-  <select id="historyProduct">
-    <option value="">Todos os produtos</option>
-  </select>
+            <div class="historyfilters">
+              <select id="historyProduct">
+                <option value="">Todos os produtos</option>
+              </select>
 
-  <select id="historyType">
-    <option value="">Todos os tipos</option>
-    <option value="receipt">Recebimento</option>
-    <option value="transfer">Transferência</option>
-    <option value="return">Retorno</option>
-    <option value="sale">Venda</option>
-    <option value="loss">Perda</option>
-    <option value="adjust">Ajuste</option>
-  </select>
+              <select id="historyType">
+                <option value="">Todos os tipos</option>
+                <option value="receipt">Recebimento</option>
+                <option value="transfer">Transferência</option>
+                <option value="return">Retorno</option>
+                <option value="sale">Venda</option>
+                <option value="loss">Perda</option>
+                <option value="adjust">Ajuste</option>
+              </select>
 
-  <input
-    id="historyDateFrom"
-    type="date"
-    aria-label="Data inicial"
-    title="Data inicial"
-  />
+              <input
+                id="historyDateFrom"
+                type="date"
+                aria-label="Data inicial"
+                title="Data inicial"
+              />
 
-  <input
-    id="historyDateTo"
-    type="date"
-    aria-label="Data final"
-    title="Data final"
-  />
+              <input
+                id="historyDateTo"
+                type="date"
+                aria-label="Data final"
+                title="Data final"
+              />
 
-  <select id="historyActor">
-    <option value="">Todos os usuários</option>
-  </select>
+              <select id="historyActor">
+                <option value="">Todos os usuários</option>
+              </select>
 
-  <input
-    id="search"
-    type="search"
-    placeholder="Buscar produto, lote ou observação…"
-  />
+              <input
+                id="search"
+                type="search"
+                placeholder="Buscar produto, lote ou observação…"
+              />
 
-  <button id="clearHistoryFilters" class="btn" type="button">
-    Limpar filtros
-  </button>
-</div>
+              <button id="clearHistoryFilters" class="btn" type="button">
+                Limpar filtros
+              </button>
+            </div>
             <div class="tablewrap history-table-wrap">
               <table class="table history-table">
                 <thead>
@@ -1369,8 +1314,8 @@
                     <th>Produto / lote</th>
                     <th>Tipo</th>
                     <th>Local</th>
-<th>Responsável</th>
-<th class="num">Variação</th>
+                    <th>Responsável</th>
+                    <th class="num">Variação</th>
                   </tr>
                 </thead>
 
