@@ -18,6 +18,15 @@ let historyTotal = 0;
 const historyPageSize = 20;
 
 let query = '';
+
+let historyProduct = '';
+let historyType = '';
+let historyActor = '';
+let historyDateFrom = '';
+let historyDateTo = '';
+
+let historyActors = [];
+
 let historySearchTimer = null;
 
 let requestCounter = 0;
@@ -391,7 +400,11 @@ async function refresh() {
 
     populateReceiveProducts();
 
-    await loadHistory();
+await loadHistoryActors();
+
+populateHistoryFilters();
+
+await loadHistory();
 
 
     el('content')
@@ -1079,6 +1092,138 @@ function render() {
 // HISTÓRICO
 // ============================================================
 
+async function loadHistoryActors() {
+
+  if (!shop || !client) {
+    return;
+  }
+
+
+  const {
+    data,
+    error
+  } = await client.rpc(
+    'guigs_get_history_actors',
+    {
+      p_shop: shop.shop_id
+    }
+  );
+
+
+  if (error) {
+    throw error;
+  }
+
+
+  historyActors =
+    data || [];
+}
+
+
+function populateHistoryFilters() {
+
+  const productSelect =
+    el('historyProduct');
+
+
+  const actorSelect =
+    el('historyActor');
+
+
+  productSelect.replaceChildren();
+
+
+  const allProducts =
+    document.createElement('option');
+
+
+  allProducts.value = '';
+
+  allProducts.textContent =
+    'Todos os produtos';
+
+
+  productSelect.append(
+    allProducts
+  );
+
+
+  for (
+    const product
+    of [...products].sort(
+      (a, b) =>
+        a.name.localeCompare(
+          b.name,
+          'pt-BR'
+        )
+    )
+  ) {
+
+    const option =
+      document.createElement('option');
+
+
+    option.value =
+      product.id;
+
+
+    option.textContent =
+      product.name;
+
+
+    productSelect.append(
+      option
+    );
+  }
+
+
+  productSelect.value =
+    historyProduct;
+
+
+  actorSelect.replaceChildren();
+
+
+  const allActors =
+    document.createElement('option');
+
+
+  allActors.value = '';
+
+  allActors.textContent =
+    'Todos os usuários';
+
+
+  actorSelect.append(
+    allActors
+  );
+
+
+  for (const actor of historyActors) {
+
+    const option =
+      document.createElement('option');
+
+
+    option.value =
+      actor.actor_id;
+
+
+    option.textContent =
+      actor.actor_email
+      || 'Usuário desconhecido';
+
+
+    actorSelect.append(
+      option
+    );
+  }
+
+
+  actorSelect.value =
+    historyActor;
+}
+
 async function loadHistory() {
 
   if (!shop || !client) {
@@ -1099,11 +1244,28 @@ async function loadHistory() {
       p_shop: shop.shop_id,
       p_limit: historyPageSize,
       p_offset: offset,
-      p_product: null,
-      p_type: null,
-      p_actor: null,
-      p_date_from: null,
-      p_date_to: null,
+      p_product:
+  historyProduct || null,
+
+p_type:
+  historyType || null,
+
+p_actor:
+  historyActor || null,
+
+p_date_from:
+  historyDateFrom
+    ? new Date(
+        `${historyDateFrom}T00:00:00`
+      ).toISOString()
+    : null,
+
+p_date_to:
+  historyDateTo
+    ? new Date(
+        `${historyDateTo}T23:59:59.999`
+      ).toISOString()
+    : null,
       p_search:
         query.trim()
           ? query.trim()
@@ -1245,6 +1407,11 @@ function renderHistory() {
       locationCell
     );
 
+    cell(
+      r,
+      m.actor_email
+      || 'Usuário desconhecido'
+    );
 
     cell(
       r,
@@ -1264,7 +1431,7 @@ function renderHistory() {
     empty(
       ht,
       'Nenhuma movimentação encontrada.',
-      5
+      6
     );
   }
 
@@ -2538,6 +2705,116 @@ el('signout')
     }
   );
 
+async function applyHistoryFilters() {
+
+  historyPage = 0;
+
+
+  try {
+
+    await loadHistory();
+
+  }
+  catch (e) {
+
+    say(
+      'Não foi possível filtrar o histórico: '
+      + (e.message || e),
+      'danger'
+    );
+  }
+}
+
+
+el('historyProduct')
+  .addEventListener(
+    'change',
+    event => {
+
+      historyProduct =
+        event.target.value;
+
+      void applyHistoryFilters();
+    }
+  );
+
+
+el('historyType')
+  .addEventListener(
+    'change',
+    event => {
+
+      historyType =
+        event.target.value;
+
+      void applyHistoryFilters();
+    }
+  );
+
+
+el('historyActor')
+  .addEventListener(
+    'change',
+    event => {
+
+      historyActor =
+        event.target.value;
+
+      void applyHistoryFilters();
+    }
+  );
+
+
+el('historyDateFrom')
+  .addEventListener(
+    'change',
+    event => {
+
+      historyDateFrom =
+        event.target.value;
+
+      void applyHistoryFilters();
+    }
+  );
+
+
+el('historyDateTo')
+  .addEventListener(
+    'change',
+    event => {
+
+      historyDateTo =
+        event.target.value;
+
+      void applyHistoryFilters();
+    }
+  );
+
+
+el('clearHistoryFilters')
+  .addEventListener(
+    'click',
+    () => {
+
+      historyProduct = '';
+      historyType = '';
+      historyActor = '';
+      historyDateFrom = '';
+      historyDateTo = '';
+      query = '';
+
+
+      el('historyProduct').value = '';
+      el('historyType').value = '';
+      el('historyActor').value = '';
+      el('historyDateFrom').value = '';
+      el('historyDateTo').value = '';
+      el('search').value = '';
+
+
+      void applyHistoryFilters();
+    }
+  );
 
 el('search')
   .addEventListener(
