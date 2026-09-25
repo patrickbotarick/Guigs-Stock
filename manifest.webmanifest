@@ -1,0 +1,19 @@
+{
+  "name": "Guig's Stock",
+  "short_name": "Guig's Stock",
+  "description": "Controle interno de estoque da Pizzaria Guig's.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "logo-guigs.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
