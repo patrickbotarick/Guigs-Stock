@@ -14,7 +14,20 @@ let moves = [];
 let lotBalances = new Map();
 
 let historyPage = 0;
+let historyTotal = 0;
+const historyPageSize = 20;
+
 let query = '';
+
+let historyProduct = '';
+let historyType = '';
+let historyActor = '';
+let historyDateFrom = '';
+let historyDateTo = '';
+
+let historyActors = [];
+
+let historySearchTimer = null;
 
 let requestCounter = 0;
 
@@ -329,7 +342,7 @@ async function refresh() {
 
   try {
 
-    const [p, l, m] =
+    const [p, l, balanceResult] =
       await Promise.all([
 
         allRows(
@@ -342,10 +355,14 @@ async function refresh() {
           'id,product_id,code,expiry'
         ),
 
-        allRows(
-          'guigs_movements',
-          'id,lot_id,event_id,movement_type,location,delta,actor_id,note,created_at'
-        )
+        client.rpc(
+          'guigs_get_lot_balances',
+          {
+            p_shop: shop.shop_id
+          }
+        ),
+
+
 
       ]);
 
@@ -355,14 +372,39 @@ async function refresh() {
     }
 
 
+    if (balanceResult.error) {
+      throw balanceResult.error;
+    }
+
+
     products = p;
     lots = l;
-    moves = m;
+
+
+
+    lotBalances =
+      new Map(
+        (balanceResult.data || []).map(
+          row => [
+            row.lot_id,
+            {
+              stock: Number(row.stock),
+              fridge: Number(row.fridge)
+            }
+          ]
+        )
+      );
 
 
     render();
 
     populateReceiveProducts();
+
+await loadHistoryActors();
+
+populateHistoryFilters();
+
+await loadHistory();
 
 
     el('content')
@@ -408,47 +450,8 @@ function render() {
       )
     );
 
-
-  const balance =
-    new Map(
-      lots.map(
-        l => [
-          l.id,
-          {
-            stock: 0,
-            fridge: 0
-          }
-        ]
-      )
-    );
-
-
-  for (const m of moves) {
-
-    if (
-      !balance.has(m.lot_id)
-      ||
-      !['stock', 'fridge']
-        .includes(m.location)
-      ||
-      !Number.isSafeInteger(m.delta)
-    ) {
-
-      throw Error(
-        'Movimentação inconsistente no banco de dados.'
-      );
-    }
-
-
-    balance
-      .get(m.lot_id)[m.location]
-      += m.delta;
-  }
-
-  lotBalances = balance;
-
   if (
-    [...balance.values()]
+    [...lotBalances.values()]
       .some(
         b =>
           b.stock < 0
@@ -493,7 +496,11 @@ function render() {
 
 
     const b =
-      balance.get(l.id);
+      lotBalances.get(l.id)
+      || {
+        stock: 0,
+        fridge: 0
+      };
 
 
     const q =
@@ -551,18 +558,232 @@ function render() {
   }
 
 
-  el('total').textContent =
-    stock + fridge;
+  const productsAttention =
+    products.filter(
+      p => {
+
+        if (!p.active) {
+          return false;
+        }
+
+
+        const b =
+          ps.get(p.id);
+
+
+        const total =
+          b.stock + b.fridge;
+
+
+        return (
+          total === 0
+          ||
+          total < p.min_total
+          ||
+          b.fridge < p.min_fridge
+        );
+      }
+    ).length;
+
+
+  const criticalLots =
+    lotList.filter(
+      l =>
+        l.days <= 30
+    ).length;
+
 
   el('stock').textContent =
     stock;
 
+
   el('fridge').textContent =
     fridge;
 
-  el('expiring').textContent =
-    near;
 
+  el('productsAttention').textContent =
+    productsAttention;
+
+
+  el('criticalLots').textContent =
+    criticalLots;
+
+  // ALERTAS OPERACIONAIS
+
+  const alerts = [];
+
+
+  for (const p of products) {
+
+    if (!p.active) {
+      continue;
+    }
+
+
+    const b =
+      ps.get(p.id);
+
+
+    const total =
+      b.stock + b.fridge;
+
+
+    if (total === 0) {
+
+      alerts.push({
+        level: 'danger',
+        title: `${p.name} está zerado`,
+        description:
+          'Não há unidades no estoque nem na geladeira.'
+      });
+
+      continue;
+    }
+
+
+    if (total < p.min_total) {
+
+      alerts.push({
+        level: 'warning',
+        title: `${p.name} abaixo do estoque mínimo`,
+        description:
+          `${total} unidades disponíveis · mínimo definido: ${p.min_total}.`
+      });
+    }
+
+
+    if (b.fridge < p.min_fridge) {
+
+      alerts.push({
+        level: 'warning',
+        title: `${p.name} com geladeira abaixo do mínimo`,
+        description:
+          `${b.fridge} unidades na geladeira · mínimo definido: ${p.min_fridge}.`
+      });
+    }
+  }
+
+
+  for (const l of lotList) {
+
+    if (l.days < 0) {
+
+      alerts.push({
+        level: 'danger',
+        title: `${l.product} possui lote vencido`,
+        description:
+          `Lote ${l.code} · ${l.qty} unidade(s) · validade ${dateBR(l.expiry)}.`
+      });
+
+    }
+    else if (l.days <= 15) {
+
+      alerts.push({
+        level: 'warning',
+        title: `${l.product} próximo do vencimento`,
+        description:
+          `Lote ${l.code} · vence em ${l.days} dia(s) · ${l.qty} unidade(s).`
+      });
+    }
+  }
+
+
+  const alertsPanel =
+    el('alertsPanel');
+
+
+  const alertsList =
+    el('operationalAlerts');
+
+
+  alertsList.replaceChildren();
+
+
+  if (!alerts.length) {
+
+    alertsPanel.classList.add(
+      'hidden'
+    );
+
+  }
+  else {
+
+    alertsPanel.classList.remove(
+      'hidden'
+    );
+
+
+    for (const alert of alerts) {
+
+      const item =
+        document.createElement('div');
+
+
+      item.className =
+        `operational-alert ${alert.level}`;
+
+
+      const text =
+        document.createElement('div');
+
+
+      const title =
+        document.createElement('strong');
+
+
+      title.textContent =
+        alert.title;
+
+
+      const description =
+        document.createElement('small');
+
+
+      description.textContent =
+        alert.description;
+
+
+      text.append(
+        title,
+        description
+      );
+
+
+      const level =
+        document.createElement('span');
+
+
+      level.className =
+        'alert-level';
+
+
+      level.textContent =
+        alert.level === 'danger'
+          ? 'Urgente'
+          : 'Atenção';
+
+
+      item.append(
+        text,
+        level
+      );
+
+
+      alertsList.append(
+        item
+      );
+    }
+
+
+    el('alertCount').textContent =
+      alerts.length
+      +
+      (
+        alerts.length === 1
+          ? ' alerta'
+          : ' alertas'
+      );
+  }
 
   // PRODUTOS
 
@@ -593,15 +814,70 @@ function render() {
       pt.insertRow();
 
 
+    const total =
+      b.stock + b.fridge;
+
+
+    let statusText =
+      'OK';
+
+
+    let statusClass =
+      'ok';
+
+
+    if (!p.active) {
+
+      statusText =
+        'Inativo';
+
+      statusClass =
+        'inactive';
+
+    }
+    else if (total === 0) {
+
+      statusText =
+        'Zerado';
+
+      statusClass =
+        'danger';
+
+      r.classList.add(
+        'product-row-danger'
+      );
+
+    }
+    else if (total < p.min_total) {
+
+      statusText =
+        'Estoque baixo';
+
+      statusClass =
+        'warning';
+
+      r.classList.add(
+        'product-row-warning'
+      );
+
+    }
+    else if (b.fridge < p.min_fridge) {
+
+      statusText =
+        'Geladeira baixa';
+
+      statusClass =
+        'warning';
+
+      r.classList.add(
+        'product-row-warning'
+      );
+    }
+
+
     cell(
       r,
       p.name
-      +
-      (
-        p.active
-          ? ''
-          : ' (inativo)'
-      )
     );
 
 
@@ -621,8 +897,34 @@ function render() {
 
     cell(
       r,
-      b.stock + b.fridge,
+      total,
       'num'
+    );
+
+
+    const statusCell =
+      document.createElement('td');
+
+
+    const statusBadge =
+      document.createElement('span');
+
+
+    statusBadge.className =
+      `product-status ${statusClass}`;
+
+
+    statusBadge.textContent =
+      statusText;
+
+
+    statusCell.append(
+      statusBadge
+    );
+
+
+    r.append(
+      statusCell
     );
   }
 
@@ -632,7 +934,7 @@ function render() {
     empty(
       pt,
       'Nenhuma bebida cadastrada.',
-      4
+      5
     );
   }
 
@@ -688,15 +990,77 @@ function render() {
     );
 
 
-    cell(
-      r,
-      l.days < 0
-        ? 'Vencido'
-        : l.days <= 15
-          ? 'Urgente'
-          : l.days <= 30
-            ? 'Atenção'
-            : 'Normal'
+    let expiryText =
+      'Normal';
+
+
+    let expiryClass =
+      'normal';
+
+
+    if (l.days < 0) {
+
+      expiryText =
+        'Vencido';
+
+      expiryClass =
+        'expired';
+
+      r.classList.add(
+        'expiry-row-expired'
+      );
+
+    }
+    else if (l.days <= 15) {
+
+      expiryText =
+        'Urgente';
+
+      expiryClass =
+        'urgent';
+
+      r.classList.add(
+        'expiry-row-urgent'
+      );
+
+    }
+    else if (l.days <= 30) {
+
+      expiryText =
+        'Atenção';
+
+      expiryClass =
+        'attention';
+
+      r.classList.add(
+        'expiry-row-attention'
+      );
+    }
+
+
+    const expiryCell =
+      document.createElement('td');
+
+
+    const expiryBadge =
+      document.createElement('span');
+
+
+    expiryBadge.className =
+      `expiry-status ${expiryClass}`;
+
+
+    expiryBadge.textContent =
+      expiryText;
+
+
+    expiryCell.append(
+      expiryBadge
+    );
+
+
+    r.append(
+      expiryCell
     );
   }
 
@@ -721,11 +1085,6 @@ function render() {
       .toLocaleString('pt-BR')
     }.`;
 
-
-  renderHistory(
-    lotMap,
-    productMap
-  );
 }
 
 
@@ -733,79 +1092,229 @@ function render() {
 // HISTÓRICO
 // ============================================================
 
-function renderHistory(
-  lotMap =
-    new Map(
-      lots.map(
-        l => [l.id, l]
-      )
-    ),
-  productMap =
-    new Map(
-      products.map(
-        p => [p.id, p]
-      )
+async function loadHistoryActors() {
+
+  if (!shop || !client) {
+    return;
+  }
+
+
+  const {
+    data,
+    error
+  } = await client.rpc(
+    'guigs_get_history_actors',
+    {
+      p_shop: shop.shop_id
+    }
+  );
+
+
+  if (error) {
+    throw error;
+  }
+
+
+  historyActors =
+    data || [];
+}
+
+
+function populateHistoryFilters() {
+
+  const productSelect =
+    el('historyProduct');
+
+
+  const actorSelect =
+    el('historyActor');
+
+
+  productSelect.replaceChildren();
+
+
+  const allProducts =
+    document.createElement('option');
+
+
+  allProducts.value = '';
+
+  allProducts.textContent =
+    'Todos os produtos';
+
+
+  productSelect.append(
+    allProducts
+  );
+
+
+  for (
+    const product
+    of [...products].sort(
+      (a, b) =>
+        a.name.localeCompare(
+          b.name,
+          'pt-BR'
+        )
     )
-) {
+  ) {
 
-  const ordered =
-    [...moves]
-      .sort(
-        (a, b) =>
-          b.created_at.localeCompare(
-            a.created_at
-          )
-          ||
-          b.id.localeCompare(a.id)
-      );
+    const option =
+      document.createElement('option');
 
 
-  const visible =
-    ordered.filter(
-      m => {
-
-        const l =
-          lotMap.get(m.lot_id);
+    option.value =
+      product.id;
 
 
-        const p =
-          productMap.get(
-            l?.product_id
-          );
+    option.textContent =
+      product.name;
 
 
-        return [
-          p?.name,
-          l?.code,
-          m.movement_type,
-          m.note
-        ].some(
-          v =>
-            String(v || '')
-              .toLocaleLowerCase(
-                'pt-BR'
-              )
-              .includes(query)
-        );
-      }
+    productSelect.append(
+      option
     );
+  }
 
 
+  productSelect.value =
+    historyProduct;
+
+
+  actorSelect.replaceChildren();
+
+
+  const allActors =
+    document.createElement('option');
+
+
+  allActors.value = '';
+
+  allActors.textContent =
+    'Todos os usuários';
+
+
+  actorSelect.append(
+    allActors
+  );
+
+
+  for (const actor of historyActors) {
+
+    const option =
+      document.createElement('option');
+
+
+    option.value =
+      actor.actor_id;
+
+
+    option.textContent =
+      actor.actor_email
+      || 'Usuário desconhecido';
+
+
+    actorSelect.append(
+      option
+    );
+  }
+
+
+  actorSelect.value =
+    historyActor;
+}
+
+async function loadHistory() {
+
+  if (!shop || !client) {
+    return;
+  }
+
+
+  const offset =
+    historyPage * historyPageSize;
+
+
+  const {
+    data,
+    error
+  } = await client.rpc(
+    'guigs_get_history',
+    {
+      p_shop: shop.shop_id,
+      p_limit: historyPageSize,
+      p_offset: offset,
+      p_product:
+  historyProduct || null,
+
+p_type:
+  historyType || null,
+
+p_actor:
+  historyActor || null,
+
+p_date_from:
+  historyDateFrom
+    ? new Date(
+        `${historyDateFrom}T00:00:00`
+      ).toISOString()
+    : null,
+
+p_date_to:
+  historyDateTo
+    ? new Date(
+        `${historyDateTo}T23:59:59.999`
+      ).toISOString()
+    : null,
+      p_search:
+        query.trim()
+          ? query.trim()
+          : null
+    }
+  );
+
+
+  if (error) {
+    throw error;
+  }
+
+
+  moves =
+    data || [];
+
+
+  historyTotal =
+    moves.length
+      ? Number(moves[0].total_count)
+      : 0;
+
+
+  /*
+   * Se uma página deixou de existir após filtros ou alterações,
+   * volta automaticamente para a última página válida.
+   */
   const pages =
     Math.max(
       1,
       Math.ceil(
-        visible.length / 20
+        historyTotal / historyPageSize
       )
     );
 
 
-  historyPage =
-    Math.min(
-      historyPage,
-      pages - 1
-    );
+  if (historyPage > pages - 1) {
 
+    historyPage =
+      pages - 1;
+
+    return loadHistory();
+  }
+
+
+  renderHistory();
+}
+
+function renderHistory() {
 
   const ht =
     el('history');
@@ -814,23 +1323,7 @@ function renderHistory(
   ht.replaceChildren();
 
 
-  for (
-    const m
-    of visible.slice(
-      historyPage * 20,
-      historyPage * 20 + 20
-    )
-  ) {
-
-    const l =
-      lotMap.get(m.lot_id);
-
-
-    const p =
-      productMap.get(
-        l?.product_id
-      );
-
+  for (const m of moves) {
 
     const r =
       ht.insertRow();
@@ -844,56 +1337,117 @@ function renderHistory(
 
     cell(
       r,
-      (p?.name || 'Desconhecido')
+      (m.product_name || 'Desconhecido')
       + ' · '
-      + (l?.code || '—')
+      + (m.lot_code || '—')
     );
 
 
-    cell(
-      r,
-      {
-        receipt: 'Recebimento',
-        transfer: 'Transferência',
-        return: 'Devolução',
-        sale: 'Venda',
-        loss: 'Perda',
-        adjust: 'Ajuste'
-      }[m.movement_type]
-      || m.movement_type
+    const movementLabels = {
+      receipt: 'Recebimento',
+      transfer: 'Transferência',
+      return: 'Retorno',
+      sale: 'Venda',
+      loss: 'Perda',
+      adjust: 'Ajuste'
+    };
+
+
+    const typeCell =
+      document.createElement('td');
+
+
+    const typeBadge =
+      document.createElement('span');
+
+
+    typeBadge.className =
+      `movement-type ${m.movement_type}`;
+
+
+    typeBadge.textContent =
+      movementLabels[m.movement_type]
+      || m.movement_type;
+
+
+    typeCell.append(
+      typeBadge
     );
 
 
-    cell(
-      r,
+    r.append(
+      typeCell
+    );
+
+
+    const locationCell =
+      document.createElement('td');
+
+
+    const locationBadge =
+      document.createElement('span');
+
+
+    locationBadge.className =
+      'location-badge';
+
+
+    locationBadge.textContent =
       m.location === 'stock'
         ? 'Estoque'
-        : 'Geladeira'
+        : 'Geladeira';
+
+
+    locationCell.append(
+      locationBadge
     );
 
+
+    r.append(
+      locationCell
+    );
+
+    cell(
+      r,
+      m.actor_email
+      || 'Usuário desconhecido'
+    );
 
     cell(
       r,
       (m.delta > 0 ? '+' : '')
       + m.delta,
-      'num'
+      m.delta > 0
+        ? 'num delta-positive'
+        : m.delta < 0
+          ? 'num delta-negative'
+          : 'num'
     );
   }
 
 
-  if (!visible.length) {
+  if (!moves.length) {
 
     empty(
       ht,
       'Nenhuma movimentação encontrada.',
-      5
+      6
     );
   }
 
 
+  const pages =
+    Math.max(
+      1,
+      Math.ceil(
+        historyTotal / historyPageSize
+      )
+    );
+
+
   el('page').textContent =
     `${historyPage + 1}/${pages}`
-    + ` · ${visible.length} lançamentos`;
+    + ` · ${historyTotal} lançamentos`;
 
 
   el('prev').disabled =
@@ -2151,6 +2705,116 @@ el('signout')
     }
   );
 
+async function applyHistoryFilters() {
+
+  historyPage = 0;
+
+
+  try {
+
+    await loadHistory();
+
+  }
+  catch (e) {
+
+    say(
+      'Não foi possível filtrar o histórico: '
+      + (e.message || e),
+      'danger'
+    );
+  }
+}
+
+
+el('historyProduct')
+  .addEventListener(
+    'change',
+    event => {
+
+      historyProduct =
+        event.target.value;
+
+      void applyHistoryFilters();
+    }
+  );
+
+
+el('historyType')
+  .addEventListener(
+    'change',
+    event => {
+
+      historyType =
+        event.target.value;
+
+      void applyHistoryFilters();
+    }
+  );
+
+
+el('historyActor')
+  .addEventListener(
+    'change',
+    event => {
+
+      historyActor =
+        event.target.value;
+
+      void applyHistoryFilters();
+    }
+  );
+
+
+el('historyDateFrom')
+  .addEventListener(
+    'change',
+    event => {
+
+      historyDateFrom =
+        event.target.value;
+
+      void applyHistoryFilters();
+    }
+  );
+
+
+el('historyDateTo')
+  .addEventListener(
+    'change',
+    event => {
+
+      historyDateTo =
+        event.target.value;
+
+      void applyHistoryFilters();
+    }
+  );
+
+
+el('clearHistoryFilters')
+  .addEventListener(
+    'click',
+    () => {
+
+      historyProduct = '';
+      historyType = '';
+      historyActor = '';
+      historyDateFrom = '';
+      historyDateTo = '';
+      query = '';
+
+
+      el('historyProduct').value = '';
+      el('historyType').value = '';
+      el('historyActor').value = '';
+      el('historyDateFrom').value = '';
+      el('historyDateTo').value = '';
+      el('search').value = '';
+
+
+      void applyHistoryFilters();
+    }
+  );
 
 el('search')
   .addEventListener(
@@ -2160,14 +2824,36 @@ el('search')
       query =
         event
           .target
-          .value
-          .toLocaleLowerCase(
-            'pt-BR'
-          );
+          .value;
+
 
       historyPage = 0;
 
-      renderHistory();
+
+      clearTimeout(
+        historySearchTimer
+      );
+
+
+      historySearchTimer =
+        setTimeout(
+          async () => {
+
+            try {
+              await loadHistory();
+            }
+            catch (e) {
+
+              say(
+                'Não foi possível pesquisar o histórico: '
+                + (e.message || e),
+                'danger'
+              );
+            }
+
+          },
+          350
+        );
     }
   );
 
@@ -2175,11 +2861,29 @@ el('search')
 el('prev')
   .addEventListener(
     'click',
-    () => {
+    async () => {
+
+      if (historyPage <= 0) {
+        return;
+      }
+
 
       historyPage--;
 
-      renderHistory();
+
+      try {
+        await loadHistory();
+      }
+      catch (e) {
+
+        historyPage++;
+
+        say(
+          'Não foi possível carregar o histórico: '
+          + (e.message || e),
+          'danger'
+        );
+      }
     }
   );
 
@@ -2187,11 +2891,38 @@ el('prev')
 el('next')
   .addEventListener(
     'click',
-    () => {
+    async () => {
+
+      const pages =
+        Math.max(
+          1,
+          Math.ceil(
+            historyTotal / historyPageSize
+          )
+        );
+
+
+      if (historyPage >= pages - 1) {
+        return;
+      }
+
 
       historyPage++;
 
-      renderHistory();
+
+      try {
+        await loadHistory();
+      }
+      catch (e) {
+
+        historyPage--;
+
+        say(
+          'Não foi possível carregar o histórico: '
+          + (e.message || e),
+          'danger'
+        );
+      }
     }
   );
 
