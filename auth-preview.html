@@ -1,1 +1,146 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Guig's Stock · Login de testes</title><style>body{margin:0;background:#151519;color:#252429;font:15px system-ui}main{max-width:460px;margin:6vh auto;padding:27px;background:#fff;border-radius:22px;box-shadow:0 20px 60px #0005}img{height:72px;display:block;margin:auto}h1{text-align:center;font-size:25px}p{line-height:1.6;color:#666}label{display:block;font-weight:700;margin:15px 0 6px}input,button{font:inherit;width:100%;padding:13px;box-sizing:border-box;border-radius:10px;border:1px solid #ddd}button{background:#a72832;color:#fff;border:0;margin-top:18px;font-weight:700;cursor:pointer}.primarylink{display:block;background:#237247;color:white;text-align:center;text-decoration:none;padding:13px;border-radius:10px;margin-top:14px;font-weight:700}button:disabled{opacity:.6}.secondary{background:#fff;color:#a72832;border:1px solid #a72832;margin-top:5px}.hint{font-size:12px}#message{white-space:pre-wrap;background:#f4f4f4;border-radius:10px;padding:13px;margin-top:17px;font-size:13px;overflow-wrap:anywhere}a{color:#b32935}#session{display:none}small{color:#9a3131}</style></head><body><main><img src="logo-guigs.png" alt="Pizzaria Guig's"><h1>Área de acesso · 1.2C.1</h1><p><strong>Autenticação do painel em nuvem.</strong> O painel permite consultar dados protegidos por login, mas lançamentos e sincronização ainda estão bloqueados. Use apenas dados de teste.</p><section id="login"><form id="form"><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required><button id="enter" type="submit">Entrar</button></form></section><section id="session"><p id="identity"></p><a id="openCloud" class="primarylink" href="index.html" style="display:none">Abrir painel em nuvem →</a><button id="logout" type="button">Sair</button></section><div id="message" role="status" aria-live="polite">Preparando ambiente…</div><section id="recovery"><p><button type="button" id="request-reset" class="secondary">Esqueci minha senha — enviar link de recuperação</button></p><p class="hint">O link será enviado ao e-mail preenchido acima. Aguarde se o Supabase indicar limite de envios.</p></section><p><a href="preview-local.html">Abrir protótipo LOCAL separado (sem sincronização)</a></p><small>Não existe cadastro público. A proprietária e as atendentes são criadas pelo administrador no Supabase.</small></main><script src="config.js"></script><script type="module" src="auth-preview.js"></script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#111111" />
+
+    <link rel="manifest" href="manifest.webmanifest" />
+
+    <link rel="icon" href="logo-guigs.png" />
+
+    <link rel="apple-touch-icon" href="logo-guigs.png" />
+
+    <title>Guig's Stock · Acesso</title>
+    <style>
+      body {
+        margin: 0;
+        background: #151519;
+        color: #252429;
+        font: 15px system-ui;
+      }
+      main {
+        max-width: 460px;
+        margin: 6vh auto;
+        padding: 27px;
+        background: #fff;
+        border-radius: 22px;
+        box-shadow: 0 20px 60px #0005;
+      }
+      img {
+        height: 72px;
+        display: block;
+        margin: auto;
+      }
+      h1 {
+        text-align: center;
+        font-size: 25px;
+      }
+      p {
+        line-height: 1.6;
+        color: #666;
+      }
+      label {
+        display: block;
+        font-weight: 700;
+        margin: 15px 0 6px;
+      }
+      input,
+      button {
+        font: inherit;
+        width: 100%;
+        padding: 13px;
+        box-sizing: border-box;
+        border-radius: 10px;
+        border: 1px solid #ddd;
+      }
+      button {
+        background: #a72832;
+        color: #fff;
+        border: 0;
+        margin-top: 18px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      
+      button:disabled {
+        opacity: 0.6;
+      }
+      .secondary {
+        background: #fff;
+        color: #a72832;
+        border: 1px solid #a72832;
+        margin-top: 5px;
+      }
+      .hint {
+        font-size: 12px;
+      }
+      #message {
+        white-space: pre-wrap;
+        background: #f4f4f4;
+        border-radius: 10px;
+        padding: 13px;
+        margin-top: 17px;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+      a {
+        color: #b32935;
+      }
+    
+      small {
+        color: #9a3131;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="logo-guigs.png" alt="Pizzaria Guig's" />
+      <h1>Área de acesso</h1>
+      <p>
+        <strong>Acesso ao Guig's Stock.</strong> Entre com sua conta para
+        consultar e operar o estoque da Pizzaria Guig's com os dados
+        sincronizados em nuvem.
+      </p>
+      <section id="login">
+        <form id="form">
+          <label for="email">E-mail</label
+          ><input
+            id="email"
+            type="email"
+            autocomplete="username"
+            required
+          /><label for="password">Senha</label
+          ><input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          /><button id="enter" type="submit">Entrar</button>
+        </form>
+      </section>
+      
+      <div id="message" role="status" aria-live="polite">
+        Preparando ambiente…
+      </div>
+      <section id="recovery">
+        <p>
+          <button type="button" id="request-reset" class="secondary">
+            Esqueci minha senha — enviar link de recuperação
+          </button>
+        </p>
+        <p class="hint">
+          O link será enviado ao e-mail preenchido acima. Aguarde se o Supabase
+          indicar limite de envios.
+        </p>
+      </section>
+     
+      <small
+        >O acesso é restrito a usuários autorizados da Pizzaria Guig's.</small
+      >
+    </main>
+    <script src="config.js"></script>
+    <script type="module" src="auth-preview.js?v=1.4.1"></script>
+    <script src="pwa.js"></script>
+  </body>
+</html>
