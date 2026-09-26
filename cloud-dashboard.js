@@ -132,6 +132,81 @@ function setOnlineDashboardState() {
   el('status').textContent = message;
   el('status').className = 'notice ' + kind;
 }
+function setOfflineDashboardState() {
+
+  isOffline = true;
+
+  say(
+    'Você está sem conexão com a internet. '
+    + 'Os dados em nuvem e as operações de estoque ficarão indisponíveis '
+    + 'até a conexão ser restaurada.',
+    'danger'
+  );
+
+  const ids = [
+    'refresh',
+    'receiveStock',
+    'transferStock',
+    'registerSale',
+    'registerLoss',
+    'newProduct',
+    'editProduct',
+    'adjustStock'
+  ];
+
+  for (const id of ids) {
+
+    const node =
+      el(id);
+
+    if (node) {
+      node.disabled = true;
+    }
+  }
+}
+
+
+function setOnlineDashboardState() {
+
+  isOffline = false;
+
+  const ids = [
+    'refresh',
+    'receiveStock',
+    'transferStock',
+    'registerSale',
+    'registerLoss'
+  ];
+
+  for (const id of ids) {
+
+    const node =
+      el(id);
+
+    if (node) {
+      node.disabled = false;
+    }
+  }
+
+  if (shop?.role === 'owner') {
+
+    const ownerIds = [
+      'newProduct',
+      'editProduct',
+      'adjustStock'
+    ];
+
+    for (const id of ownerIds) {
+
+      const node =
+        el(id);
+
+      if (node) {
+        node.disabled = false;
+      }
+    }
+  }
+}
 
 
 function cell(row, text, className = '') {
