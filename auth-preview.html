@@ -11,7 +11,7 @@
 
     <link rel="apple-touch-icon" href="logo-guigs.png" />
 
-    <title>Guig's Stock · Login de testes</title>
+    <title>Guig's Stock · Acesso</title>
     <style>
       body {
         margin: 0;
@@ -62,17 +62,7 @@
         font-weight: 700;
         cursor: pointer;
       }
-      .primarylink {
-        display: block;
-        background: #237247;
-        color: white;
-        text-align: center;
-        text-decoration: none;
-        padding: 13px;
-        border-radius: 10px;
-        margin-top: 14px;
-        font-weight: 700;
-      }
+      
       button:disabled {
         opacity: 0.6;
       }
@@ -97,9 +87,7 @@
       a {
         color: #b32935;
       }
-      #session {
-        display: none;
-      }
+    
       small {
         color: #9a3131;
       }
@@ -108,11 +96,11 @@
   <body>
     <main>
       <img src="logo-guigs.png" alt="Pizzaria Guig's" />
-      <h1>Área de acesso · 1.2C.1</h1>
+      <h1>Área de acesso</h1>
       <p>
-        <strong>Autenticação do painel em nuvem.</strong> O painel permite
-        consultar dados protegidos por login, mas lançamentos e sincronização
-        ainda estão bloqueados. Use apenas dados de teste.
+        <strong>Acesso ao Guig's Stock.</strong> Entre com sua conta para
+        consultar e operar o estoque da Pizzaria Guig's com os dados
+        sincronizados em nuvem.
       </p>
       <section id="login">
         <form id="form">
@@ -131,16 +119,7 @@
           /><button id="enter" type="submit">Entrar</button>
         </form>
       </section>
-      <section id="session">
-        <p id="identity"></p>
-        <a
-          id="openCloud"
-          class="primarylink"
-          href="index.html"
-          style="display: none"
-          >Abrir painel em nuvem →</a
-        ><button id="logout" type="button">Sair</button>
-      </section>
+      
       <div id="message" role="status" aria-live="polite">
         Preparando ambiente…
       </div>
@@ -155,18 +134,13 @@
           indicar limite de envios.
         </p>
       </section>
-      <p>
-        <a href="preview-local.html"
-          >Abrir protótipo LOCAL separado (sem sincronização)</a
-        >
-      </p>
+     
       <small
-        >Não existe cadastro público. A proprietária e as atendentes são criadas
-        pelo administrador no Supabase.</small
+        >O acesso é restrito a usuários autorizados da Pizzaria Guig's.</small
       >
     </main>
     <script src="config.js"></script>
-    <script type="module" src="auth-preview.js?v=1.4.0"></script>
+    <script type="module" src="auth-preview.js?v=1.4.1"></script>
     <script src="pwa.js"></script>
   </body>
 </html>
