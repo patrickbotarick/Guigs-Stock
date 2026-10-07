@@ -2273,6 +2273,32 @@ function updateTransferBalance() {
       : '';
 }
 
+function confirmFefo(selected, candidates) {
+  const list = el('fefoCandidates');
+  list.replaceChildren();
+  for (const candidate of candidates) {
+    const item = document.createElement('p');
+    item.textContent = `Lote: ${candidate.code} · Validade: ${dateBR(candidate.expiry)} · Disponível no estoque: ${candidate.stock} unidades`;
+    list.append(item);
+  }
+  el('fefoSelected').textContent = `Você está movimentando: ${lotLabel(selected)} · Validade: ${dateBR(selected.expiry)}.`;
+  const dialog = el('fefoDialog');
+  return new Promise(resolve => {
+    const cancel = () => dialog.close('cancel');
+    const proceed = () => dialog.close('continue');
+    const closed = () => {
+      el('cancelFefo').removeEventListener('click', cancel);
+      el('continueFefo').removeEventListener('click', proceed);
+      resolve(dialog.returnValue === 'continue');
+    };
+    dialog.returnValue = 'cancel';
+    el('cancelFefo').addEventListener('click', cancel);
+    el('continueFefo').addEventListener('click', proceed);
+    dialog.addEventListener('close', closed, {once: true});
+    dialog.showModal();
+    el('cancelFefo').focus();
+  });
+}
 
 async function transferStockOperation(event) {
 
@@ -2282,10 +2308,12 @@ async function transferStockOperation(event) {
 
   const button =
     el('saveTransfer');
+  if (button.disabled) return;
 
   button.disabled = true;
 
   try {
+    requireOnline();
 
     const direction =
       el('transferDirection').value;
@@ -2300,34 +2328,32 @@ async function transferStockOperation(event) {
         ? 'fridge'
         : 'stock';
 
+    // Captura o lote/quantidade antes da consulta e mantém a escolha ao confirmar.
+    const args = {
+      p_shop_id: shop.shop_id,
+      p_lot_id: el('transferLot').value,
+      p_from_location: from,
+      p_to_location: to,
+      p_quantity: Number(el('transferQuantity').value),
+      p_note: el('transferNote').value.trim()
+    };
+    const selected = lots.find(lot => lot.id === args.p_lot_id);
+    if (!selected) throw Error('Selecione um lote disponível.');
+    if (from === 'stock' && to === 'fridge') {
+      const result = await client.rpc('guigs_get_fefo_candidates', {
+        p_shop_id: shop.shop_id, p_lot_id: args.p_lot_id
+      });
+      if (result.error) throw result.error;
+      if (result.data?.length && !await confirmFefo(selected, result.data)) return;
+    }
+    requireOnline();
+
     const {
       data,
       error
     } = await client.rpc(
       'guigs_transfer_stock',
-      {
-        p_shop_id:
-          shop.shop_id,
-
-        p_lot_id:
-          el('transferLot').value,
-
-        p_from_location:
-          from,
-
-        p_to_location:
-          to,
-
-        p_quantity:
-          Number(
-            el('transferQuantity').value
-          ),
-
-        p_note:
-          el('transferNote')
-            .value
-            .trim()
-      }
+      args
     );
 
     if (error) {
@@ -2362,7 +2388,7 @@ async function transferStockOperation(event) {
   }
   finally {
 
-    button.disabled = false;
+    button.disabled = !navigator.onLine;
   }
 }
 

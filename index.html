@@ -1704,6 +1704,20 @@
       </div>
     </dialog>
 
+    <dialog id="fefoDialog" aria-labelledby="fefoTitle" aria-describedby="fefoAdvice">
+      <div class="modal">
+        <h2 id="fefoTitle">Atenção à ordem dos lotes</h2>
+        <p>Existe um lote deste produto com prioridade de uso por validade ou ordem de recebimento.</p>
+        <div id="fefoCandidates" class="balancebox"></div>
+        <p id="fefoSelected"></p>
+        <p id="fefoAdvice" class="muted">Recomendamos utilizar primeiro o lote com validade mais próxima; em caso de empate, o recebido primeiro. Deseja continuar mesmo assim?</p>
+        <div class="modalactions">
+          <button id="cancelFefo" type="button" class="btn">Cancelar</button>
+          <button id="continueFefo" type="button" class="btn green">Continuar movimentação</button>
+        </div>
+      </div>
+    </dialog>
+
     <!-- VENDA -->
 
     <dialog id="saleDialog">
