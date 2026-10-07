@@ -1,4 +1,4 @@
-const CACHE_NAME = "guigs-stock-shell-v5";
+const CACHE_NAME = "guigs-stock-shell-v6";
 
 const APP_SHELL = [
   "./",

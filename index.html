@@ -57,6 +57,12 @@
       }
 
       .side {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 225px;
+        height: 100dvh;
+        overflow-y: auto;
+        overflow-x: hidden;
         background: #19191c;
         color: white;
         padding: 24px 16px;
@@ -91,11 +97,19 @@
       }
 
       .menu {
+        display: block;
         padding: 13px;
         border-radius: 12px;
-        background: #ab2933;
+        color: #eee;
+        text-decoration: none;
         font-weight: 750;
       }
+
+      .menu[aria-current="page"] { background: #ab2933; }
+      .menu:hover { background: #713036; }
+      .menu:focus-visible { outline: 2px solid #e8bf83; outline-offset: 2px; }
+      .navigation { display: grid; gap: 8px; }
+      .nav-label { color: #bbb; font-size: 11px; letter-spacing: 1px; }
 
       .side p {
         color: #bbb;
@@ -111,12 +125,17 @@
       }
 
       .main {
+        grid-column: 2;
         padding: 35px clamp(15px, 4vw, 55px);
         max-width: 1500px;
         width: 100%;
-        margin: auto;
+        margin: 0 auto;
         min-width: 0;
       }
+
+      .main.history-view { max-width: none; }
+      #historyView .panel { width: 100%; }
+      #fefoCandidates { max-height: 35vh; overflow-y: auto; }
 
       .top {
         display: flex;
@@ -848,20 +867,29 @@
         }
 
         .side {
+          position: static;
+          width: auto;
+          height: auto;
+          overflow: visible;
           padding: 15px;
           flex-direction: row;
+          flex-wrap: wrap;
           align-items: center;
           justify-content: space-between;
           gap: 10px;
         }
 
         .side p,
-        .side footer,
-        .side .menu {
+        .side footer {
           display: none;
         }
 
+        .navigation { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-label { display: none; }
+        .menu { font-size: 13px; padding: 10px 12px; }
+
         .main {
+          grid-column: 1;
           padding: 18px 14px;
         }
 
@@ -1091,7 +1119,11 @@
           </div>
         </div>
 
-        <div class="menu">◫ Visão geral</div>
+        <nav class="navigation" aria-label="Navegação principal">
+          <span class="nav-label">NAVEGAÇÃO</span>
+          <a id="navOverview" class="menu" href="#visao-geral" aria-current="page">◫ Visão geral</a>
+          <a id="navHistory" class="menu" href="#historico">↻ Histórico</a>
+        </nav>
 
         <p>
           Controle de bebidas, lotes, validades e movimentações da Pizzaria
@@ -1105,7 +1137,7 @@
         <header class="top">
           <div>
             <p class="eyebrow">Pizzaria Guig's • Estoque em nuvem</p>
-            <h1>Painel do estoque</h1>
+            <h1 id="viewTitle">Painel do estoque</h1>
             <div id="identity" class="muted">Verificando autenticação…</div>
           </div>
 
@@ -1120,6 +1152,7 @@
         </div>
 
         <section id="content" class="hidden">
+          <section id="overviewView" aria-label="Visão geral">
           <div class="operationbar">
             <div class="operationhead">
               <div>
@@ -1254,10 +1287,12 @@
             </div>
           </div>
 
+          </section>
+          <section id="historyView" class="hidden" aria-label="Histórico de movimentações">
           <div class="panel">
             <div class="panelhead">
               <div>
-                <h2>Histórico na nuvem</h2>
+                <h2>Histórico de movimentações</h2>
                 <div class="muted">Movimentações mais recentes.</div>
               </div>
 
@@ -1329,6 +1364,7 @@
               </table>
             </div>
           </div>
+          </section>
 
           <div class="foot" id="updated"></div>
         </section>

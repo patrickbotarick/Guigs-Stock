@@ -2867,6 +2867,21 @@ async function adjustStockOperation(event) {
 // EVENTOS DE INTERFACE
 // ============================================================
 
+function applyView() {
+  const history = location.hash === '#historico';
+  el('overviewView').classList.toggle('hidden', history);
+  el('historyView').classList.toggle('hidden', !history);
+  document.querySelector('.main').classList.toggle('history-view', history);
+  el('viewTitle').textContent = history ? 'Histórico de movimentações' : 'Painel do estoque';
+  for (const [id, active] of [['navOverview', !history], ['navHistory', history]]) {
+    if (active) el(id).setAttribute('aria-current', 'page');
+    else el(id).removeAttribute('aria-current');
+  }
+}
+
+window.addEventListener('hashchange', applyView);
+applyView();
+
 el('refresh')
   .addEventListener(
     'click',
