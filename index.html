@@ -1153,217 +1153,217 @@
 
         <section id="content" class="hidden">
           <section id="overviewView" aria-label="Visão geral">
-          <div class="operationbar">
-            <div class="operationhead">
-              <div>
-                <h2>O que você precisa fazer?</h2>
-                <div class="muted">
-                  Acesse rapidamente as operações mais usadas no dia a dia.
-                </div>
-              </div>
-            </div>
-
-            <div class="quickactions">
-              <button id="receiveStock" class="quickaction primary">
-                <strong>↓ Receber estoque</strong>
-                <small>Registrar a chegada de novas bebidas</small>
-              </button>
-
-              <button id="transferStock" class="quickaction">
-                <strong>⇄ Movimentar</strong>
-                <small>Estoque ↔ geladeira</small>
-              </button>
-
-              <button id="registerSale" class="quickaction">
-                <strong>Venda</strong>
-                <small>Dar baixa em bebidas vendidas</small>
-              </button>
-
-              <button id="registerLoss" class="quickaction loss">
-                <strong>Registrar perda</strong>
-                <small>Quebra, vencimento ou descarte</small>
-              </button>
-            </div>
-
-            <div class="managementactions">
-              <button id="newProduct" class="btn">+ Novo produto</button>
-              <button id="editProduct" class="btn">Editar produto</button>
-              <button id="adjustStock" class="btn">Ajustar inventário</button>
-              <button id="manageSuppliers" class="btn">Fornecedores</button>
-            </div>
-          </div>
-
-          <section class="metrics">
-            <div class="metric">
-              <span>Estoque</span>
-              <b id="stock">—</b>
-              <small>Unidades armazenadas</small>
-            </div>
-
-            <div class="metric">
-              <span>Geladeira</span>
-              <b id="fridge">—</b>
-              <small>Unidades disponíveis</small>
-            </div>
-
-            <div class="metric">
-              <span>Produtos com atenção</span>
-              <b id="productsAttention">—</b>
-              <small>Abaixo do mínimo ou zerados</small>
-            </div>
-
-            <div class="metric">
-              <span>Lotes críticos</span>
-              <b id="criticalLots">—</b>
-              <small>Vencidos ou até 30 dias</small>
-            </div>
-          </section>
-
-          <div id="alertsPanel" class="alerts-panel hidden">
-            <div class="alerts-head">
-              <div>
-                <h2>Atenção operacional</h2>
-                <div class="muted">Situações que podem precisar de ação.</div>
-              </div>
-
-              <span id="alertCount" class="alerts-count">0 alertas</span>
-            </div>
-
-            <div id="operationalAlerts" class="alerts-list"></div>
-          </div>
-
-          <div class="section">
-            <div class="panel">
-              <div class="panelhead">
+            <div class="operationbar">
+              <div class="operationhead">
                 <div>
-                  <h2>Bebidas e localização</h2>
-                  <div class="muted">Saldo atual por produto</div>
+                  <h2>O que você precisa fazer?</h2>
+                  <div class="muted">
+                    Acesse rapidamente as operações mais usadas no dia a dia.
+                  </div>
                 </div>
-
-                <span class="badge green" id="productCount"> 0 produtos </span>
               </div>
 
-              <div class="tablewrap">
-                <table class="table product-table">
-                  <thead>
-                    <tr>
-                      <th>Produto</th>
-                      <th class="num">Est.</th>
-                      <th class="num">Gel.</th>
-                      <th class="num">Total</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
+              <div class="quickactions">
+                <button id="receiveStock" class="quickaction primary">
+                  <strong>↓ Receber estoque</strong>
+                  <small>Registrar a chegada de novas bebidas</small>
+                </button>
 
-                  <tbody id="products"></tbody>
-                </table>
+                <button id="transferStock" class="quickaction">
+                  <strong>⇄ Movimentar</strong>
+                  <small>Estoque ↔ geladeira</small>
+                </button>
+
+                <button id="registerSale" class="quickaction">
+                  <strong>Venda</strong>
+                  <small>Dar baixa em bebidas vendidas</small>
+                </button>
+
+                <button id="registerLoss" class="quickaction loss">
+                  <strong>Registrar perda</strong>
+                  <small>Quebra, vencimento ou descarte</small>
+                </button>
+              </div>
+
+              <div class="managementactions">
+                <button id="newProduct" class="btn">+ Novo produto</button>
+                <button id="editProduct" class="btn">Editar produto</button>
+                <button id="adjustStock" class="btn">Ajustar inventário</button>
+                <button id="manageSuppliers" class="btn">Fornecedores</button>
               </div>
             </div>
 
-            <div class="panel">
-              <div class="panelhead">
+            <section class="metrics">
+              <div class="metric">
+                <span>Estoque</span>
+                <b id="stock">—</b>
+                <small>Unidades armazenadas</small>
+              </div>
+
+              <div class="metric">
+                <span>Geladeira</span>
+                <b id="fridge">—</b>
+                <small>Unidades disponíveis</small>
+              </div>
+
+              <div class="metric">
+                <span>Produtos com atenção</span>
+                <b id="productsAttention">—</b>
+                <small>Abaixo do mínimo ou zerados</small>
+              </div>
+
+              <div class="metric">
+                <span>Lotes críticos</span>
+                <b id="criticalLots">—</b>
+                <small>Vencidos ou até 30 dias</small>
+              </div>
+            </section>
+
+            <div id="alertsPanel" class="alerts-panel hidden">
+              <div class="alerts-head">
                 <div>
-                  <h2>Validades</h2>
-                  <div class="muted">Lotes com unidades restantes</div>
+                  <h2>Atenção operacional</h2>
+                  <div class="muted">Situações que podem precisar de ação.</div>
                 </div>
 
-                <span class="badge amber" id="lotCount"> 0 lotes </span>
+                <span id="alertCount" class="alerts-count">0 alertas</span>
               </div>
 
-              <div class="tablewrap">
-                <table class="table expiry-table">
-                  <thead>
-                    <tr>
-                      <th>Bebida · lote</th>
-                      <th>Validade</th>
-                      <th class="num">Un.</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
+              <div id="operationalAlerts" class="alerts-list"></div>
+            </div>
 
-                  <tbody id="lots"></tbody>
-                </table>
+            <div class="section">
+              <div class="panel">
+                <div class="panelhead">
+                  <div>
+                    <h2>Bebidas e localização</h2>
+                    <div class="muted">Saldo atual por produto</div>
+                  </div>
+
+                  <span class="badge green" id="productCount"> 0 produtos </span>
+                </div>
+
+                <div class="tablewrap">
+                  <table class="table product-table">
+                    <thead>
+                      <tr>
+                        <th>Produto</th>
+                        <th class="num">Est.</th>
+                        <th class="num">Gel.</th>
+                        <th class="num">Total</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+
+                    <tbody id="products"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panelhead">
+                  <div>
+                    <h2>Validades</h2>
+                    <div class="muted">Lotes com unidades restantes</div>
+                  </div>
+
+                  <span class="badge amber" id="lotCount"> 0 lotes </span>
+                </div>
+
+                <div class="tablewrap">
+                  <table class="table expiry-table">
+                    <thead>
+                      <tr>
+                        <th>Bebida · lote</th>
+                        <th>Validade</th>
+                        <th class="num">Un.</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+
+                    <tbody id="lots"></tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
 
           </section>
           <section id="historyView" class="hidden" aria-label="Histórico de movimentações">
-          <div class="panel">
-            <div class="panelhead">
-              <div>
-                <h2>Histórico de movimentações</h2>
-                <div class="muted">Movimentações mais recentes.</div>
+            <div class="panel">
+              <div class="panelhead">
+                <div>
+                  <h2>Histórico de movimentações</h2>
+                  <div class="muted">Movimentações mais recentes.</div>
+                </div>
+
+                <div class="historypaging">
+                  <button id="prev" class="btn">←</button>
+
+                  <span id="page" class="badge">1/1</span>
+
+                  <button id="next" class="btn">→</button>
+                </div>
               </div>
+              <div class="historyfilters">
+                <select id="historyProduct">
+                  <option value="">Todos os produtos</option>
+                </select>
 
-              <div class="historypaging">
-                <button id="prev" class="btn">←</button>
+                <select id="historyType">
+                  <option value="">Todos os tipos</option>
+                  <option value="receipt">Recebimento</option>
+                  <option value="transfer">Transferência</option>
+                  <option value="return">Retorno</option>
+                  <option value="sale">Venda</option>
+                  <option value="loss">Perda</option>
+                  <option value="adjust">Ajuste</option>
+                </select>
 
-                <span id="page" class="badge">1/1</span>
+                <input
+                  id="historyDateFrom"
+                  type="date"
+                  aria-label="Data inicial"
+                  title="Data inicial"
+                />
 
-                <button id="next" class="btn">→</button>
+                <input
+                  id="historyDateTo"
+                  type="date"
+                  aria-label="Data final"
+                  title="Data final"
+                />
+
+                <select id="historyActor">
+                  <option value="">Todos os usuários</option>
+                </select>
+
+                <input
+                  id="search"
+                  type="search"
+                  placeholder="Buscar produto, lote ou observação…"
+                />
+
+                <button id="clearHistoryFilters" class="btn" type="button">
+                  Limpar filtros
+                </button>
+              </div>
+              <div class="tablewrap history-table-wrap">
+                <table class="table history-table">
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Produto / lote</th>
+                      <th>Tipo</th>
+                      <th>Local</th>
+                      <th>Responsável</th>
+                      <th class="num">Variação</th>
+                    </tr>
+                  </thead>
+
+                  <tbody id="history"></tbody>
+                </table>
               </div>
             </div>
-            <div class="historyfilters">
-              <select id="historyProduct">
-                <option value="">Todos os produtos</option>
-              </select>
-
-              <select id="historyType">
-                <option value="">Todos os tipos</option>
-                <option value="receipt">Recebimento</option>
-                <option value="transfer">Transferência</option>
-                <option value="return">Retorno</option>
-                <option value="sale">Venda</option>
-                <option value="loss">Perda</option>
-                <option value="adjust">Ajuste</option>
-              </select>
-
-              <input
-                id="historyDateFrom"
-                type="date"
-                aria-label="Data inicial"
-                title="Data inicial"
-              />
-
-              <input
-                id="historyDateTo"
-                type="date"
-                aria-label="Data final"
-                title="Data final"
-              />
-
-              <select id="historyActor">
-                <option value="">Todos os usuários</option>
-              </select>
-
-              <input
-                id="search"
-                type="search"
-                placeholder="Buscar produto, lote ou observação…"
-              />
-
-              <button id="clearHistoryFilters" class="btn" type="button">
-                Limpar filtros
-              </button>
-            </div>
-            <div class="tablewrap history-table-wrap">
-              <table class="table history-table">
-                <thead>
-                  <tr>
-                    <th>Data</th>
-                    <th>Produto / lote</th>
-                    <th>Tipo</th>
-                    <th>Local</th>
-                    <th>Responsável</th>
-                    <th class="num">Variação</th>
-                  </tr>
-                </thead>
-
-                <tbody id="history"></tbody>
-              </table>
-            </div>
-          </div>
           </section>
 
           <div class="foot" id="updated"></div>

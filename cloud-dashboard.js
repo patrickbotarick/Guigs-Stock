@@ -29,6 +29,9 @@ let historyDateTo = '';
 let historyActors = [];
 
 let historySearchTimer = null;
+let receiptPending = false;
+let transferPending = false;
+let transferDialogVersion = 0;
 
 let requestCounter = 0;
 
@@ -126,7 +129,7 @@ function setOnlineDashboardState() {
     }
   }
   populateReceiveSuppliers();
-  if (el('transferDialog').open) populateTransferLots();
+  if (el('transferDialog').open && !transferPending) populateTransferLots();
 }
 
 
@@ -1990,7 +1993,8 @@ async function updateProductOperation(event) {
 async function receiveStock(event) {
 
   event.preventDefault();
-  if (el('saveReceipt').disabled) return;
+  if (receiptPending || el('saveReceipt').disabled) return;
+  receiptPending = true;
 
 
   formMessage(
@@ -2093,7 +2097,8 @@ async function receiveStock(event) {
   }
   finally {
 
-    button.disabled = !navigator.onLine;
+    receiptPending = false;
+    populateReceiveSuppliers();
   }
 }
 
@@ -2116,7 +2121,7 @@ function populateReceiveSuppliers(selected = el('receiveSupplier').value) {
     select.add(new Option(supplier.name, supplier.id));
   }
   select.value = selected;
-  el('saveReceipt').disabled = !navigator.onLine || !products.some(p => p.active) || !suppliers.some(s => s.active);
+  el('saveReceipt').disabled = receiptPending || !navigator.onLine || !products.some(p => p.active) || !suppliers.some(s => s.active);
 }
 
 function fillSupplierForm() {
@@ -2207,7 +2212,7 @@ function populateTransferLots() {
       })
       .sort(
         (a, b) =>
-          a.expiry.localeCompare(b.expiry)
+          a.expiry.localeCompare(b.expiry) || a.created_at.localeCompare(b.created_at)
       );
 
   if (!available.length) {
@@ -2308,7 +2313,8 @@ async function transferStockOperation(event) {
 
   const button =
     el('saveTransfer');
-  if (button.disabled) return;
+  if (transferPending || button.disabled) return;
+  transferPending = true;
 
   button.disabled = true;
 
@@ -2339,11 +2345,13 @@ async function transferStockOperation(event) {
     };
     const selected = lots.find(lot => lot.id === args.p_lot_id);
     if (!selected) throw Error('Selecione um lote disponível.');
+    const dialogVersion = transferDialogVersion;
     if (from === 'stock' && to === 'fridge') {
       const result = await client.rpc('guigs_get_fefo_candidates', {
         p_shop_id: shop.shop_id, p_lot_id: args.p_lot_id
       });
       if (result.error) throw result.error;
+      if (!el('transferDialog').open || dialogVersion !== transferDialogVersion) return;
       if (result.data?.length && !await confirmFefo(selected, result.data)) return;
     }
     requireOnline();
@@ -2388,6 +2396,7 @@ async function transferStockOperation(event) {
   }
   finally {
 
+    transferPending = false;
     button.disabled = !navigator.onLine;
   }
 }
@@ -3347,6 +3356,7 @@ el('transferForm')
     'submit',
     transferStockOperation
   );
+el('transferDialog').addEventListener('close', () => { transferDialogVersion++; });
 
 
 el('saleForm')
