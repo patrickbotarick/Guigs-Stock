@@ -57,6 +57,12 @@
       }
 
       .side {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 225px;
+        height: 100dvh;
+        overflow-y: auto;
+        overflow-x: hidden;
         background: #19191c;
         color: white;
         padding: 24px 16px;
@@ -91,11 +97,19 @@
       }
 
       .menu {
+        display: block;
         padding: 13px;
         border-radius: 12px;
-        background: #ab2933;
+        color: #eee;
+        text-decoration: none;
         font-weight: 750;
       }
+
+      .menu[aria-current="page"] { background: #ab2933; }
+      .menu:hover { background: #713036; }
+      .menu:focus-visible { outline: 2px solid #e8bf83; outline-offset: 2px; }
+      .navigation { display: grid; gap: 8px; }
+      .nav-label { color: #bbb; font-size: 11px; letter-spacing: 1px; }
 
       .side p {
         color: #bbb;
@@ -111,12 +125,17 @@
       }
 
       .main {
+        grid-column: 2;
         padding: 35px clamp(15px, 4vw, 55px);
         max-width: 1500px;
         width: 100%;
-        margin: auto;
+        margin: 0 auto;
         min-width: 0;
       }
+
+      .main.history-view { max-width: none; }
+      #historyView .panel { width: 100%; }
+      #fefoCandidates { max-height: 35vh; overflow-y: auto; }
 
       .top {
         display: flex;
@@ -848,20 +867,29 @@
         }
 
         .side {
+          position: static;
+          width: auto;
+          height: auto;
+          overflow: visible;
           padding: 15px;
           flex-direction: row;
+          flex-wrap: wrap;
           align-items: center;
           justify-content: space-between;
           gap: 10px;
         }
 
         .side p,
-        .side footer,
-        .side .menu {
+        .side footer {
           display: none;
         }
 
+        .navigation { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-label { display: none; }
+        .menu { font-size: 13px; padding: 10px 12px; }
+
         .main {
+          grid-column: 1;
           padding: 18px 14px;
         }
 
@@ -1091,7 +1119,11 @@
           </div>
         </div>
 
-        <div class="menu">◫ Visão geral</div>
+        <nav class="navigation" aria-label="Navegação principal">
+          <span class="nav-label">NAVEGAÇÃO</span>
+          <a id="navOverview" class="menu" href="#visao-geral" aria-current="page">◫ Visão geral</a>
+          <a id="navHistory" class="menu" href="#historico">↻ Histórico</a>
+        </nav>
 
         <p>
           Controle de bebidas, lotes, validades e movimentações da Pizzaria
@@ -1105,7 +1137,7 @@
         <header class="top">
           <div>
             <p class="eyebrow">Pizzaria Guig's • Estoque em nuvem</p>
-            <h1>Painel do estoque</h1>
+            <h1 id="viewTitle">Painel do estoque</h1>
             <div id="identity" class="muted">Verificando autenticação…</div>
           </div>
 
@@ -1120,214 +1152,219 @@
         </div>
 
         <section id="content" class="hidden">
-          <div class="operationbar">
-            <div class="operationhead">
-              <div>
-                <h2>O que você precisa fazer?</h2>
-                <div class="muted">
-                  Acesse rapidamente as operações mais usadas no dia a dia.
+          <section id="overviewView" aria-label="Visão geral">
+            <div class="operationbar">
+              <div class="operationhead">
+                <div>
+                  <h2>O que você precisa fazer?</h2>
+                  <div class="muted">
+                    Acesse rapidamente as operações mais usadas no dia a dia.
+                  </div>
+                </div>
+              </div>
+
+              <div class="quickactions">
+                <button id="receiveStock" class="quickaction primary">
+                  <strong>↓ Receber estoque</strong>
+                  <small>Registrar a chegada de novas bebidas</small>
+                </button>
+
+                <button id="transferStock" class="quickaction">
+                  <strong>⇄ Movimentar</strong>
+                  <small>Estoque ↔ geladeira</small>
+                </button>
+
+                <button id="registerSale" class="quickaction">
+                  <strong>Venda</strong>
+                  <small>Dar baixa em bebidas vendidas</small>
+                </button>
+
+                <button id="registerLoss" class="quickaction loss">
+                  <strong>Registrar perda</strong>
+                  <small>Quebra, vencimento ou descarte</small>
+                </button>
+              </div>
+
+              <div class="managementactions">
+                <button id="newProduct" class="btn">+ Novo produto</button>
+                <button id="editProduct" class="btn">Editar produto</button>
+                <button id="adjustStock" class="btn">Ajustar inventário</button>
+                <button id="manageSuppliers" class="btn">Fornecedores</button>
+              </div>
+            </div>
+
+            <section class="metrics">
+              <div class="metric">
+                <span>Estoque</span>
+                <b id="stock">—</b>
+                <small>Unidades armazenadas</small>
+              </div>
+
+              <div class="metric">
+                <span>Geladeira</span>
+                <b id="fridge">—</b>
+                <small>Unidades disponíveis</small>
+              </div>
+
+              <div class="metric">
+                <span>Produtos com atenção</span>
+                <b id="productsAttention">—</b>
+                <small>Abaixo do mínimo ou zerados</small>
+              </div>
+
+              <div class="metric">
+                <span>Lotes críticos</span>
+                <b id="criticalLots">—</b>
+                <small>Vencidos ou até 30 dias</small>
+              </div>
+            </section>
+
+            <div id="alertsPanel" class="alerts-panel hidden">
+              <div class="alerts-head">
+                <div>
+                  <h2>Atenção operacional</h2>
+                  <div class="muted">Situações que podem precisar de ação.</div>
+                </div>
+
+                <span id="alertCount" class="alerts-count">0 alertas</span>
+              </div>
+
+              <div id="operationalAlerts" class="alerts-list"></div>
+            </div>
+
+            <div class="section">
+              <div class="panel">
+                <div class="panelhead">
+                  <div>
+                    <h2>Bebidas e localização</h2>
+                    <div class="muted">Saldo atual por produto</div>
+                  </div>
+
+                  <span class="badge green" id="productCount"> 0 produtos </span>
+                </div>
+
+                <div class="tablewrap">
+                  <table class="table product-table">
+                    <thead>
+                      <tr>
+                        <th>Produto</th>
+                        <th class="num">Est.</th>
+                        <th class="num">Gel.</th>
+                        <th class="num">Total</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+
+                    <tbody id="products"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panelhead">
+                  <div>
+                    <h2>Validades</h2>
+                    <div class="muted">Lotes com unidades restantes</div>
+                  </div>
+
+                  <span class="badge amber" id="lotCount"> 0 lotes </span>
+                </div>
+
+                <div class="tablewrap">
+                  <table class="table expiry-table">
+                    <thead>
+                      <tr>
+                        <th>Bebida · lote</th>
+                        <th>Validade</th>
+                        <th class="num">Un.</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+
+                    <tbody id="lots"></tbody>
+                  </table>
                 </div>
               </div>
             </div>
 
-            <div class="quickactions">
-              <button id="receiveStock" class="quickaction primary">
-                <strong>↓ Receber estoque</strong>
-                <small>Registrar a chegada de novas bebidas</small>
-              </button>
+          </section>
+          <section id="historyView" class="hidden" aria-label="Histórico de movimentações">
+            <div class="panel">
+              <div class="panelhead">
+                <div>
+                  <h2>Histórico de movimentações</h2>
+                  <div class="muted">Movimentações mais recentes.</div>
+                </div>
 
-              <button id="transferStock" class="quickaction">
-                <strong>⇄ Movimentar</strong>
-                <small>Estoque ↔ geladeira</small>
-              </button>
+                <div class="historypaging">
+                  <button id="prev" class="btn">←</button>
 
-              <button id="registerSale" class="quickaction">
-                <strong>Venda</strong>
-                <small>Dar baixa em bebidas vendidas</small>
-              </button>
+                  <span id="page" class="badge">1/1</span>
 
-              <button id="registerLoss" class="quickaction loss">
-                <strong>Registrar perda</strong>
-                <small>Quebra, vencimento ou descarte</small>
-              </button>
-            </div>
+                  <button id="next" class="btn">→</button>
+                </div>
+              </div>
+              <div class="historyfilters">
+                <select id="historyProduct">
+                  <option value="">Todos os produtos</option>
+                </select>
 
-            <div class="managementactions">
-              <button id="newProduct" class="btn">+ Novo produto</button>
-              <button id="editProduct" class="btn">Editar produto</button>
-              <button id="adjustStock" class="btn">Ajustar inventário</button>
-            </div>
-          </div>
+                <select id="historyType">
+                  <option value="">Todos os tipos</option>
+                  <option value="receipt">Recebimento</option>
+                  <option value="transfer">Transferência</option>
+                  <option value="return">Retorno</option>
+                  <option value="sale">Venda</option>
+                  <option value="loss">Perda</option>
+                  <option value="adjust">Ajuste</option>
+                </select>
 
-          <section class="metrics">
-            <div class="metric">
-              <span>Estoque</span>
-              <b id="stock">—</b>
-              <small>Unidades armazenadas</small>
-            </div>
+                <input
+                  id="historyDateFrom"
+                  type="date"
+                  aria-label="Data inicial"
+                  title="Data inicial"
+                />
 
-            <div class="metric">
-              <span>Geladeira</span>
-              <b id="fridge">—</b>
-              <small>Unidades disponíveis</small>
-            </div>
+                <input
+                  id="historyDateTo"
+                  type="date"
+                  aria-label="Data final"
+                  title="Data final"
+                />
 
-            <div class="metric">
-              <span>Produtos com atenção</span>
-              <b id="productsAttention">—</b>
-              <small>Abaixo do mínimo ou zerados</small>
-            </div>
+                <select id="historyActor">
+                  <option value="">Todos os usuários</option>
+                </select>
 
-            <div class="metric">
-              <span>Lotes críticos</span>
-              <b id="criticalLots">—</b>
-              <small>Vencidos ou até 30 dias</small>
+                <input
+                  id="search"
+                  type="search"
+                  placeholder="Buscar produto, lote ou observação…"
+                />
+
+                <button id="clearHistoryFilters" class="btn" type="button">
+                  Limpar filtros
+                </button>
+              </div>
+              <div class="tablewrap history-table-wrap">
+                <table class="table history-table">
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Produto / lote</th>
+                      <th>Tipo</th>
+                      <th>Local</th>
+                      <th>Responsável</th>
+                      <th class="num">Variação</th>
+                    </tr>
+                  </thead>
+
+                  <tbody id="history"></tbody>
+                </table>
+              </div>
             </div>
           </section>
-
-          <div id="alertsPanel" class="alerts-panel hidden">
-            <div class="alerts-head">
-              <div>
-                <h2>Atenção operacional</h2>
-                <div class="muted">Situações que podem precisar de ação.</div>
-              </div>
-
-              <span id="alertCount" class="alerts-count">0 alertas</span>
-            </div>
-
-            <div id="operationalAlerts" class="alerts-list"></div>
-          </div>
-
-          <div class="section">
-            <div class="panel">
-              <div class="panelhead">
-                <div>
-                  <h2>Bebidas e localização</h2>
-                  <div class="muted">Saldo atual por produto</div>
-                </div>
-
-                <span class="badge green" id="productCount"> 0 produtos </span>
-              </div>
-
-              <div class="tablewrap">
-                <table class="table product-table">
-                  <thead>
-                    <tr>
-                      <th>Produto</th>
-                      <th class="num">Est.</th>
-                      <th class="num">Gel.</th>
-                      <th class="num">Total</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-
-                  <tbody id="products"></tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="panel">
-              <div class="panelhead">
-                <div>
-                  <h2>Validades</h2>
-                  <div class="muted">Lotes com unidades restantes</div>
-                </div>
-
-                <span class="badge amber" id="lotCount"> 0 lotes </span>
-              </div>
-
-              <div class="tablewrap">
-                <table class="table expiry-table">
-                  <thead>
-                    <tr>
-                      <th>Bebida · lote</th>
-                      <th>Validade</th>
-                      <th class="num">Un.</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-
-                  <tbody id="lots"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panelhead">
-              <div>
-                <h2>Histórico na nuvem</h2>
-                <div class="muted">Movimentações mais recentes.</div>
-              </div>
-
-              <div class="historypaging">
-                <button id="prev" class="btn">←</button>
-
-                <span id="page" class="badge">1/1</span>
-
-                <button id="next" class="btn">→</button>
-              </div>
-            </div>
-            <div class="historyfilters">
-              <select id="historyProduct">
-                <option value="">Todos os produtos</option>
-              </select>
-
-              <select id="historyType">
-                <option value="">Todos os tipos</option>
-                <option value="receipt">Recebimento</option>
-                <option value="transfer">Transferência</option>
-                <option value="return">Retorno</option>
-                <option value="sale">Venda</option>
-                <option value="loss">Perda</option>
-                <option value="adjust">Ajuste</option>
-              </select>
-
-              <input
-                id="historyDateFrom"
-                type="date"
-                aria-label="Data inicial"
-                title="Data inicial"
-              />
-
-              <input
-                id="historyDateTo"
-                type="date"
-                aria-label="Data final"
-                title="Data final"
-              />
-
-              <select id="historyActor">
-                <option value="">Todos os usuários</option>
-              </select>
-
-              <input
-                id="search"
-                type="search"
-                placeholder="Buscar produto, lote ou observação…"
-              />
-
-              <button id="clearHistoryFilters" class="btn" type="button">
-                Limpar filtros
-              </button>
-            </div>
-            <div class="tablewrap history-table-wrap">
-              <table class="table history-table">
-                <thead>
-                  <tr>
-                    <th>Data</th>
-                    <th>Produto / lote</th>
-                    <th>Tipo</th>
-                    <th>Local</th>
-                    <th>Responsável</th>
-                    <th class="num">Variação</th>
-                  </tr>
-                </thead>
-
-                <tbody id="history"></tbody>
-              </table>
-            </div>
-          </div>
 
           <div class="foot" id="updated"></div>
         </section>
@@ -1541,6 +1578,13 @@
           </div>
 
           <div class="field">
+            <label for="receiveSupplier">Fornecedor</label>
+            <select id="receiveSupplier" required></select>
+            <button id="newReceiveSupplier" type="button" class="btn">+ Novo fornecedor</button>
+            <small class="muted">Selecione um fornecedor ativo. O proprietário pode cadastrar e gerenciar fornecedores.</small>
+          </div>
+
+          <div class="field">
             <label for="lotCode"> Código do lote </label>
 
             <input
@@ -1576,7 +1620,7 @@
 
             <textarea
               id="receiveNote"
-              maxlength="1000"
+              maxlength="800"
               placeholder="Opcional"
             ></textarea>
           </div>
@@ -1591,6 +1635,35 @@
             <button id="saveReceipt" class="btn green" type="submit">
               Registrar recebimento
             </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <dialog id="supplierDialog" aria-labelledby="supplierTitle">
+      <div class="modal">
+        <h2 id="supplierTitle">Fornecedores</h2>
+        <p class="muted">Cadastre um fornecedor ou selecione um existente para editar nome e situação.</p>
+        <form id="supplierForm" class="modalform">
+          <div class="field">
+            <label for="supplierSelect">Fornecedor</label>
+            <select id="supplierSelect"></select>
+          </div>
+          <div class="field">
+            <label for="supplierName">Nome</label>
+            <input id="supplierName" maxlength="160" required />
+          </div>
+          <div class="field">
+            <label for="supplierActive">Situação</label>
+            <select id="supplierActive">
+              <option value="true">Ativo</option>
+              <option value="false">Inativo</option>
+            </select>
+          </div>
+          <div id="supplierMessage" class="formmsg" role="status"></div>
+          <div class="modalactions">
+            <button type="button" class="btn" data-close="supplierDialog">Cancelar</button>
+            <button id="saveSupplier" type="submit" class="btn green">Salvar fornecedor</button>
           </div>
         </form>
       </div>
@@ -1664,6 +1737,20 @@
             </button>
           </div>
         </form>
+      </div>
+    </dialog>
+
+    <dialog id="fefoDialog" aria-labelledby="fefoTitle" aria-describedby="fefoAdvice">
+      <div class="modal">
+        <h2 id="fefoTitle">Atenção à ordem dos lotes</h2>
+        <p>Existe um lote deste produto com prioridade de uso por validade ou ordem de recebimento.</p>
+        <div id="fefoCandidates" class="balancebox"></div>
+        <p id="fefoSelected"></p>
+        <p id="fefoAdvice" class="muted">Recomendamos utilizar primeiro o lote com validade mais próxima; em caso de empate, o recebido primeiro. Deseja continuar mesmo assim?</p>
+        <div class="modalactions">
+          <button id="cancelFefo" type="button" class="btn">Cancelar</button>
+          <button id="continueFefo" type="button" class="btn green">Continuar movimentação</button>
+        </div>
       </div>
     </dialog>
 

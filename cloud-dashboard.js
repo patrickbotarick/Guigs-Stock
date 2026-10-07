@@ -9,6 +9,7 @@ let client = null;
 let shop = null;
 
 let products = [];
+let suppliers = [];
 let lots = [];
 let moves = [];
 let lotBalances = new Map();
@@ -28,6 +29,9 @@ let historyDateTo = '';
 let historyActors = [];
 
 let historySearchTimer = null;
+let receiptPending = false;
+let transferPending = false;
+let transferDialogVersion = 0;
 
 let requestCounter = 0;
 
@@ -39,96 +43,6 @@ let isOffline =
 // ============================================================
 
 function say(message, kind = '') {
-function setOfflineDashboardState() {
-
-  isOffline =
-    true;
-
-
-  say(
-    'Você está sem conexão com a internet. '
-    + 'Os dados em nuvem e as operações de estoque ficarão indisponíveis '
-    + 'até a conexão ser restaurada.',
-    'danger'
-  );
-
-
-  const ids = [
-    'refresh',
-    'receiveStock',
-    'transferStock',
-    'registerSale',
-    'registerLoss',
-    'newProduct',
-    'editProduct',
-    'adjustStock'
-  ];
-
-
-  for (const id of ids) {
-
-    const node =
-      el(id);
-
-
-    if (node) {
-      node.disabled = true;
-    }
-  }
-}
-
-
-function setOnlineDashboardState() {
-
-  isOffline =
-    false;
-
-
-  const ids = [
-    'refresh',
-    'receiveStock',
-    'transferStock',
-    'registerSale',
-    'registerLoss'
-  ];
-
-
-  for (const id of ids) {
-
-    const node =
-      el(id);
-
-
-    if (node) {
-      node.disabled = false;
-    }
-  }
-
-
-  if (
-    shop?.role === 'owner'
-  ) {
-
-    for (
-      const id
-      of [
-        'newProduct',
-        'editProduct',
-        'adjustStock'
-      ]
-    ) {
-
-      const node =
-        el(id);
-
-
-      if (node) {
-        node.disabled = false;
-      }
-    }
-  }
-}
-
   el('status').textContent = message;
   el('status').className = 'notice ' + kind;
 }
@@ -151,7 +65,12 @@ function setOfflineDashboardState() {
     'registerLoss',
     'newProduct',
     'editProduct',
-    'adjustStock'
+    'adjustStock',
+    'manageSuppliers',
+    'newReceiveSupplier',
+    'saveSupplier',
+    'saveReceipt',
+    'saveTransfer'
   ];
 
   for (const id of ids) {
@@ -193,7 +112,10 @@ function setOnlineDashboardState() {
     const ownerIds = [
       'newProduct',
       'editProduct',
-      'adjustStock'
+      'adjustStock',
+      'manageSuppliers',
+      'newReceiveSupplier',
+      'saveSupplier'
     ];
 
     for (const id of ownerIds) {
@@ -206,6 +128,8 @@ function setOnlineDashboardState() {
       }
     }
   }
+  populateReceiveSuppliers();
+  if (el('transferDialog').open && !transferPending) populateTransferLots();
 }
 
 
@@ -456,6 +380,8 @@ async function bootstrap() {
     el('adjustStock')
       .classList
       .add('hidden');
+    el('manageSuppliers').classList.add('hidden');
+    el('newReceiveSupplier').classList.add('hidden');
   }
 
 
@@ -520,7 +446,7 @@ if (!navigator.onLine) {
 
   try {
 
-    const [p, l, balanceResult] =
+    const [p, l, balanceResult, s] =
       await Promise.all([
 
         allRows(
@@ -530,7 +456,7 @@ if (!navigator.onLine) {
 
         allRows(
           'guigs_lots',
-          'id,product_id,code,expiry'
+          'id,product_id,code,expiry,created_at,supplier_id'
         ),
 
         client.rpc(
@@ -539,9 +465,7 @@ if (!navigator.onLine) {
             p_shop: shop.shop_id
           }
         ),
-
-
-
+        allRows('guigs_suppliers', 'id,name,active,created_at')
       ]);
 
 
@@ -557,6 +481,7 @@ if (!navigator.onLine) {
 
     products = p;
     lots = l;
+    suppliers = s;
 
 
 
@@ -577,6 +502,7 @@ if (!navigator.onLine) {
     render();
 
     populateReceiveProducts();
+    populateReceiveSuppliers();
 
 await loadHistoryActors();
 
@@ -602,7 +528,7 @@ await loadHistory();
   }
   finally {
 
-    el('refresh').disabled = false;
+    el('refresh').disabled = !navigator.onLine;
   }
 }
 
@@ -1153,6 +1079,11 @@ function render() {
       + ' · '
       + l.code
     );
+    const supplierInfo = document.createElement('small');
+    supplierInfo.className = 'muted';
+    supplierInfo.style.display = 'block';
+    supplierInfo.textContent = `Fornecedor: ${supplierName(l)}`;
+    r.cells[0].append(supplierInfo);
 
 
     cell(
@@ -1519,6 +1450,13 @@ function renderHistory() {
       + ' · '
       + (m.lot_code || '—')
     );
+    if (m.note) {
+      const note = document.createElement('small');
+      note.className = 'muted';
+      note.style.display = 'block';
+      note.textContent = m.note;
+      r.cells[1].append(note);
+    }
 
 
     const movementLabels = {
@@ -2055,6 +1993,8 @@ async function updateProductOperation(event) {
 async function receiveStock(event) {
 
   event.preventDefault();
+  if (receiptPending || el('saveReceipt').disabled) return;
+  receiptPending = true;
 
 
   formMessage(
@@ -2070,6 +2010,8 @@ async function receiveStock(event) {
 
 
   try {
+    requireOnline();
+    if (!el('receiveSupplier').value) throw Error('Selecione um fornecedor ativo.');
 
     const args = {
 
@@ -2079,6 +2021,7 @@ async function receiveStock(event) {
       p_product_id:
         el('receiveProduct')
           .value,
+      p_supplier_id: el('receiveSupplier').value,
 
       p_lot_code:
         el('lotCode')
@@ -2137,6 +2080,7 @@ async function receiveStock(event) {
           .reset();
 
         populateReceiveProducts();
+        populateReceiveSuppliers();
 
       },
       500
@@ -2153,13 +2097,82 @@ async function receiveStock(event) {
   }
   finally {
 
-    button.disabled = false;
+    receiptPending = false;
+    populateReceiveSuppliers();
   }
 }
 
 // ============================================================
 // OPERAÇÕES DE MOVIMENTAÇÃO
 // ============================================================
+
+function requireOnline() {
+  if (!navigator.onLine) throw Error('Conecte-se à internet para concluir a operação.');
+}
+
+function supplierName(lot) {
+  return suppliers.find(s => s.id === lot?.supplier_id)?.name || 'Não informado';
+}
+
+function populateReceiveSuppliers(selected = el('receiveSupplier').value) {
+  const select = el('receiveSupplier');
+  select.replaceChildren(new Option('Selecione um fornecedor', ''));
+  for (const supplier of [...suppliers].filter(s => s.active).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))) {
+    select.add(new Option(supplier.name, supplier.id));
+  }
+  select.value = selected;
+  el('saveReceipt').disabled = receiptPending || !navigator.onLine || !products.some(p => p.active) || !suppliers.some(s => s.active);
+}
+
+function fillSupplierForm() {
+  const supplier = suppliers.find(s => s.id === el('supplierSelect').value);
+  el('supplierName').value = supplier?.name || '';
+  el('supplierActive').value = String(supplier?.active ?? true);
+}
+
+async function openSupplierDialog() {
+  if (shop?.role !== 'owner') return;
+  formMessage('supplierMessage');
+  try {
+    requireOnline();
+    suppliers = await allRows('guigs_suppliers', 'id,name,active,created_at');
+    const select = el('supplierSelect');
+    select.replaceChildren(new Option('+ Novo fornecedor', ''));
+    for (const supplier of [...suppliers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))) {
+      select.add(new Option(`${supplier.name}${supplier.active ? '' : ' · Inativo'}`, supplier.id));
+    }
+    fillSupplierForm();
+    el('saveSupplier').disabled = false;
+    el('supplierDialog').showModal();
+  } catch (error) {
+    say(error.message || 'Não foi possível consultar fornecedores.', 'danger');
+  }
+}
+
+async function saveSupplier(event) {
+  event.preventDefault();
+  const button = el('saveSupplier');
+  if (button.disabled || shop?.role !== 'owner') return;
+  button.disabled = true;
+  formMessage('supplierMessage');
+  try {
+    requireOnline();
+    const id = el('supplierSelect').value;
+    const args = {p_shop_id: shop.shop_id, p_name: el('supplierName').value.trim(), p_active: el('supplierActive').value === 'true'};
+    if (id) args.p_supplier_id = id;
+    const {data, error} = await client.rpc(id ? 'guigs_update_supplier' : 'guigs_create_supplier', args);
+    if (error) throw error;
+    suppliers = await allRows('guigs_suppliers', 'id,name,active,created_at');
+    populateReceiveSuppliers(args.p_active ? (id || data) : '');
+    render();
+    el('supplierDialog').close();
+    say('Fornecedor salvo.', 'good');
+  } catch (error) {
+    formMessage('supplierMessage', error.message || 'Não foi possível salvar o fornecedor.');
+  } finally {
+    button.disabled = !navigator.onLine;
+  }
+}
 
 function productById(id) {
   return products.find(p => p.id === id);
@@ -2199,7 +2212,7 @@ function populateTransferLots() {
       })
       .sort(
         (a, b) =>
-          a.expiry.localeCompare(b.expiry)
+          a.expiry.localeCompare(b.expiry) || a.created_at.localeCompare(b.created_at)
       );
 
   if (!available.length) {
@@ -2265,6 +2278,32 @@ function updateTransferBalance() {
       : '';
 }
 
+function confirmFefo(selected, candidates) {
+  const list = el('fefoCandidates');
+  list.replaceChildren();
+  for (const candidate of candidates) {
+    const item = document.createElement('p');
+    item.textContent = `Lote: ${candidate.code} · Validade: ${dateBR(candidate.expiry)} · Disponível no estoque: ${candidate.stock} unidades`;
+    list.append(item);
+  }
+  el('fefoSelected').textContent = `Você está movimentando: ${lotLabel(selected)} · Validade: ${dateBR(selected.expiry)}.`;
+  const dialog = el('fefoDialog');
+  return new Promise(resolve => {
+    const cancel = () => dialog.close('cancel');
+    const proceed = () => dialog.close('continue');
+    const closed = () => {
+      el('cancelFefo').removeEventListener('click', cancel);
+      el('continueFefo').removeEventListener('click', proceed);
+      resolve(dialog.returnValue === 'continue');
+    };
+    dialog.returnValue = 'cancel';
+    el('cancelFefo').addEventListener('click', cancel);
+    el('continueFefo').addEventListener('click', proceed);
+    dialog.addEventListener('close', closed, {once: true});
+    dialog.showModal();
+    el('cancelFefo').focus();
+  });
+}
 
 async function transferStockOperation(event) {
 
@@ -2274,10 +2313,13 @@ async function transferStockOperation(event) {
 
   const button =
     el('saveTransfer');
+  if (transferPending || button.disabled) return;
+  transferPending = true;
 
   button.disabled = true;
 
   try {
+    requireOnline();
 
     const direction =
       el('transferDirection').value;
@@ -2292,34 +2334,34 @@ async function transferStockOperation(event) {
         ? 'fridge'
         : 'stock';
 
+    // Captura o lote/quantidade antes da consulta e mantém a escolha ao confirmar.
+    const args = {
+      p_shop_id: shop.shop_id,
+      p_lot_id: el('transferLot').value,
+      p_from_location: from,
+      p_to_location: to,
+      p_quantity: Number(el('transferQuantity').value),
+      p_note: el('transferNote').value.trim()
+    };
+    const selected = lots.find(lot => lot.id === args.p_lot_id);
+    if (!selected) throw Error('Selecione um lote disponível.');
+    const dialogVersion = transferDialogVersion;
+    if (from === 'stock' && to === 'fridge') {
+      const result = await client.rpc('guigs_get_fefo_candidates', {
+        p_shop_id: shop.shop_id, p_lot_id: args.p_lot_id
+      });
+      if (result.error) throw result.error;
+      if (!el('transferDialog').open || dialogVersion !== transferDialogVersion) return;
+      if (result.data?.length && !await confirmFefo(selected, result.data)) return;
+    }
+    requireOnline();
+
     const {
       data,
       error
     } = await client.rpc(
       'guigs_transfer_stock',
-      {
-        p_shop_id:
-          shop.shop_id,
-
-        p_lot_id:
-          el('transferLot').value,
-
-        p_from_location:
-          from,
-
-        p_to_location:
-          to,
-
-        p_quantity:
-          Number(
-            el('transferQuantity').value
-          ),
-
-        p_note:
-          el('transferNote')
-            .value
-            .trim()
-      }
+      args
     );
 
     if (error) {
@@ -2354,7 +2396,8 @@ async function transferStockOperation(event) {
   }
   finally {
 
-    button.disabled = false;
+    transferPending = false;
+    button.disabled = !navigator.onLine;
   }
 }
 
@@ -2833,6 +2876,21 @@ async function adjustStockOperation(event) {
 // EVENTOS DE INTERFACE
 // ============================================================
 
+function applyView() {
+  const history = location.hash === '#historico';
+  el('overviewView').classList.toggle('hidden', history);
+  el('historyView').classList.toggle('hidden', !history);
+  document.querySelector('.main').classList.toggle('history-view', history);
+  el('viewTitle').textContent = history ? 'Histórico de movimentações' : 'Painel do estoque';
+  for (const [id, active] of [['navOverview', !history], ['navHistory', history]]) {
+    if (active) el(id).setAttribute('aria-current', 'page');
+    else el(id).removeAttribute('aria-current');
+  }
+}
+
+window.addEventListener('hashchange', applyView);
+applyView();
+
 el('refresh')
   .addEventListener(
     'click',
@@ -3159,6 +3217,7 @@ el('receiveStock')
       );
 
       populateReceiveProducts();
+      populateReceiveSuppliers();
 
       el('receiveDialog')
         .showModal();
@@ -3200,6 +3259,11 @@ el('receiveForm')
     'submit',
     receiveStock
   );
+
+el('manageSuppliers').addEventListener('click', openSupplierDialog);
+el('newReceiveSupplier').addEventListener('click', openSupplierDialog);
+el('supplierSelect').addEventListener('change', fillSupplierForm);
+el('supplierForm').addEventListener('submit', saveSupplier);
 
 el('transferStock')
   .addEventListener(
@@ -3292,6 +3356,7 @@ el('transferForm')
     'submit',
     transferStockOperation
   );
+el('transferDialog').addEventListener('close', () => { transferDialogVersion++; });
 
 
 el('saleForm')
