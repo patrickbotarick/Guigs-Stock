@@ -1156,6 +1156,7 @@
               <button id="newProduct" class="btn">+ Novo produto</button>
               <button id="editProduct" class="btn">Editar produto</button>
               <button id="adjustStock" class="btn">Ajustar inventário</button>
+              <button id="manageSuppliers" class="btn">Fornecedores</button>
             </div>
           </div>
 
@@ -1541,6 +1542,13 @@
           </div>
 
           <div class="field">
+            <label for="receiveSupplier">Fornecedor</label>
+            <select id="receiveSupplier" required></select>
+            <button id="newReceiveSupplier" type="button" class="btn">+ Novo fornecedor</button>
+            <small class="muted">Selecione um fornecedor ativo. O proprietário pode cadastrar e gerenciar fornecedores.</small>
+          </div>
+
+          <div class="field">
             <label for="lotCode"> Código do lote </label>
 
             <input
@@ -1576,7 +1584,7 @@
 
             <textarea
               id="receiveNote"
-              maxlength="1000"
+              maxlength="800"
               placeholder="Opcional"
             ></textarea>
           </div>
@@ -1591,6 +1599,35 @@
             <button id="saveReceipt" class="btn green" type="submit">
               Registrar recebimento
             </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <dialog id="supplierDialog" aria-labelledby="supplierTitle">
+      <div class="modal">
+        <h2 id="supplierTitle">Fornecedores</h2>
+        <p class="muted">Cadastre um fornecedor ou selecione um existente para editar nome e situação.</p>
+        <form id="supplierForm" class="modalform">
+          <div class="field">
+            <label for="supplierSelect">Fornecedor</label>
+            <select id="supplierSelect"></select>
+          </div>
+          <div class="field">
+            <label for="supplierName">Nome</label>
+            <input id="supplierName" maxlength="160" required />
+          </div>
+          <div class="field">
+            <label for="supplierActive">Situação</label>
+            <select id="supplierActive">
+              <option value="true">Ativo</option>
+              <option value="false">Inativo</option>
+            </select>
+          </div>
+          <div id="supplierMessage" class="formmsg" role="status"></div>
+          <div class="modalactions">
+            <button type="button" class="btn" data-close="supplierDialog">Cancelar</button>
+            <button id="saveSupplier" type="submit" class="btn green">Salvar fornecedor</button>
           </div>
         </form>
       </div>

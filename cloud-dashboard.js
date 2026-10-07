@@ -9,6 +9,7 @@ let client = null;
 let shop = null;
 
 let products = [];
+let suppliers = [];
 let lots = [];
 let moves = [];
 let lotBalances = new Map();
@@ -39,96 +40,6 @@ let isOffline =
 // ============================================================
 
 function say(message, kind = '') {
-function setOfflineDashboardState() {
-
-  isOffline =
-    true;
-
-
-  say(
-    'Você está sem conexão com a internet. '
-    + 'Os dados em nuvem e as operações de estoque ficarão indisponíveis '
-    + 'até a conexão ser restaurada.',
-    'danger'
-  );
-
-
-  const ids = [
-    'refresh',
-    'receiveStock',
-    'transferStock',
-    'registerSale',
-    'registerLoss',
-    'newProduct',
-    'editProduct',
-    'adjustStock'
-  ];
-
-
-  for (const id of ids) {
-
-    const node =
-      el(id);
-
-
-    if (node) {
-      node.disabled = true;
-    }
-  }
-}
-
-
-function setOnlineDashboardState() {
-
-  isOffline =
-    false;
-
-
-  const ids = [
-    'refresh',
-    'receiveStock',
-    'transferStock',
-    'registerSale',
-    'registerLoss'
-  ];
-
-
-  for (const id of ids) {
-
-    const node =
-      el(id);
-
-
-    if (node) {
-      node.disabled = false;
-    }
-  }
-
-
-  if (
-    shop?.role === 'owner'
-  ) {
-
-    for (
-      const id
-      of [
-        'newProduct',
-        'editProduct',
-        'adjustStock'
-      ]
-    ) {
-
-      const node =
-        el(id);
-
-
-      if (node) {
-        node.disabled = false;
-      }
-    }
-  }
-}
-
   el('status').textContent = message;
   el('status').className = 'notice ' + kind;
 }
@@ -151,7 +62,12 @@ function setOfflineDashboardState() {
     'registerLoss',
     'newProduct',
     'editProduct',
-    'adjustStock'
+    'adjustStock',
+    'manageSuppliers',
+    'newReceiveSupplier',
+    'saveSupplier',
+    'saveReceipt',
+    'saveTransfer'
   ];
 
   for (const id of ids) {
@@ -193,7 +109,10 @@ function setOnlineDashboardState() {
     const ownerIds = [
       'newProduct',
       'editProduct',
-      'adjustStock'
+      'adjustStock',
+      'manageSuppliers',
+      'newReceiveSupplier',
+      'saveSupplier'
     ];
 
     for (const id of ownerIds) {
@@ -206,6 +125,8 @@ function setOnlineDashboardState() {
       }
     }
   }
+  populateReceiveSuppliers();
+  if (el('transferDialog').open) populateTransferLots();
 }
 
 
@@ -456,6 +377,8 @@ async function bootstrap() {
     el('adjustStock')
       .classList
       .add('hidden');
+    el('manageSuppliers').classList.add('hidden');
+    el('newReceiveSupplier').classList.add('hidden');
   }
 
 
@@ -520,7 +443,7 @@ if (!navigator.onLine) {
 
   try {
 
-    const [p, l, balanceResult] =
+    const [p, l, balanceResult, s] =
       await Promise.all([
 
         allRows(
@@ -530,7 +453,7 @@ if (!navigator.onLine) {
 
         allRows(
           'guigs_lots',
-          'id,product_id,code,expiry'
+          'id,product_id,code,expiry,created_at,supplier_id'
         ),
 
         client.rpc(
@@ -539,9 +462,7 @@ if (!navigator.onLine) {
             p_shop: shop.shop_id
           }
         ),
-
-
-
+        allRows('guigs_suppliers', 'id,name,active,created_at')
       ]);
 
 
@@ -557,6 +478,7 @@ if (!navigator.onLine) {
 
     products = p;
     lots = l;
+    suppliers = s;
 
 
 
@@ -577,6 +499,7 @@ if (!navigator.onLine) {
     render();
 
     populateReceiveProducts();
+    populateReceiveSuppliers();
 
 await loadHistoryActors();
 
@@ -602,7 +525,7 @@ await loadHistory();
   }
   finally {
 
-    el('refresh').disabled = false;
+    el('refresh').disabled = !navigator.onLine;
   }
 }
 
@@ -1153,6 +1076,11 @@ function render() {
       + ' · '
       + l.code
     );
+    const supplierInfo = document.createElement('small');
+    supplierInfo.className = 'muted';
+    supplierInfo.style.display = 'block';
+    supplierInfo.textContent = `Fornecedor: ${supplierName(l)}`;
+    r.cells[0].append(supplierInfo);
 
 
     cell(
@@ -1519,6 +1447,13 @@ function renderHistory() {
       + ' · '
       + (m.lot_code || '—')
     );
+    if (m.note) {
+      const note = document.createElement('small');
+      note.className = 'muted';
+      note.style.display = 'block';
+      note.textContent = m.note;
+      r.cells[1].append(note);
+    }
 
 
     const movementLabels = {
@@ -2055,6 +1990,7 @@ async function updateProductOperation(event) {
 async function receiveStock(event) {
 
   event.preventDefault();
+  if (el('saveReceipt').disabled) return;
 
 
   formMessage(
@@ -2070,6 +2006,8 @@ async function receiveStock(event) {
 
 
   try {
+    requireOnline();
+    if (!el('receiveSupplier').value) throw Error('Selecione um fornecedor ativo.');
 
     const args = {
 
@@ -2079,6 +2017,7 @@ async function receiveStock(event) {
       p_product_id:
         el('receiveProduct')
           .value,
+      p_supplier_id: el('receiveSupplier').value,
 
       p_lot_code:
         el('lotCode')
@@ -2137,6 +2076,7 @@ async function receiveStock(event) {
           .reset();
 
         populateReceiveProducts();
+        populateReceiveSuppliers();
 
       },
       500
@@ -2153,13 +2093,81 @@ async function receiveStock(event) {
   }
   finally {
 
-    button.disabled = false;
+    button.disabled = !navigator.onLine;
   }
 }
 
 // ============================================================
 // OPERAÇÕES DE MOVIMENTAÇÃO
 // ============================================================
+
+function requireOnline() {
+  if (!navigator.onLine) throw Error('Conecte-se à internet para concluir a operação.');
+}
+
+function supplierName(lot) {
+  return suppliers.find(s => s.id === lot?.supplier_id)?.name || 'Não informado';
+}
+
+function populateReceiveSuppliers(selected = el('receiveSupplier').value) {
+  const select = el('receiveSupplier');
+  select.replaceChildren(new Option('Selecione um fornecedor', ''));
+  for (const supplier of [...suppliers].filter(s => s.active).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))) {
+    select.add(new Option(supplier.name, supplier.id));
+  }
+  select.value = selected;
+  el('saveReceipt').disabled = !navigator.onLine || !products.some(p => p.active) || !suppliers.some(s => s.active);
+}
+
+function fillSupplierForm() {
+  const supplier = suppliers.find(s => s.id === el('supplierSelect').value);
+  el('supplierName').value = supplier?.name || '';
+  el('supplierActive').value = String(supplier?.active ?? true);
+}
+
+async function openSupplierDialog() {
+  if (shop?.role !== 'owner') return;
+  formMessage('supplierMessage');
+  try {
+    requireOnline();
+    suppliers = await allRows('guigs_suppliers', 'id,name,active,created_at');
+    const select = el('supplierSelect');
+    select.replaceChildren(new Option('+ Novo fornecedor', ''));
+    for (const supplier of [...suppliers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))) {
+      select.add(new Option(`${supplier.name}${supplier.active ? '' : ' · Inativo'}`, supplier.id));
+    }
+    fillSupplierForm();
+    el('saveSupplier').disabled = false;
+    el('supplierDialog').showModal();
+  } catch (error) {
+    say(error.message || 'Não foi possível consultar fornecedores.', 'danger');
+  }
+}
+
+async function saveSupplier(event) {
+  event.preventDefault();
+  const button = el('saveSupplier');
+  if (button.disabled || shop?.role !== 'owner') return;
+  button.disabled = true;
+  formMessage('supplierMessage');
+  try {
+    requireOnline();
+    const id = el('supplierSelect').value;
+    const args = {p_shop_id: shop.shop_id, p_name: el('supplierName').value.trim(), p_active: el('supplierActive').value === 'true'};
+    if (id) args.p_supplier_id = id;
+    const {data, error} = await client.rpc(id ? 'guigs_update_supplier' : 'guigs_create_supplier', args);
+    if (error) throw error;
+    suppliers = await allRows('guigs_suppliers', 'id,name,active,created_at');
+    populateReceiveSuppliers(args.p_active ? (id || data) : '');
+    render();
+    el('supplierDialog').close();
+    say('Fornecedor salvo.', 'good');
+  } catch (error) {
+    formMessage('supplierMessage', error.message || 'Não foi possível salvar o fornecedor.');
+  } finally {
+    button.disabled = !navigator.onLine;
+  }
+}
 
 function productById(id) {
   return products.find(p => p.id === id);
@@ -3159,6 +3167,7 @@ el('receiveStock')
       );
 
       populateReceiveProducts();
+      populateReceiveSuppliers();
 
       el('receiveDialog')
         .showModal();
@@ -3200,6 +3209,11 @@ el('receiveForm')
     'submit',
     receiveStock
   );
+
+el('manageSuppliers').addEventListener('click', openSupplierDialog);
+el('newReceiveSupplier').addEventListener('click', openSupplierDialog);
+el('supplierSelect').addEventListener('change', fillSupplierForm);
+el('supplierForm').addEventListener('submit', saveSupplier);
 
 el('transferStock')
   .addEventListener(
