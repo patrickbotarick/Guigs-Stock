@@ -884,6 +884,20 @@
       .operation-summary dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
       #operationFeedback { overflow-wrap: anywhere; }
       .stock-thresholds { display: block; margin-top: 4px; line-height: 1.5; }
+      .inventory-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+      .inventory-actions .btn, .inventory-item .btn, #inventoryComplete, #inventoryNextItem { min-height: 44px; }
+      .inventory-filters { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr)); align-items: end; gap: 12px; margin: 20px 0; }
+      .inventory-items { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,300px),1fr)); gap: 12px; margin: 16px 0; }
+      .inventory-item, .inventory-history-card { border: 1px solid #e7e3df; border-radius: 12px; padding: 16px; min-width: 0; overflow-wrap: anywhere; }
+      .inventory-history-card { margin: 10px 0; }
+      .inventory-item h3 { margin-top: 0; }
+      .inventory-positive { background: #e7f5ec; }
+      .inventory-negative { background: #fff0d2; }
+      .inventory-pending { background: #f7f6f4; }
+      .inventory-count-form { display: grid; gap: 8px; margin: 14px 0; }
+      .inventory-count-input { min-width: 0; width: 100%; font-size: 20px; padding: 12px; border: 1px solid #dcd8d3; border-radius: 10px; }
+      #inventoryReviewGate input { width: 22px; height: 22px; vertical-align: middle; }
+      #inventoryAudit p { overflow-wrap: anywhere; }
 
       .formmsg {
         font-size: 12px;
@@ -1170,6 +1184,7 @@
           <span class="nav-label">NAVEGAÇÃO</span>
           <a id="navOverview" class="menu" href="#visao-geral" aria-current="page">◫ Visão geral</a>
           <a id="navHistory" class="menu" href="#historico">↻ Histórico</a>
+          <a id="navInventory" class="menu" href="#inventario">▤ Inventário</a>
         </nav>
 
         <p>
@@ -1429,11 +1444,54 @@
             </div>
           </section>
 
+          <section id="inventoryView" class="hidden" aria-label="Inventário físico">
+            <div id="inventoryOffline" class="notice danger hidden" role="status">Sem internet: criação, contagem e fechamento bloqueados. Os dados exibidos podem estar desatualizados.</div>
+            <div id="inventoryMessage" class="notice hidden" role="status" aria-live="polite"></div>
+            <div class="panel">
+              <div class="panelhead"><div><h2>Inventários físicos</h2><p class="muted">Contar não altera estoque. Somente o proprietário pode fechar e aplicar divergências após revisão.</p></div>
+                <div class="inventory-actions"><button type="button" id="newInventory" class="btn green hidden" data-inventory-write>Novo inventário</button><button type="button" id="inventoryReload" class="btn">Atualizar inventários</button></div>
+              </div>
+              <p id="inventoryOpenSummary"></p><p id="inventoryLastCompleted" class="muted"></p>
+              <h3>Histórico de inventários</h3><div id="inventoryList"></div>
+              <div class="inventory-actions"><button type="button" id="inventoryPrevious" class="btn">Anterior</button><span id="inventoryPage"></span><button type="button" id="inventoryNext" class="btn">Próxima</button></div>
+            </div>
+            <section id="inventoryDetail" class="panel hidden" aria-labelledby="inventoryDetailTitle">
+              <h2 id="inventoryDetailTitle"></h2><p id="inventoryDetailInfo" class="muted"></p>
+              <p id="inventoryTotals" tabindex="-1" role="status"></p>
+              <div id="inventoryMovementWarning" class="notice danger hidden" role="status"></div>
+              <div class="inventory-actions">
+                <button type="button" id="inventoryReview" class="btn" data-inventory-write>Revisar inventário</button>
+                <button type="button" id="inventoryReopen" class="btn" data-inventory-write>Reabrir para contagem</button>
+                <button type="button" id="inventoryScope" class="btn" data-inventory-write>Incluir novos lotes</button>
+                <button type="button" id="inventoryCancel" class="btn red" data-inventory-write>Cancelar inventário</button>
+              </div>
+              <section id="inventoryDifferencesPanel" class="balancebox hidden"><h3>Divergências para revisão</h3><div id="inventoryDifferences"></div></section>
+              <div id="inventoryReviewGate" class="balancebox hidden"><label><input id="inventoryReviewCheck" type="checkbox" /> Revisei cada divergência e os avisos de movimentação.</label></div>
+              <button type="button" id="inventoryComplete" class="btn red hidden" data-inventory-write>Fechar inventário e aplicar ajustes</button>
+              <div class="inventory-filters">
+                <div class="field"><label for="inventoryItemSelect">Pesquisar produto / lote</label><select id="inventoryItemSelect"><option value="">Todos os produtos / lotes</option></select></div>
+                <div class="field"><label for="inventoryLocation">Localização</label><select id="inventoryLocation"><option value="">Ambas</option><option value="stock">Estoque seco</option><option value="fridge">Geladeira</option></select></div>
+                <div class="field"><label for="inventoryFilter">Conferência</label><select id="inventoryFilter"><option value="all">Todos</option><option value="divergent">Divergentes</option><option value="pending">Não contados</option><option value="counted">Conferidos</option></select></div>
+                <button type="button" id="inventoryNextItem" class="btn">Próxima contagem pendente</button>
+              </div>
+              <div id="inventoryItems" class="inventory-items"></div>
+              <details><summary>Auditoria das contagens e estados</summary><div id="inventoryAudit"></div></details>
+            </section>
+          </section>
           <div class="foot" id="updated"></div>
         </section>
       </main>
     </div>
 
+    <dialog id="inventoryCreateDialog" aria-labelledby="inventoryCreateTitle">
+      <div class="modal"><h2 id="inventoryCreateTitle">Novo inventário físico</h2><p>Capturar os lotes e os saldos dos dois locais. Nenhum saldo será alterado.</p>
+        <form id="inventoryCreateForm" class="modalform">
+          <div class="field"><label for="inventoryObservation">Observação</label><textarea id="inventoryObservation" maxlength="1000" placeholder="Ex.: contagem de fechamento"></textarea></div>
+          <div id="inventoryCreateMessage" class="formmsg" role="alert"></div>
+          <div class="modalactions"><button type="button" class="btn" data-close="inventoryCreateDialog">Cancelar</button><button id="inventoryCreateSubmit" type="submit" class="btn green">Criar inventário</button></div>
+        </form>
+      </div>
+    </dialog>
     <!-- NOVO PRODUTO -->
 
     <dialog id="productDialog">

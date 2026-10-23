@@ -1,4 +1,4 @@
-const CACHE_NAME = "guigs-stock-shell-v8";
+const CACHE_NAME = "guigs-stock-shell-v9";
 
 const APP_SHELL = [
   "./",
@@ -6,6 +6,7 @@ const APP_SHELL = [
   "./auth-preview.html",
   "./reset-password.html",
   "./cloud-dashboard.js",
+  "./inventory.js",
   "./auth-preview.js?v=1.4.1",
   "./reset-password.js",
   "./manifest.webmanifest",

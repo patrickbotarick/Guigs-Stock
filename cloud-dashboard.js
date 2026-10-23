@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createInventoryUI } from './inventory.js';
 
 const el = id => document.getElementById(id);
 
@@ -436,6 +437,26 @@ function confirmOperation(context, title, reason, details) {
   return context.waitForConfirmation(dialog, 'cancelOperation', 'confirmOperation');
 }
 
+function waitForDialogConfirmation(confirmation, cancelId, continueId, parent, isCancelled = () => false) {
+  return new Promise(resolve => {
+    const cancel = () => confirmation.close('cancel');
+    const proceed = () => confirmation.close('continue');
+    const closed = () => {
+      el(cancelId).removeEventListener('click', cancel);
+      el(continueId).removeEventListener('click', proceed);
+      parent?.removeEventListener('close', cancel);
+      resolve(!isCancelled() && confirmation.returnValue === 'continue');
+    };
+    confirmation.returnValue = 'cancel';
+    el(cancelId).addEventListener('click', cancel);
+    el(continueId).addEventListener('click', proceed);
+    parent?.addEventListener('close', cancel, {once:true});
+    confirmation.addEventListener('close', closed, {once:true});
+    confirmation.showModal();
+    el(cancelId).focus();
+  });
+}
+
 async function runOperation(event, {buttonId, messageId, owner = false, reset = true, task, afterSave}) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -465,23 +486,7 @@ async function runOperation(event, {buttonId, messageId, owner = false, reset = 
     },
     waitForConfirmation(confirmation, cancelId, continueId) {
       context.ensure();
-      return new Promise(resolve => {
-        const cancel = () => confirmation.close('cancel');
-        const proceed = () => confirmation.close('continue');
-        const closed = () => {
-          el(cancelId).removeEventListener('click', cancel);
-          el(continueId).removeEventListener('click', proceed);
-          dialog.removeEventListener('close', cancel);
-          resolve(!state.cancelled && confirmation.returnValue === 'continue');
-        };
-        confirmation.returnValue = 'cancel';
-        el(cancelId).addEventListener('click', cancel);
-        el(continueId).addEventListener('click', proceed);
-        dialog.addEventListener('close', cancel, {once: true});
-        confirmation.addEventListener('close', closed, {once: true});
-        confirmation.showModal();
-        el(cancelId).focus();
-      });
+      return waitForDialogConfirmation(confirmation,cancelId,continueId,dialog,()=>state.cancelled);
     }
   };
   try {
@@ -829,6 +834,7 @@ await loadHistory();
     el('content')
       .classList
       .remove('hidden');
+    if (location.hash === '#inventario') inventoryUI.activate();
 
 
     say(
@@ -2685,16 +2691,21 @@ async function adjustStockOperation(event) {
 
 function applyView() {
   const history = location.hash === '#historico';
-  el('overviewView').classList.toggle('hidden', history);
+  const inventory = location.hash === '#inventario';
+  el('overviewView').classList.toggle('hidden', history || inventory);
   el('historyView').classList.toggle('hidden', !history);
-  document.querySelector('.main').classList.toggle('history-view', history);
-  el('viewTitle').textContent = history ? 'Histórico de movimentações' : 'Painel do estoque';
-  for (const [id, active] of [['navOverview', !history], ['navHistory', history]]) {
+  el('inventoryView').classList.toggle('hidden', !inventory);
+  document.querySelector('.main').classList.toggle('history-view', history || inventory);
+  el('viewTitle').textContent = inventory ? 'Inventário físico' : history ? 'Histórico de movimentações' : 'Painel do estoque';
+  for (const [id, active] of [['navOverview', !history && !inventory], ['navHistory', history], ['navInventory',inventory]]) {
     if (active) el(id).setAttribute('aria-current', 'page');
     else el(id).removeAttribute('aria-current');
   }
+  if (inventory) inventoryUI.activate();
 }
 
+const inventoryUI = createInventoryUI({getContext:()=>({client,shop}),enhanceSelect:enhanceSearchableSelect,
+  confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[]),refreshStock:refresh});
 window.addEventListener('hashchange', applyView);
 applyView();
 

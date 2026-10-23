@@ -125,7 +125,7 @@ function fixture({role, session, searchable = false, readOnly = false, operation
 module.exports = {fixture};
 if (require.main === module) (async () => {
   // Lista explícita; config.js real nunca é lido nem servido.
-  const files = ['index.html','auth-preview.html','reset-password.html','cloud-dashboard.js','auth-preview.js','reset-password.js','pwa.js','service-worker.js','manifest.webmanifest','logo-guigs.png'];
+  const files = ['index.html','auth-preview.html','reset-password.html','cloud-dashboard.js','inventory.js','auth-preview.js','reset-password.js','pwa.js','service-worker.js','manifest.webmanifest','logo-guigs.png'];
   const server = http.createServer((req,res) => {
     const file = new URL(req.url,'http://localhost').pathname.slice(1) || 'index.html';
     res.setHeader('Cache-Control','no-store');
@@ -265,7 +265,7 @@ if (require.main === module) (async () => {
     await page.click('#cancelFefo'); await page.click('[data-close="transferDialog"]');
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v8')), 'Novo cache PWA instalado');
+    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v9')), 'Novo cache PWA instalado');
     await context.setOffline(true);
     await page.waitForFunction(() => document.getElementById('receiveStock').disabled);
     check((await page.textContent('#status')).includes('sem conexão'), 'Offline informa indisponibilidade e desabilita operações');
