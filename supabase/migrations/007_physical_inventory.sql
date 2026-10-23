@@ -2,6 +2,13 @@
 -- Aditiva: não substitui nenhuma função/policy/tabela anterior.
 begin;
 
+do $$ begin
+  if to_regclass('public.guigs_suppliers') is null or not exists (
+    select 1 from pg_catalog.pg_attribute where attrelid=to_regclass('public.guigs_lots')
+      and attname='supplier_id' and not attisdropped
+  ) then raise exception 'Pré-requisito ausente: confira a migration 006 antes da 007.'; end if;
+end $$;
+
 create table public.guigs_inventories (
   id uuid primary key default gen_random_uuid(),
   shop_id uuid not null references public.guigs_shops(id),

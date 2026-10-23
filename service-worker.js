@@ -8,10 +8,14 @@ const APP_SHELL = [
   "./cloud-dashboard.js",
   "./inventory.js",
   "./reports.js",
+  "./pwa.js",
   "./auth-preview.js?v=1.4.1",
   "./reset-password.js",
   "./manifest.webmanifest",
   "./logo-guigs.png",
+  "./icons/guigs-stock-192.png",
+  "./icons/guigs-stock-512.png",
+  "./icons/guigs-stock-maskable-512.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -83,8 +87,8 @@ self.addEventListener("fetch", (event) => {
 
   /*
    * Arquivos estáticos:
-   * cache primeiro,
-   * rede como fallback.
+   * tenta rede primeiro,
+   * usa cache se a rede falhar.
    */
   event.respondWith(
     fetch(request)

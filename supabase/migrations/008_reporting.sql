@@ -1,6 +1,14 @@
 -- v1.6D: somente preparação. NÃO aplicar no Supabase real nesta etapa.
 begin;
 
+do $$ begin
+  if to_regclass('public.guigs_inventories') is null
+     or to_regclass('public.guigs_inventory_items') is null
+     or to_regclass('public.guigs_inventory_audit') is null then
+    raise exception 'Pré-requisito ausente: confira a migration 007 antes da 008.';
+  end if;
+end $$;
+
 -- O índice existente (shop_id,created_at desc) da 003 atende ao período.
 -- Sem índices novos até medição em homologação com volume representativo.
 create function public.guigs_get_reports(

@@ -9,12 +9,12 @@ const signatures={
  guigs_recount_inventory_item:['p_shop_id','p_inventory_id','p_item_id','p_version'],guigs_refresh_inventory_scope:['p_shop_id','p_inventory_id','p_version'],
  guigs_set_inventory_status:['p_shop_id','p_inventory_id','p_status','p_version'],guigs_complete_inventory:['p_shop_id','p_inventory_id','p_version','p_confirm']
 };
-async function createTestDatabase(){
+async function createTestDatabase({through=8}={}){
  const db=new PGlite({extensions:{pgcrypto}});
  await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,email text);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema auth to anon,authenticated;grant execute on function auth.uid() to anon,authenticated;`);
- for(const file of fs.readdirSync(path.join(__dirname,'../supabase/migrations')).filter(f=>f.endsWith('.sql')).sort())await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations',file),'utf8'));
+ for(const file of fs.readdirSync(path.join(__dirname,'../supabase/migrations')).filter(f=>f.endsWith('.sql')&&Number(f.slice(0,3))<=through).sort())await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations',file),'utf8'));
  await db.query('insert into auth.users values($1,$2),($3,$4)',[id(1),'owner@test.invalid',id(2),'attendant@test.invalid']);
  await db.query('insert into public.guigs_shops(id,name) values($1,$2)',[id(10),'Loja artificial UI']);
  await db.query("insert into public.guigs_memberships(shop_id,user_id,role) values($1,$2,'owner'),($1,$3,'attendant')",[id(10),id(1),id(2)]);
