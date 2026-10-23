@@ -9,7 +9,7 @@ const artifacts = process.env.TEST_ARTIFACTS_DIR;
 let checks = 0;
 const check = (value, message) => {assert.ok(value, message); checks++;};
 
-function fixture({role, session, searchable = false, readOnly = false}) {
+function fixture({role, session, searchable = false, readOnly = false, operations = false}) {
   const user = {id: 'user-test', email: `${role}@test.invalid`};
   const product = {id: 'product-1', name: 'Coca-Cola 2L', category: 'Refrigerante', min_total: 1, target_total: 20, min_fridge: 1, target_fridge: 10, active: true};
   const lots = [
@@ -28,14 +28,26 @@ function fixture({role, session, searchable = false, readOnly = false}) {
     for (let i = 2; i <= 80; i++) products.push({...product,id:`product-${i}`,name:i === 2 ? 'SUCO UVA 1L' : i === 3 ? 'COCA COLA 1L ZERO' : `ÁGUA ${i}`});
     products.push({...product,id:'product-off',name:'Produto inativo',active:false});
   }
+  if (operations) {
+    const date = delta => {const d=new Date();d.setDate(d.getDate()+delta);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+    Object.assign(product,{min_total:30,target_total:60,min_fridge:8,target_fridge:12});
+    lots[0].expiry=date(5); lots[1].expiry=date(20);
+    balances[0].fridge=4; balances[1].stock=20;
+    products.push({...product,id:'product-juice',name:'Suco Uva 1L',min_total:8,target_total:20,min_fridge:4,target_fridge:10});
+    products.push({...product,id:'product-off',name:'Produto inativo',active:false});
+    lots.push({id:'lot-expired',product_id:product.id,code:'VENCIDO',expiry:date(-1),created_at:'2026-10-01T10:00:00Z'});
+    lots.push({id:'lot-juice',product_id:'product-juice',code:'UVA-01',expiry:date(31),created_at:'2026-10-01T10:00:00Z'});
+    balances.push({lot_id:'lot-expired',stock:7,fridge:1},{lot_id:'lot-juice',stock:3,fridge:2});
+  }
   const calls = [];
   const listeners = [];
   const history = Array.from({length: 45}, (_, i) => ({id:`move-${i}`,lot_id:'lot-b',lot_code:'LOTE-B',product_id:product.id,product_name:product.name,movement_type:i%2?'sale':'receipt',location:'stock',delta:1,actor_id:user.id,actor_email:user.email,note:i===0?'Fornecedor: Distribuidora teste':'',created_at:'2026-10-07T12:00:00Z'}));
-  window.__test = {calls, lots, suppliers, balances, history};
+  window.__test = {calls, lots, suppliers, balances, history, products};
   function from(table) {
     const builder = {
       select() {return this;}, eq() {return this;}, range() {return this;},
       then(resolve, reject) {
+        if (window.__test.readError) return Promise.resolve({error:{message:'Leitura simulada indisponível'}}).then(resolve,reject);
         if (!navigator.onLine) return Promise.resolve({error: {message:'Failed to fetch'}}).then(resolve,reject);
         const data = table === 'guigs_memberships' ? [{shop_id:'shop-test',role,active:true}] :
           table === 'guigs_products' ? products : table === 'guigs_lots' ? lots : suppliers;
@@ -56,6 +68,10 @@ function fixture({role, session, searchable = false, readOnly = false}) {
     async rpc(name,args) {
       if (readOnly && !name.startsWith('guigs_get_')) throw Error(`Escrita proibida no teste: ${name}`);
       calls.push({name,args:structuredClone(args)});
+      if (!name.startsWith('guigs_get_')) {
+        if (window.__test.writeDelay) await new Promise(resolve=>setTimeout(resolve,window.__test.writeDelay));
+        if (window.__test.writeError) return {error:{message:window.__test.writeError==='network' ? 'Failed to fetch' : 'Falha de gravação simulada'}};
+      }
       if (!navigator.onLine) return {error:{message:'Failed to fetch'}};
       let data;
       if (name === 'guigs_get_lot_balances') data = structuredClone(balances);
@@ -85,7 +101,22 @@ function fixture({role, session, searchable = false, readOnly = false}) {
         if (b[args.p_from_location]<args.p_quantity) return {error:{message:'Saldo insuficiente'}};
         b[args.p_from_location]-=args.p_quantity; b[args.p_to_location]+=args.p_quantity;
         data = {success:true,quantity:args.p_quantity};
+      } else if (name === 'guigs_register_sale' || name === 'guigs_register_loss') {
+        const balance=balances.find(b=>b.lot_id===args.p_lot_id);
+        const location=name==='guigs_register_sale' ? 'fridge' : args.p_location;
+        if(balance[location]<args.p_quantity)return {error:{message:'Saldo insuficiente'}};
+        balance[location]-=args.p_quantity;data={quantity:args.p_quantity};
+      } else if (name === 'guigs_adjust_stock') {
+        const balance=balances.find(b=>b.lot_id===args.p_lot_id);
+        const delta=args.p_new_quantity-balance[args.p_location];
+        balance[args.p_location]=args.p_new_quantity;data={changed:delta!==0,delta};
+      } else if (name === 'guigs_create_product' || name === 'guigs_update_product') {
+        const updated={name:args.p_name,category:args.p_category,min_total:args.p_min_total,target_total:args.p_target_total,min_fridge:args.p_min_fridge,target_fridge:args.p_target_fridge,active:args.p_active??true};
+        if(name==='guigs_update_product')Object.assign(products.find(p=>p.id===args.p_product_id),updated);
+        else products.push({...updated,id:`product-${products.length+1}`});
+        data=true;
       }
+      if (!name.startsWith('guigs_get_') && window.__test.failRefreshAfterWrite) window.__test.readError=true;
       return {data,error:null};
     }
   };
@@ -112,6 +143,7 @@ if (require.main === module) (async () => {
   try {
     browser = await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'});
     const context = await browser.newContext({viewport:{width:1440,height:900}});
+    await context.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1' ? route.continue() : route.abort());
     await context.addInitScript(fixture,{role:'owner',session:false});
     const page = await context.newPage();
     const errors = [];
@@ -233,7 +265,7 @@ if (require.main === module) (async () => {
     await page.click('#cancelFefo'); await page.click('[data-close="transferDialog"]');
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v7')), 'Novo cache PWA instalado');
+    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v8')), 'Novo cache PWA instalado');
     await context.setOffline(true);
     await page.waitForFunction(() => document.getElementById('receiveStock').disabled);
     check((await page.textContent('#status')).includes('sem conexão'), 'Offline informa indisponibilidade e desabilita operações');
@@ -250,6 +282,7 @@ if (require.main === module) (async () => {
     await context.close();
 
     const attendantContext = await browser.newContext({viewport:{width:1280,height:800}});
+    await attendantContext.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1' ? route.continue() : route.abort());
     await attendantContext.addInitScript(fixture,{role:'attendant',session:false});
     const attendant = await attendantContext.newPage(); attendant.on('pageerror',e=>errors.push(e.message));
     await attendant.goto(`${base}/auth-preview.html`); await attendant.fill('#email','attendant@test.invalid'); await attendant.fill('#password','test-only'); await attendant.click('#enter');
