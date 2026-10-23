@@ -9,7 +9,7 @@ const artifacts = process.env.TEST_ARTIFACTS_DIR;
 let checks = 0;
 const check = (value, message) => {assert.ok(value, message); checks++;};
 
-function fixture({role, session}) {
+function fixture({role, session, searchable = false, readOnly = false}) {
   const user = {id: 'user-test', email: `${role}@test.invalid`};
   const product = {id: 'product-1', name: 'Coca-Cola 2L', category: 'Refrigerante', min_total: 1, target_total: 20, min_fridge: 1, target_fridge: 10, active: true};
   const lots = [
@@ -18,6 +18,16 @@ function fixture({role, session}) {
   ];
   const suppliers = [{id: 'supplier-1', name: 'Distribuidora teste', active: true}, {id: 'supplier-off', name: 'Inativo teste', active: false}];
   const balances = [{lot_id:'lot-a', stock:10, fridge:0}, {lot_id:'lot-b', stock:10, fridge:0}];
+  const products = [product];
+  if (searchable) {
+    product.name = 'COCA COLA 2L';
+    lots[0].code = 'L3-2103';
+    balances[0].fridge = 8;
+    suppliers[0].name = 'BEBIDAS POTY';
+    suppliers.push({id:'supplier-2',name:'ARCO ÍRIS (COTUBA)',active:true});
+    for (let i = 2; i <= 80; i++) products.push({...product,id:`product-${i}`,name:i === 2 ? 'SUCO UVA 1L' : i === 3 ? 'COCA COLA 1L ZERO' : `ÁGUA ${i}`});
+    products.push({...product,id:'product-off',name:'Produto inativo',active:false});
+  }
   const calls = [];
   const listeners = [];
   const history = Array.from({length: 45}, (_, i) => ({id:`move-${i}`,lot_id:'lot-b',lot_code:'LOTE-B',product_id:product.id,product_name:product.name,movement_type:i%2?'sale':'receipt',location:'stock',delta:1,actor_id:user.id,actor_email:user.email,note:i===0?'Fornecedor: Distribuidora teste':'',created_at:'2026-10-07T12:00:00Z'}));
@@ -28,7 +38,7 @@ function fixture({role, session}) {
       then(resolve, reject) {
         if (!navigator.onLine) return Promise.resolve({error: {message:'Failed to fetch'}}).then(resolve,reject);
         const data = table === 'guigs_memberships' ? [{shop_id:'shop-test',role,active:true}] :
-          table === 'guigs_products' ? [product] : table === 'guigs_lots' ? lots : suppliers;
+          table === 'guigs_products' ? products : table === 'guigs_lots' ? lots : suppliers;
         return Promise.resolve({data:structuredClone(data),error:null}).then(resolve,reject);
       }
     };
@@ -44,6 +54,7 @@ function fixture({role, session}) {
       async signOut() {session = false; return {error:null};}
     },
     async rpc(name,args) {
+      if (readOnly && !name.startsWith('guigs_get_')) throw Error(`Escrita proibida no teste: ${name}`);
       calls.push({name,args:structuredClone(args)});
       if (!navigator.onLine) return {error:{message:'Failed to fetch'}};
       let data;
@@ -80,7 +91,8 @@ function fixture({role, session}) {
   };
 }
 
-(async () => {
+module.exports = {fixture};
+if (require.main === module) (async () => {
   // Lista explícita; config.js real nunca é lido nem servido.
   const files = ['index.html','auth-preview.html','reset-password.html','cloud-dashboard.js','auth-preview.js','reset-password.js','pwa.js','service-worker.js','manifest.webmanifest','logo-guigs.png'];
   const server = http.createServer((req,res) => {
@@ -117,7 +129,7 @@ function fixture({role, session}) {
     const sideY = await page.evaluate(() => document.querySelector('.side').getBoundingClientRect().y);
     await page.evaluate(() => window.scrollTo(0,document.body.scrollHeight));
     check(await page.evaluate(() => document.querySelector('.side').getBoundingClientRect().y)===sideY, 'Sidebar permanece fixa com scroll');
-    await page.click('#navHistory');
+    await page.click('#navHistory'); await page.waitForSelector('#historyView:not(.hidden)');
     check(await page.isVisible('#historyView') && !await page.isVisible('#overviewView'), 'Navegação para Histórico');
     check(await page.getAttribute('#navHistory','aria-current')==='page', 'Menu ativo acessível');
     check((await page.textContent('#page')).includes('1/3') && await page.locator('#history tr').count()===20, 'Histórico pagina 20 de 45');
@@ -127,7 +139,7 @@ function fixture({role, session}) {
     await page.selectOption('#historyType','sale');
     await page.waitForFunction(() => document.getElementById('page').textContent.includes('22 lançamentos'));
     check(await page.locator('#history .movement-type.sale').count()===20, 'Filtro tipo preservado');
-    await page.selectOption('#historyProduct','product-1');
+    await page.selectOption('#historyProduct','product-1',{force:true});
     await page.selectOption('#historyActor','user-test');
     await page.fill('#historyDateFrom','2026-10-01'); await page.dispatchEvent('#historyDateFrom','change');
     await page.fill('#historyDateTo','2026-10-08'); await page.dispatchEvent('#historyDateTo','change');
@@ -136,12 +148,12 @@ function fixture({role, session}) {
     await page.fill('#search','Distribuidora teste');
     await page.waitForFunction(() => document.getElementById('page').textContent.includes('1 lançamentos'));
     check((await page.textContent('#history')).includes('Fornecedor: Distribuidora teste'), 'Busca e contexto do recebimento');
-    await page.click('#navOverview');
+    await page.click('#navOverview'); await page.waitForSelector('#overviewView:not(.hidden)');
     check(await page.isVisible('#overviewView') && !await page.isVisible('#historyView'), 'Retorno à Visão geral');
-    await page.click('#navHistory');
+    await page.click('#navHistory'); await page.waitForSelector('#historyView:not(.hidden)');
     check(await page.inputValue('#search')==='Distribuidora teste', 'Filtros preservados entre views');
     if (artifacts) {fs.mkdirSync(artifacts,{recursive:true}); await page.screenshot({path:path.join(artifacts,'historico-desktop.png'),fullPage:true});}
-    await page.click('#navOverview');
+    await page.click('#navOverview'); await page.waitForSelector('#overviewView:not(.hidden)');
 
     await page.click('#receiveStock');
     check(await page.locator('#receiveSupplier option').count()===2, 'Lista somente fornecedores ativos');
@@ -154,7 +166,7 @@ function fixture({role, session}) {
     await page.waitForFunction(() => !document.getElementById('receiveDialog').open);
     check((await page.textContent('#lots')).includes('Fornecedor: Fornecedor novo'), 'Receber e visualizar fornecedor');
     check(await page.evaluate(() => window.__test.calls.find(c=>c.name==='guigs_receive_stock').args.p_supplier_id)==='supplier-3', 'Recebimento envia supplier_id');
-    await page.click('#manageSuppliers'); await page.selectOption('#supplierSelect','supplier-3');
+    await page.click('#manageSuppliers'); await page.selectOption('#supplierSelect','supplier-3',{force:true});
     await page.selectOption('#supplierActive','false'); await page.click('#saveSupplier');
     await page.waitForFunction(() => !document.getElementById('supplierDialog').open);
     await page.click('#receiveStock');
@@ -162,7 +174,7 @@ function fixture({role, session}) {
     await page.click('[data-close="receiveDialog"]');
 
     const transfers = () => page.evaluate(() => window.__test.calls.filter(c=>c.name==='guigs_transfer_stock').length);
-    const openB = async () => {await page.click('#transferStock'); await page.selectOption('#transferLot','lot-b'); await page.fill('#transferQuantity','5');};
+    const openB = async () => {await page.click('#transferStock'); await page.selectOption('#transferLot','lot-b',{force:true}); await page.fill('#transferQuantity','5');};
     await openB(); await page.click('#saveTransfer');
     await page.waitForSelector('#fefoDialog[open]');
     check((await page.textContent('#fefoCandidates')).includes('LOTE-A') && (await page.textContent('#fefoCandidates')).includes('10 unidades'), 'Aviso FEFO identifica lote A e saldo');
@@ -210,10 +222,10 @@ function fixture({role, session}) {
     await page.setViewportSize({width:390,height:844});
     check(await page.evaluate(() => getComputedStyle(document.querySelector('.side')).position==='static'), 'Sidebar mobile não ocupa lateral');
     check(await page.evaluate(() => document.documentElement.scrollWidth<=window.innerWidth), 'Sem scroll horizontal na página mobile');
-    await page.click('#navHistory');
+    await page.click('#navHistory'); await page.waitForSelector('#historyView:not(.hidden)');
     check(await page.isVisible('#historyView') && await page.isVisible('#navOverview'), 'Histórico acessível no celular');
     if (artifacts) await page.screenshot({path:path.join(artifacts,'historico-mobile.png'),fullPage:true});
-    await page.click('#navOverview');
+    await page.click('#navOverview'); await page.waitForSelector('#overviewView:not(.hidden)');
     check(await page.isVisible('#overviewView'), 'Retorno mobile');
     await openB(); await page.fill('#transferQuantity','1'); await page.click('#saveTransfer'); await page.waitForSelector('#fefoDialog[open]');
     check(await page.isVisible('#cancelFefo') && await page.isVisible('#continueFefo'), 'Ações FEFO acessíveis mobile');
@@ -221,7 +233,7 @@ function fixture({role, session}) {
     await page.click('#cancelFefo'); await page.click('[data-close="transferDialog"]');
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v6')), 'Novo cache PWA instalado');
+    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v7')), 'Novo cache PWA instalado');
     await context.setOffline(true);
     await page.waitForFunction(() => document.getElementById('receiveStock').disabled);
     check((await page.textContent('#status')).includes('sem conexão'), 'Offline informa indisponibilidade e desabilita operações');
@@ -245,8 +257,8 @@ function fixture({role, session}) {
     check((await attendant.textContent('#identity')).includes('Atendente'), 'Login attendant');
     check(!await attendant.isVisible('#manageSuppliers') && !await attendant.isVisible('#newProduct'), 'Atendente sem controles administrativos');
     await attendant.click('#receiveStock');
-    check(await attendant.isVisible('#receiveSupplier') && !await attendant.isVisible('#newReceiveSupplier'), 'Atendente seleciona, sem cadastrar fornecedor');
-    await attendant.selectOption('#receiveSupplier','supplier-1'); await attendant.fill('#lotCode','ATENDENTE'); await attendant.fill('#expiry','2027-02-10'); await attendant.click('#saveReceipt');
+    check(await attendant.isVisible('#receiveSupplierSearch') && !await attendant.isVisible('#newReceiveSupplier'), 'Atendente seleciona, sem cadastrar fornecedor');
+    await attendant.selectOption('#receiveSupplier','supplier-1',{force:true}); await attendant.fill('#lotCode','ATENDENTE'); await attendant.fill('#expiry','2027-02-10'); await attendant.click('#saveReceipt');
     await attendant.waitForFunction(() => !document.getElementById('receiveDialog').open);
     check(await attendant.evaluate(() => window.__test.calls.some(c=>c.name==='guigs_receive_stock')), 'Recebimento por atendente');
     await attendantContext.close();
