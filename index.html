@@ -715,6 +715,8 @@
         border-radius: 20px;
         padding: 0;
         width: min(520px, calc(100% - 30px));
+        max-height: calc(100dvh - 24px);
+        overflow-y: auto;
         box-shadow: 0 25px 80px rgba(0, 0, 0, 0.28);
       }
 
@@ -823,6 +825,28 @@
         padding: 11px 12px;
         background: white;
       }
+
+      .searchable-select { min-width: 0; }
+      .searchable-native { display: none !important; }
+      .searchable-select input { width: 100%; min-width: 0; font-size: 16px; }
+      .searchable-options {
+        max-height: min(220px, 30dvh);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        border: 1px solid #dcd8d3;
+        border-radius: 10px;
+        background: white;
+        margin-top: 4px;
+      }
+      .searchable-option, .searchable-empty {
+        padding: 12px;
+        min-height: 44px;
+        overflow-wrap: anywhere;
+      }
+      .searchable-option { cursor: pointer; }
+      .searchable-option[aria-selected="true"] { font-weight: 750; }
+      .searchable-option.active { background: #fff0d2; outline: 2px solid #8c5816; outline-offset: -2px; }
+      .searchable-option:hover { background: #f2efec; }
 
       .field textarea {
         min-height: 80px;
@@ -1524,7 +1548,7 @@
             </div>
 
             <div class="field">
-              <label for="editTargetFridge">Mínimo na geladeira</label>
+              <label for="editTargetFridge">Meta na geladeira</label>
 
               <input id="editTargetFridge" type="number" min="0" required />
             </div>
