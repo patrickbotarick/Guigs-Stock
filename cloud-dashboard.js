@@ -2,6 +2,17 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const el = id => document.getElementById(id);
 
+// A viewport visual também encolhe quando o teclado sobrepõe a página no celular.
+function updateDialogViewport() {
+  const viewport = window.visualViewport;
+  document.documentElement.style.setProperty('--dialog-viewport-height', `${viewport?.height || innerHeight}px`);
+  document.documentElement.style.setProperty('--dialog-viewport-top', `${viewport?.offsetTop || 0}px`);
+}
+window.visualViewport?.addEventListener('resize', updateDialogViewport);
+window.visualViewport?.addEventListener('scroll', updateDialogViewport);
+window.addEventListener('resize', updateDialogViewport);
+updateDialogViewport();
+
 // O select continua responsável pelo valor, pelas opções e pela validação.
 // A pesquisa só apresenta essas mesmas opções, sem alterar a ordem (inclusive FEFO).
 const searchableSelects = new Map();
@@ -181,9 +192,10 @@ let historyDateTo = '';
 let historyActors = [];
 
 let historySearchTimer = null;
-let receiptPending = false;
-let transferPending = false;
-let transferDialogVersion = 0;
+const pendingOperations = new Map();
+const HIGH_QUANTITY = 48; // Confirmação de UX; não é limite de estoque/RPC.
+let attentionFilter = 'all';
+let feedbackVersion = 0;
 
 let requestCounter = 0;
 
@@ -222,7 +234,7 @@ function setOfflineDashboardState() {
     'newReceiveSupplier',
     'saveSupplier',
     'saveReceipt',
-    'saveTransfer'
+    'saveTransfer', 'saveSale', 'saveLoss', 'saveAdjust', 'saveProduct', 'saveProductEdit'
   ];
 
   for (const id of ids) {
@@ -234,6 +246,7 @@ function setOfflineDashboardState() {
       node.disabled = true;
     }
   }
+  syncOperationButtons();
 }
 
 
@@ -281,7 +294,8 @@ function setOnlineDashboardState() {
     }
   }
   populateReceiveSuppliers();
-  if (el('transferDialog').open && !transferPending) populateTransferLots();
+  if (el('transferDialog').open && !operationPending('transferForm')) populateTransferLots();
+  syncOperationButtons();
 }
 
 
@@ -369,10 +383,159 @@ function formMessage(id, message = '', good = false) {
   const node = el(id);
 
   node.textContent = message;
+  node.setAttribute('role', good ? 'status' : 'alert');
 
   node.className = good
     ? 'formmsg good'
     : 'formmsg';
+}
+
+function operationPending(formId) { return pendingOperations.has(formId); }
+const locationLabel = location => location === 'fridge' ? 'Geladeira' : 'Estoque seco';
+
+function syncOperationButtons() {
+  const rules = [
+    ['productForm', 'saveProduct', true, true],
+    ['editProductForm', 'saveProductEdit', true, !!el('editProductSelect').value],
+    ['supplierForm', 'saveSupplier', true, true],
+    ['receiveForm', 'saveReceipt', false, !!el('receiveProduct').value && suppliers.some(s => s.active)],
+    ['transferForm', 'saveTransfer', false, !!el('transferLot').value],
+    ['saleForm', 'saveSale', false, !!el('saleLot').value],
+    ['lossForm', 'saveLoss', false, !!el('lossLot').value],
+    ['adjustForm', 'saveAdjust', true, !!el('adjustLot').value]
+  ];
+  for (const [form, button, owner, available] of rules) {
+    el(button).disabled = operationPending(form) || !navigator.onLine || !available || (owner && shop?.role !== 'owner');
+  }
+  for (const [form, action, owner] of [
+    ['productForm','newProduct',true], ['editProductForm','editProduct',true], ['supplierForm','manageSuppliers',true],
+    ['supplierForm','newReceiveSupplier',true], ['receiveForm','receiveStock',false], ['transferForm','transferStock',false],
+    ['saleForm','registerSale',false], ['lossForm','registerLoss',false], ['adjustForm','adjustStock',true]
+  ]) el(action).disabled = operationPending(form) || !navigator.onLine || (owner && shop?.role !== 'owner');
+}
+
+function showOperationFeedback(message, warning = false) {
+  const node = el('operationFeedback');
+  node.textContent = message;
+  node.className = `notice ${warning ? 'danger' : 'good'}`;
+}
+
+function confirmOperation(context, title, reason, details) {
+  const dialog = el('operationConfirmDialog');
+  el('operationConfirmTitle').textContent = title;
+  el('operationConfirmReason').textContent = reason;
+  const summary = el('operationConfirmSummary');
+  summary.replaceChildren();
+  for (const [label, value] of details) {
+    const term = document.createElement('dt');
+    const description = document.createElement('dd');
+    term.textContent = label;
+    description.textContent = String(value);
+    summary.append(term, description);
+  }
+  return context.waitForConfirmation(dialog, 'cancelOperation', 'confirmOperation');
+}
+
+async function runOperation(event, {buttonId, messageId, owner = false, reset = true, task, afterSave}) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = el(buttonId);
+  if (operationPending(form.id) || button.disabled) return;
+  formMessage(messageId);
+  const dialog = form.closest('dialog');
+  const state = {cancelled: false, writing: false};
+  const originalText = button.textContent;
+  const controls = [...form.querySelectorAll('input, select, textarea, button')];
+  const originalDisabled = new Map(controls.map(control => [control, control.disabled]));
+  const closeButtons = controls.filter(control => control.matches('[data-close]'));
+  const cancelled = () => { state.cancelled = true; };
+  const cancelDuringWrite = event => { if (state.writing) event.preventDefault(); };
+  const context = {
+    ensure() {
+      if (state.cancelled || !dialog.open) throw Error('Operação cancelada.');
+      requireOnline();
+    },
+    async write(name, args) {
+      context.ensure();
+      state.writing = true;
+      closeButtons.forEach(control => { control.disabled = true; });
+      const result = await client.rpc(name, args);
+      if (result.error) throw result.error;
+      return result.data;
+    },
+    waitForConfirmation(confirmation, cancelId, continueId) {
+      context.ensure();
+      return new Promise(resolve => {
+        const cancel = () => confirmation.close('cancel');
+        const proceed = () => confirmation.close('continue');
+        const closed = () => {
+          el(cancelId).removeEventListener('click', cancel);
+          el(continueId).removeEventListener('click', proceed);
+          dialog.removeEventListener('close', cancel);
+          resolve(!state.cancelled && confirmation.returnValue === 'continue');
+        };
+        confirmation.returnValue = 'cancel';
+        el(cancelId).addEventListener('click', cancel);
+        el(continueId).addEventListener('click', proceed);
+        dialog.addEventListener('close', cancel, {once: true});
+        confirmation.addEventListener('close', closed, {once: true});
+        confirmation.showModal();
+        el(cancelId).focus();
+      });
+    }
+  };
+  try {
+    requireOnline();
+    if (owner && shop?.role !== 'owner') throw Error('Ação disponível apenas ao proprietário.');
+    if (!form.reportValidity()) return;
+    pendingOperations.set(form.id, state);
+    dialog.addEventListener('close', cancelled);
+    dialog.addEventListener('cancel', cancelDuringWrite);
+    syncOperationButtons();
+    form.setAttribute('aria-busy', 'true');
+    button.textContent = 'Salvando…';
+    controls.filter(control => !control.matches('[data-close]')).forEach(control => { control.disabled = true; });
+    // task captura os campos antes de qualquer await. O valor confirmado é o enviado.
+    const message = await task(context);
+    if (!message) return;
+    dialog.removeEventListener('close', cancelled);
+    dialog.close();
+    if (reset) form.reset();
+    const version = ++feedbackVersion;
+    showOperationFeedback(message);
+    const updated = await refresh();
+    if (afterSave) afterSave();
+    if (version === feedbackVersion && updated !== true) {
+      showOperationFeedback(`${message} Registro confirmado; atualização pendente. Não repita a operação.`, true);
+    }
+  } catch (error) {
+    if (!state.cancelled) {
+      const uncertain = state.writing && /fetch|network|timeout|internet/i.test(error.message || '');
+      formMessage(messageId, uncertain
+        ? 'Não foi possível confirmar o resultado. Confira o histórico antes de repetir a operação.'
+        : error.message || 'Não foi possível salvar. Tente novamente.');
+    }
+  } finally {
+    const wasPending = operationPending(form.id);
+    dialog.removeEventListener('close', cancelled);
+    pendingOperations.delete(form.id);
+    dialog.removeEventListener('cancel', cancelDuringWrite);
+    form.removeAttribute('aria-busy');
+    button.textContent = originalText;
+    for (const [control, disabled] of originalDisabled) control.disabled = disabled;
+    syncOperationButtons();
+    if (wasPending && dialog.open && !button.disabled) button.focus();
+  }
+}
+
+function lotDetails(lot, quantity, location, note) {
+  return [['Produto', productById(lot.product_id)?.name || 'Produto'], ['Lote', lot.code],
+    ['Quantidade', `${quantity} unidade(s)`], ['Local', locationLabel(location)], ['Motivo / observação', note || 'Não informado']];
+}
+
+function quantityRisk(quantity, current) {
+  return [quantity >= HIGH_QUANTITY ? `Quantidade alta (${HIGH_QUANTITY} ou mais unidades).` : '',
+    current > 0 && quantity === current ? 'Esta operação vai zerar o saldo da origem.' : ''].filter(Boolean).join(' ');
 }
 
 
@@ -672,15 +835,18 @@ await loadHistory();
       'Estoque sincronizado com o Supabase.',
       'good'
     );
+    return true;
 
   }
   catch (e) {
-
-    fail(e);
+    if (el('content').classList.contains('hidden')) fail(e);
+    else say('Não foi possível atualizar. Os dados exibidos podem estar desatualizados. ' + (e.message || ''), 'danger');
+    return false;
   }
   finally {
 
     el('refresh').disabled = !navigator.onLine;
+    syncOperationButtons();
   }
 }
 
@@ -688,6 +854,54 @@ await loadHistory();
 // ============================================================
 // RENDERIZAÇÃO DO DASHBOARD
 // ============================================================
+
+function replenishmentFor(product, balance) {
+  const deficit = Math.max(0, product.target_fridge - balance.fridge);
+  const eligible = lots.filter(lot => lot.product_id === product.id && dayDifference(lot.expiry) >= 0 && (lotBalances.get(lot.id)?.stock || 0) > 0)
+    .sort((a, b) => a.expiry.localeCompare(b.expiry) || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+  const available = eligible.reduce((total, lot) => total + lotBalances.get(lot.id).stock, 0);
+  return {deficit, available, suggested: Math.min(deficit, available), first: eligible[0]};
+}
+
+function matchesAttention(product, balance, lotList) {
+  if (attentionFilter === 'all') return true;
+  if (!product.active) return false;
+  if (attentionFilter === 'minimum') return balance.stock + balance.fridge < product.min_total || balance.fridge < product.min_fridge;
+  if (attentionFilter === 'replenish') return balance.fridge < product.target_fridge;
+  return lotList.some(lot => lot.product_id === product.id &&
+    (attentionFilter === 'expired' ? lot.days < 0 : lot.days >= 0 && lot.days <= 30));
+}
+
+function renderReplenishment(productBalances, visibleIds) {
+  const list = el('replenishmentList');
+  list.replaceChildren();
+  const ordered = products.filter(product => product.active && visibleIds.has(product.id) && productBalances.get(product.id).fridge < product.target_fridge)
+    .sort((a, b) => Number(productBalances.get(b.id).fridge < b.min_fridge) - Number(productBalances.get(a.id).fridge < a.min_fridge) || a.name.localeCompare(b.name, 'pt-BR'));
+  for (const product of ordered) {
+    const balance = productBalances.get(product.id);
+    const advice = replenishmentFor(product, balance);
+    const card = document.createElement('article');
+    card.className = 'replenishment-card' + (balance.fridge < product.min_fridge ? ' warning' : '');
+    card.dataset.productId = product.id;
+    const title = document.createElement('strong');
+    title.textContent = product.name;
+    const quantities = document.createElement('p');
+    quantities.textContent = `Geladeira: ${balance.fridge} · Mínimo: ${product.min_fridge} · Meta: ${product.target_fridge} · Estoque seco: ${balance.stock} (${advice.available} não vencidas).`;
+    const suggestion = document.createElement('p');
+    suggestion.textContent = `Sugestão de reposição: ${advice.suggested} unidade(s). ${balance.fridge < product.min_fridge ? 'Abaixo do mínimo.' : 'Reposição sugerida até a meta.'}`;
+    const guidance = document.createElement('p');
+    guidance.className = 'muted';
+    guidance.textContent = advice.first ? `Primeiro lote FEFO: ${advice.first.code} · ${dateBR(advice.first.expiry)}. Confira os lotes no modal Movimentar.` : 'Sem estoque seco não vencido para repor.';
+    card.append(title, quantities, suggestion, guidance);
+    if (advice.suggested < advice.deficit) {
+      const shortage = document.createElement('p');
+      shortage.textContent = `Estoque seco insuficiente: faltam ${advice.deficit - advice.suggested} unidade(s) para atingir a meta.`;
+      card.append(shortage);
+    }
+    list.append(card);
+  }
+  if (!ordered.length) list.textContent = 'Nenhuma reposição sugerida para este filtro.';
+}
 
 function render() {
 
@@ -864,6 +1078,14 @@ function render() {
   el('criticalLots').textContent =
     criticalLots;
 
+  const visibleProducts = products.filter(product => matchesAttention(product, ps.get(product.id), lotList));
+  const visibleIds = new Set(visibleProducts.map(product => product.id));
+  const visibleLots = lotList.filter(lot => visibleIds.has(lot.product_id) &&
+    (attentionFilter === 'expired' ? lot.days < 0 : attentionFilter === 'near' ? lot.days >= 0 && lot.days <= 30 : true));
+  renderReplenishment(ps, visibleIds);
+  const filterButton = document.querySelector(`[data-attention="${attentionFilter}"]`);
+  el('attentionFilterStatus').textContent = `${filterButton.textContent}: ${visibleProducts.length} produto(s), ${visibleLots.length} lote(s) com saldo. Métricas mostram o estoque completo.`;
+
   // ALERTAS OPERACIONAIS
 
   const alerts = [];
@@ -871,7 +1093,7 @@ function render() {
 
   for (const p of products) {
 
-    if (!p.active) {
+    if (!p.active || !visibleIds.has(p.id) || attentionFilter === 'near' || attentionFilter === 'expired') {
       continue;
     }
 
@@ -920,23 +1142,25 @@ function render() {
   }
 
 
-  for (const l of lotList) {
+  for (const l of visibleLots) {
 
     if (l.days < 0) {
 
       alerts.push({
         level: 'danger',
         title: `${l.product} possui lote vencido`,
+        badge: 'Vencido',
         description:
           `Lote ${l.code} · ${l.qty} unidade(s) · validade ${dateBR(l.expiry)}.`
       });
 
     }
-    else if (l.days <= 15) {
+    else if (l.days <= 30) {
 
       alerts.push({
         level: 'warning',
         title: `${l.product} próximo do vencimento`,
+        badge: l.days <= 15 ? 'Urgente' : 'Atenção',
         description:
           `Lote ${l.code} · vence em ${l.days} dia(s) · ${l.qty} unidade(s).`
       });
@@ -1014,9 +1238,9 @@ function render() {
 
 
       level.textContent =
-        alert.level === 'danger'
+        alert.badge || (alert.level === 'danger'
           ? 'Urgente'
-          : 'Atenção';
+          : 'Atenção');
 
 
       item.append(
@@ -1052,7 +1276,7 @@ function render() {
 
   for (
     const p
-    of [...products]
+    of [...visibleProducts]
       .sort(
         (a, b) =>
           a.name.localeCompare(
@@ -1128,6 +1352,9 @@ function render() {
       r.classList.add(
         'product-row-warning'
       );
+    } else if (total < p.target_total || b.fridge < p.target_fridge) {
+      statusText = 'Reposição sugerida';
+      statusClass = 'warning';
     }
 
 
@@ -1135,6 +1362,10 @@ function render() {
       r,
       p.name
     );
+    const thresholds = document.createElement('small');
+    thresholds.className = 'muted stock-thresholds';
+    thresholds.textContent = `Total: mínimo ${p.min_total} / meta ${p.target_total} · Geladeira: mínimo ${p.min_fridge} / meta ${p.target_fridge}`;
+    r.cells[0].append(thresholds);
 
 
     cell(
@@ -1185,18 +1416,18 @@ function render() {
   }
 
 
-  if (!products.length) {
+  if (!visibleProducts.length) {
 
     empty(
       pt,
-      'Nenhuma bebida cadastrada.',
+      'Nenhuma bebida para este filtro.',
       5
     );
   }
 
 
   el('productCount').textContent =
-    products.length
+    visibleProducts.length
     + ' produtos';
 
 
@@ -1211,7 +1442,7 @@ function render() {
 
   for (
     const l
-    of lotList
+    of visibleLots
       .sort(
         (a, b) =>
           a.expiry.localeCompare(
@@ -1252,7 +1483,7 @@ function render() {
 
 
     let expiryText =
-      'Normal';
+      'OK';
 
 
     let expiryClass =
@@ -1326,7 +1557,7 @@ function render() {
   }
 
 
-  if (!lotList.length) {
+  if (!visibleLots.length) {
 
     empty(
       lt,
@@ -1337,8 +1568,8 @@ function render() {
 
 
   el('lotCount').textContent =
-    lotList.length
-    + ' lotes com saldo';
+    visibleLots.length
+    + ' lotes com saldo (até 100 exibidos)';
 
 
   el('updated').textContent =
@@ -1802,122 +2033,15 @@ function populateReceiveProducts() {
 // ============================================================
 
 async function createProduct(event) {
-
-  event.preventDefault();
-
-
-  formMessage(
-    'productMessage'
-  );
-
-
-  const button =
-    el('saveProduct');
-
-
-  button.disabled = true;
-
-
-  try {
-
-    const args = {
-
-      p_shop_id:
-        shop.shop_id,
-
-      p_name:
-        el('productName')
-          .value
-          .trim(),
-
-      p_category:
-        el('productCategory')
-          .value,
-
-      p_min_total:
-        Number(
-          el('minTotal')
-            .value
-        ),
-
-      p_target_total:
-        Number(
-          el('targetTotal')
-            .value
-        ),
-
-      p_min_fridge:
-        Number(
-          el('minFridge')
-            .value
-        ),
-
-      p_target_fridge:
-        Number(
-          el('targetFridge')
-            .value
-        )
-
-    };
-
-
-    const {
-      data,
-      error
-    } = await client.rpc(
-      'guigs_create_product',
-      args
-    );
-
-
-    if (error) {
-      throw error;
-    }
-
-
-    formMessage(
-      'productMessage',
-      'Produto cadastrado com sucesso.',
-      true
-    );
-
-
-    console.info(
-      'Produto criado:',
-      data
-    );
-
-
-    await refresh();
-
-
-    setTimeout(
-      () => {
-
-        el('productDialog')
-          .close();
-
-        el('productForm')
-          .reset();
-
-      },
-      500
-    );
-
-  }
-  catch (e) {
-
-    formMessage(
-      'productMessage',
-      e.message
-      || 'Não foi possível cadastrar o produto.'
-    );
-  }
-  finally {
-
-    button.disabled = false;
-  }
+  return runOperation(event, {buttonId:'saveProduct',messageId:'productMessage',owner:true,task:async context => {
+    const args = {p_shop_id:shop.shop_id,p_name:el('productName').value.trim(),p_category:el('productCategory').value,
+      p_min_total:Number(el('minTotal').value),p_target_total:Number(el('targetTotal').value),
+      p_min_fridge:Number(el('minFridge').value),p_target_fridge:Number(el('targetFridge').value)};
+    await context.write('guigs_create_product',args);
+    return `Produto cadastrado: ${args.p_name}.`;
+  }});
 }
+
 
 // ============================================================
 // EDITAR PRODUTO
@@ -2027,232 +2151,35 @@ function fillEditProductForm() {
 
 
 async function updateProductOperation(event) {
-
-  event.preventDefault();
-
-
-  formMessage(
-    'editProductMessage'
-  );
-
-
-  const button =
-    el('saveProductEdit');
-
-
-  button.disabled = true;
-
-
-  try {
-
-    const {
-      data,
-      error
-    } = await client.rpc(
-      'guigs_update_product',
-      {
-
-        p_shop_id:
-          shop.shop_id,
-
-        p_product_id:
-          el('editProductSelect').value,
-
-        p_name:
-          el('editProductName')
-            .value
-            .trim(),
-
-        p_category:
-          el('editProductCategory')
-            .value,
-
-        p_min_total:
-          Number(
-            el('editMinTotal').value
-          ),
-
-        p_target_total:
-          Number(
-            el('editTargetTotal').value
-          ),
-
-        p_min_fridge:
-          Number(
-            el('editMinFridge').value
-          ),
-
-        p_target_fridge:
-          Number(
-            el('editTargetFridge').value
-          ),
-
-        p_active:
-          el('editProductActive').value
-          === 'true'
-
-      }
-    );
-
-
-    if (error) {
-      throw error;
-    }
-
-
-    formMessage(
-      'editProductMessage',
-      data
-        ? 'Produto atualizado com sucesso.'
-        : 'Nenhuma alteração realizada.',
-      true
-    );
-
-
-    await refresh();
-
-
-    setTimeout(
-      () => {
-
-        el('editProductDialog')
-          .close();
-
-      },
-      500
-    );
-
-  }
-  catch (e) {
-
-    formMessage(
-      'editProductMessage',
-      e.message
-      || 'Não foi possível atualizar o produto.'
-    );
-
-  }
-  finally {
-
-    button.disabled = false;
-  }
+  return runOperation(event, {buttonId:'saveProductEdit',messageId:'editProductMessage',owner:true,reset:false,task:async context => {
+    const args = {p_shop_id:shop.shop_id,p_product_id:el('editProductSelect').value,p_name:el('editProductName').value.trim(),
+      p_category:el('editProductCategory').value,p_min_total:Number(el('editMinTotal').value),
+      p_target_total:Number(el('editTargetTotal').value),p_min_fridge:Number(el('editMinFridge').value),
+      p_target_fridge:Number(el('editTargetFridge').value),p_active:el('editProductActive').value==='true'};
+    const data = await context.write('guigs_update_product',args);
+    return data ? `Produto atualizado: ${args.p_name}.` : 'Nenhuma alteração realizada no produto.';
+  }});
 }
+
 
 // ============================================================
 // RECEBIMENTO
 // ============================================================
 
 async function receiveStock(event) {
-
-  event.preventDefault();
-  if (receiptPending || el('saveReceipt').disabled) return;
-  receiptPending = true;
-
-
-  formMessage(
-    'receiveMessage'
-  );
-
-
-  const button =
-    el('saveReceipt');
-
-
-  button.disabled = true;
-
-
-  try {
-    requireOnline();
-    if (!el('receiveSupplier').value) throw Error('Selecione um fornecedor ativo.');
-
-    const args = {
-
-      p_shop_id:
-        shop.shop_id,
-
-      p_product_id:
-        el('receiveProduct')
-          .value,
-      p_supplier_id: el('receiveSupplier').value,
-
-      p_lot_code:
-        el('lotCode')
-          .value
-          .trim(),
-
-      p_expiry:
-        el('expiry')
-          .value,
-
-      p_quantity:
-        Number(
-          el('receiveQuantity')
-            .value
-        ),
-
-      p_note:
-        el('receiveNote')
-          .value
-          .trim()
-
-    };
-
-
-    const {
-      data,
-      error
-    } = await client.rpc(
-      'guigs_receive_stock',
-      args
-    );
-
-
-    if (error) {
-      throw error;
-    }
-
-
-    formMessage(
-      'receiveMessage',
-      `Recebimento registrado: ${data.quantity} unidade(s).`,
-      true
-    );
-
-
-    await refresh();
-
-
-    setTimeout(
-      () => {
-
-        el('receiveDialog')
-          .close();
-
-        el('receiveForm')
-          .reset();
-
-        populateReceiveProducts();
-        populateReceiveSuppliers();
-
-      },
-      500
-    );
-
-  }
-  catch (e) {
-
-    formMessage(
-      'receiveMessage',
-      e.message
-      || 'Não foi possível registrar o recebimento.'
-    );
-  }
-  finally {
-
-    receiptPending = false;
-    populateReceiveSuppliers();
-  }
+  return runOperation(event, {buttonId:'saveReceipt',messageId:'receiveMessage',task:async context => {
+    const args = {p_shop_id:shop.shop_id,p_product_id:el('receiveProduct').value,p_supplier_id:el('receiveSupplier').value,
+      p_lot_code:el('lotCode').value.trim(),p_expiry:el('expiry').value,p_quantity:Number(el('receiveQuantity').value),p_note:el('receiveNote').value.trim()};
+    if (!suppliers.some(s=>s.id===args.p_supplier_id && s.active)) throw Error('Selecione um fornecedor ativo.');
+    const name = productById(args.p_product_id)?.name || 'Produto';
+    if (args.p_quantity >= HIGH_QUANTITY && !await confirmOperation(context,'Confirmar recebimento',quantityRisk(args.p_quantity),[
+      ['Produto',name],['Lote',args.p_lot_code],['Quantidade',`${args.p_quantity} unidade(s)`],
+      ['Fornecedor',suppliers.find(s=>s.id===args.p_supplier_id)?.name || ''],['Validade',dateBR(args.p_expiry)],['Observação',args.p_note || 'Não informada']])) return;
+    const data = await context.write('guigs_receive_stock',args);
+    return `Recebimento registrado: +${data.quantity} ${name}.`;
+  }});
 }
+
 
 // ============================================================
 // OPERAÇÕES DE MOVIMENTAÇÃO
@@ -2273,7 +2200,7 @@ function populateReceiveSuppliers(selected = el('receiveSupplier').value) {
     select.add(new Option(supplier.name, supplier.id));
   }
   select.value = selected;
-  el('saveReceipt').disabled = receiptPending || !navigator.onLine || !products.some(p => p.active) || !suppliers.some(s => s.active);
+  el('saveReceipt').disabled = operationPending('receiveForm') || !navigator.onLine || !products.some(p => p.active) || !suppliers.some(s => s.active);
 }
 
 function fillSupplierForm() {
@@ -2302,29 +2229,17 @@ async function openSupplierDialog() {
 }
 
 async function saveSupplier(event) {
-  event.preventDefault();
-  const button = el('saveSupplier');
-  if (button.disabled || shop?.role !== 'owner') return;
-  button.disabled = true;
-  formMessage('supplierMessage');
-  try {
-    requireOnline();
+  let selected = '';
+  return runOperation(event, {buttonId:'saveSupplier',messageId:'supplierMessage',owner:true,reset:false,afterSave:()=>populateReceiveSuppliers(selected),task:async context => {
     const id = el('supplierSelect').value;
-    const args = {p_shop_id: shop.shop_id, p_name: el('supplierName').value.trim(), p_active: el('supplierActive').value === 'true'};
+    const args = {p_shop_id:shop.shop_id,p_name:el('supplierName').value.trim(),p_active:el('supplierActive').value==='true'};
     if (id) args.p_supplier_id = id;
-    const {data, error} = await client.rpc(id ? 'guigs_update_supplier' : 'guigs_create_supplier', args);
-    if (error) throw error;
-    suppliers = await allRows('guigs_suppliers', 'id,name,active,created_at');
-    populateReceiveSuppliers(args.p_active ? (id || data) : '');
-    render();
-    el('supplierDialog').close();
-    say('Fornecedor salvo.', 'good');
-  } catch (error) {
-    formMessage('supplierMessage', error.message || 'Não foi possível salvar o fornecedor.');
-  } finally {
-    button.disabled = !navigator.onLine;
-  }
+    const data = await context.write(id ? 'guigs_update_supplier' : 'guigs_create_supplier',args);
+    selected = args.p_active ? (id || data) : '';
+    return `Fornecedor ${id ? 'atualizado' : 'cadastrado'}: ${args.p_name}.`;
+  }});
 }
+
 
 function productById(id) {
   return products.find(p => p.id === id);
@@ -2430,7 +2345,7 @@ function updateTransferBalance() {
       : '';
 }
 
-function confirmFefo(selected, candidates) {
+function confirmFefo(context, selected, candidates, args, risk) {
   const list = el('fefoCandidates');
   list.replaceChildren();
   for (const candidate of candidates) {
@@ -2438,119 +2353,34 @@ function confirmFefo(selected, candidates) {
     item.textContent = `Lote: ${candidate.code} · Validade: ${dateBR(candidate.expiry)} · Disponível no estoque: ${candidate.stock} unidades`;
     list.append(item);
   }
-  el('fefoSelected').textContent = `Você está movimentando: ${lotLabel(selected)} · Validade: ${dateBR(selected.expiry)}.`;
-  const dialog = el('fefoDialog');
-  return new Promise(resolve => {
-    const cancel = () => dialog.close('cancel');
-    const proceed = () => dialog.close('continue');
-    const closed = () => {
-      el('cancelFefo').removeEventListener('click', cancel);
-      el('continueFefo').removeEventListener('click', proceed);
-      resolve(dialog.returnValue === 'continue');
-    };
-    dialog.returnValue = 'cancel';
-    el('cancelFefo').addEventListener('click', cancel);
-    el('continueFefo').addEventListener('click', proceed);
-    dialog.addEventListener('close', closed, {once: true});
-    dialog.showModal();
-    el('cancelFefo').focus();
-  });
+  el('fefoSelected').textContent = `Você está movimentando: ${lotLabel(selected)} · Validade: ${dateBR(selected.expiry)} · ${args.p_quantity} unidade(s) de estoque seco para geladeira. ${risk} Observação: ${args.p_note || 'Não informada'}.`;
+  return context.waitForConfirmation(el('fefoDialog'),'cancelFefo','continueFefo');
 }
 
 async function transferStockOperation(event) {
-
-  event.preventDefault();
-
-  formMessage('transferMessage');
-
-  const button =
-    el('saveTransfer');
-  if (transferPending || button.disabled) return;
-  transferPending = true;
-
-  button.disabled = true;
-
-  try {
-    requireOnline();
-
-    const direction =
-      el('transferDirection').value;
-
-    const from =
-      direction === 'stock-fridge'
-        ? 'stock'
-        : 'fridge';
-
-    const to =
-      direction === 'stock-fridge'
-        ? 'fridge'
-        : 'stock';
-
-    // Captura o lote/quantidade antes da consulta e mantém a escolha ao confirmar.
-    const args = {
-      p_shop_id: shop.shop_id,
-      p_lot_id: el('transferLot').value,
-      p_from_location: from,
-      p_to_location: to,
-      p_quantity: Number(el('transferQuantity').value),
-      p_note: el('transferNote').value.trim()
-    };
-    const selected = lots.find(lot => lot.id === args.p_lot_id);
+  return runOperation(event, {buttonId:'saveTransfer',messageId:'transferMessage',task:async context => {
+    const from = el('transferDirection').value==='stock-fridge' ? 'stock' : 'fridge';
+    const to = from==='stock' ? 'fridge' : 'stock';
+    const args = {p_shop_id:shop.shop_id,p_lot_id:el('transferLot').value,p_from_location:from,p_to_location:to,
+      p_quantity:Number(el('transferQuantity').value),p_note:el('transferNote').value.trim()};
+    const selected = lots.find(lot=>lot.id===args.p_lot_id);
     if (!selected) throw Error('Selecione um lote disponível.');
-    const dialogVersion = transferDialogVersion;
-    if (from === 'stock' && to === 'fridge') {
-      const result = await client.rpc('guigs_get_fefo_candidates', {
-        p_shop_id: shop.shop_id, p_lot_id: args.p_lot_id
-      });
+    const risk = quantityRisk(args.p_quantity,lotBalances.get(selected.id)?.[from]);
+    let fefoConfirmed = false;
+    if (from==='stock') {
+      const result = await client.rpc('guigs_get_fefo_candidates',{p_shop_id:shop.shop_id,p_lot_id:args.p_lot_id});
       if (result.error) throw result.error;
-      if (!el('transferDialog').open || dialogVersion !== transferDialogVersion) return;
-      if (result.data?.length && !await confirmFefo(selected, result.data)) return;
+      context.ensure();
+      if (result.data?.length) {
+        if (!await confirmFefo(context,selected,result.data,args,risk)) return;
+        fefoConfirmed = true;
+      }
     }
-    requireOnline();
-
-    const {
-      data,
-      error
-    } = await client.rpc(
-      'guigs_transfer_stock',
-      args
-    );
-
-    if (error) {
-      throw error;
-    }
-
-    formMessage(
-      'transferMessage',
-      `Movimentação concluída: ${data.quantity} unidade(s).`,
-      true
-    );
-
-    await refresh();
-
-    setTimeout(
-      () => {
-        el('transferDialog').close();
-        el('transferForm').reset();
-      },
-      500
-    );
-
-  }
-  catch (e) {
-
-    formMessage(
-      'transferMessage',
-      e.message
-      || 'Não foi possível realizar a movimentação.'
-    );
-
-  }
-  finally {
-
-    transferPending = false;
-    button.disabled = !navigator.onLine;
-  }
+    if (risk && !fefoConfirmed && !await confirmOperation(context,'Confirmar movimentação',risk,
+      [...lotDetails(selected,args.p_quantity,from,args.p_note),['Destino',locationLabel(to)]])) return;
+    const data = await context.write('guigs_transfer_stock',args);
+    return `${data.quantity} unidade(s) de ${productById(selected.product_id)?.name} movidas para ${locationLabel(to).toLowerCase()}.`;
+  }});
 }
 
 
@@ -2637,76 +2467,15 @@ function updateSaleBalance() {
 
 
 async function registerSaleOperation(event) {
-
-  event.preventDefault();
-
-  formMessage('saleMessage');
-
-  const button =
-    el('saveSale');
-
-  button.disabled = true;
-
-  try {
-
-    const {
-      data,
-      error
-    } = await client.rpc(
-      'guigs_register_sale',
-      {
-        p_shop_id:
-          shop.shop_id,
-
-        p_lot_id:
-          el('saleLot').value,
-
-        p_quantity:
-          Number(
-            el('saleQuantity').value
-          ),
-
-        p_note:
-          el('saleNote')
-            .value
-            .trim()
-      }
-    );
-
-    if (error) {
-      throw error;
-    }
-
-    formMessage(
-      'saleMessage',
-      `Venda registrada: ${data.quantity} unidade(s).`,
-      true
-    );
-
-    await refresh();
-
-    setTimeout(
-      () => {
-        el('saleDialog').close();
-        el('saleForm').reset();
-      },
-      500
-    );
-
-  }
-  catch (e) {
-
-    formMessage(
-      'saleMessage',
-      e.message
-      || 'Não foi possível registrar a venda.'
-    );
-
-  }
-  finally {
-
-    button.disabled = false;
-  }
+  return runOperation(event, {buttonId:'saveSale',messageId:'saleMessage',task:async context => {
+    const args = {p_shop_id:shop.shop_id,p_lot_id:el('saleLot').value,p_quantity:Number(el('saleQuantity').value),p_note:el('saleNote').value.trim()};
+    const lot = lots.find(l=>l.id===args.p_lot_id);
+    if (!lot) throw Error('Selecione um lote disponível.');
+    const risk = quantityRisk(args.p_quantity,lotBalances.get(lot.id)?.fridge);
+    if (risk && !await confirmOperation(context,'Confirmar venda',risk,lotDetails(lot,args.p_quantity,'fridge',args.p_note))) return;
+    const data = await context.write('guigs_register_sale',args);
+    return `Venda registrada: ${data.quantity} unidade(s) de ${productById(lot.product_id)?.name}.`;
+  }});
 }
 
 
@@ -2781,80 +2550,19 @@ function updateLossBalance() {
 
 
 async function registerLossOperation(event) {
-
-  event.preventDefault();
-
-  formMessage('lossMessage');
-
-  const button =
-    el('saveLoss');
-
-  button.disabled = true;
-
-  try {
-
-    const {
-      data,
-      error
-    } = await client.rpc(
-      'guigs_register_loss',
-      {
-        p_shop_id:
-          shop.shop_id,
-
-        p_lot_id:
-          el('lossLot').value,
-
-        p_location:
-          el('lossLocation').value,
-
-        p_quantity:
-          Number(
-            el('lossQuantity').value
-          ),
-
-        p_note:
-          el('lossNote')
-            .value
-            .trim()
-      }
-    );
-
-    if (error) {
-      throw error;
-    }
-
-    formMessage(
-      'lossMessage',
-      `Perda registrada: ${data.quantity} unidade(s).`,
-      true
-    );
-
-    await refresh();
-
-    setTimeout(
-      () => {
-        el('lossDialog').close();
-        el('lossForm').reset();
-      },
-      500
-    );
-
-  }
-  catch (e) {
-
-    formMessage(
-      'lossMessage',
-      e.message
-      || 'Não foi possível registrar a perda.'
-    );
-
-  }
-  finally {
-
-    button.disabled = false;
-  }
+  return runOperation(event, {buttonId:'saveLoss',messageId:'lossMessage',task:async context => {
+    const args = {p_shop_id:shop.shop_id,p_lot_id:el('lossLot').value,p_location:el('lossLocation').value,
+      p_quantity:Number(el('lossQuantity').value),p_note:el('lossNote').value.trim()};
+    const lot = lots.find(l=>l.id===args.p_lot_id);
+    if (!lot) throw Error('Selecione um lote disponível.');
+    const risk = quantityRisk(args.p_quantity,lotBalances.get(lot.id)?.[args.p_location]);
+    if (!await confirmOperation(context,'Confirmar perda',`Confira o descarte antes de registrar. ${risk}`,
+      lotDetails(lot,args.p_quantity,args.p_location,args.p_note))) return;
+    const data = await context.write('guigs_register_loss',args);
+    return `Perda registrada: ${data.quantity} unidade(s) de ${productById(lot.product_id)?.name}.`;
+  }});
 }
+
 
 // ============================================================
 // AJUSTE DE INVENTÁRIO
@@ -2934,95 +2642,42 @@ function updateAdjustBalance() {
 
   el('adjustQuantity').value =
     current;
+  updateAdjustImpact();
 }
+
+function updateAdjustImpact() {
+  const current = lotBalances.get(el('adjustLot').value)?.[el('adjustLocation').value] || 0;
+  const next = Number(el('adjustQuantity').value);
+  const delta = next - current;
+  el('adjustImpact').textContent = Number.isFinite(next) && el('adjustQuantity').value !== ''
+    ? `Saldo atual: ${current} · Novo saldo: ${next} · Diferença: ${delta > 0 ? '+' : ''}${delta} unidade(s).`
+    : 'Informe a contagem física para conferir a diferença.';
+}
+
+el('adjustQuantity').addEventListener('input', updateAdjustImpact);
+document.querySelectorAll('[data-attention]').forEach(button => button.addEventListener('click', () => {
+  attentionFilter = button.dataset.attention;
+  document.querySelectorAll('[data-attention]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+  render();
+}));
 
 
 async function adjustStockOperation(event) {
-
-  event.preventDefault();
-
-  formMessage('adjustMessage');
-
-  const button =
-    el('saveAdjust');
-
-  button.disabled = true;
-
-  try {
-
-    const {
-      data,
-      error
-    } = await client.rpc(
-      'guigs_adjust_stock',
-      {
-        p_shop_id:
-          shop.shop_id,
-
-        p_lot_id:
-          el('adjustLot').value,
-
-        p_location:
-          el('adjustLocation').value,
-
-        p_new_quantity:
-          Number(
-            el('adjustQuantity').value
-          ),
-
-        p_note:
-          el('adjustNote')
-            .value
-            .trim()
-      }
-    );
-
-    if (error) {
-      throw error;
-    }
-
-    if (data.changed === false) {
-
-      formMessage(
-        'adjustMessage',
-        'Nenhuma diferença encontrada. O saldo já estava correto.',
-        true
-      );
-
-    } else {
-
-      formMessage(
-        'adjustMessage',
-        `Ajuste aplicado: ${data.delta > 0 ? '+' : ''}${data.delta} unidade(s).`,
-        true
-      );
-    }
-
-    await refresh();
-
-    setTimeout(
-      () => {
-        el('adjustDialog').close();
-        el('adjustForm').reset();
-      },
-      500
-    );
-
-  }
-  catch (e) {
-
-    formMessage(
-      'adjustMessage',
-      e.message
-      || 'Não foi possível ajustar o inventário.'
-    );
-
-  }
-  finally {
-
-    button.disabled = false;
-  }
+  return runOperation(event, {buttonId:'saveAdjust',messageId:'adjustMessage',owner:true,task:async context => {
+    const args = {p_shop_id:shop.shop_id,p_lot_id:el('adjustLot').value,p_location:el('adjustLocation').value,
+      p_new_quantity:Number(el('adjustQuantity').value),p_note:el('adjustNote').value.trim()};
+    const lot = lots.find(l=>l.id===args.p_lot_id);
+    if (!lot) throw Error('Selecione um lote disponível.');
+    const current = lotBalances.get(lot.id)?.[args.p_location] || 0;
+    const delta = args.p_new_quantity-current;
+    if (delta && !await confirmOperation(context,'Confirmar ajuste de estoque','Confira a diferença da contagem física antes de aplicar.',[
+      ['Produto',productById(lot.product_id)?.name],['Lote',lot.code],['Local',locationLabel(args.p_location)],
+      ['Saldo atual',current],['Novo saldo',args.p_new_quantity],['Diferença',`${delta>0?'+':''}${delta}`],['Motivo / observação',args.p_note]])) return;
+    const data = await context.write('guigs_adjust_stock',args);
+    return data.changed===false ? 'Nenhuma diferença encontrada. O saldo já estava correto.' : `Ajuste aplicado: ${data.delta>0?'+':''}${data.delta} unidade(s) de ${productById(lot.product_id)?.name}.`;
+  }});
 }
+
 
 // ============================================================
 // EVENTOS DE INTERFACE
@@ -3509,7 +3164,7 @@ el('transferForm')
     'submit',
     transferStockOperation
   );
-el('transferDialog').addEventListener('close', () => { transferDialogVersion++; });
+
 
 
 el('saleForm')

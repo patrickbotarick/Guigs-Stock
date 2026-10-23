@@ -2,7 +2,7 @@
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content" />
     <meta name="theme-color" content="#111111" />
 
     <link rel="manifest" href="manifest.webmanifest" />
@@ -715,7 +715,7 @@
         border-radius: 20px;
         padding: 0;
         width: min(520px, calc(100% - 30px));
-        max-height: calc(100dvh - 24px);
+        max-height: min(calc(100dvh - 24px), calc(var(--dialog-viewport-height, 100dvh) - 24px));
         overflow-y: auto;
         box-shadow: 0 25px 80px rgba(0, 0, 0, 0.28);
       }
@@ -864,7 +864,26 @@
         justify-content: flex-end;
         gap: 8px;
         margin-top: 8px;
+        position: sticky;
+        bottom: 0;
+        background: white;
+        padding: 10px 0;
+        z-index: 2;
       }
+
+      .attention-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+      .attention-filters .btn { min-height: 44px; }
+      .attention-filters [aria-pressed="true"] { background: #fff0d2; color: #8c5816; border-color: #8c5816; }
+      .replenishment-panel { margin: 16px 0; }
+      .replenishment-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 12px; }
+      .replenishment-card { border: 1px solid #e7e3df; border-radius: 11px; padding: 14px; min-width: 0; overflow-wrap: anywhere; }
+      .replenishment-card.warning { background: #fffdf7; }
+      .replenishment-card p { margin: 8px 0; }
+      .operation-summary { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(0, 2fr); gap: 10px; }
+      .operation-summary dt { font-weight: 750; }
+      .operation-summary dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+      #operationFeedback { overflow-wrap: anywhere; }
+      .stock-thresholds { display: block; margin-top: 4px; line-height: 1.5; }
 
       .formmsg {
         font-size: 12px;
@@ -1004,8 +1023,12 @@
 
         dialog {
           width: calc(100% - 16px);
-          max-height: calc(100vh - 16px);
+          max-height: min(calc(100dvh - 16px), calc(var(--dialog-viewport-height, 100dvh) - 16px));
+          top: var(--dialog-viewport-top, 0px);
+          bottom: auto;
+          margin: 8px auto;
         }
+        .field input, .field select, .field textarea { font-size: 16px; }
 
         .modal {
           padding: 18px;
@@ -1177,6 +1200,7 @@
 
         <section id="content" class="hidden">
           <section id="overviewView" aria-label="Visão geral">
+            <div id="operationFeedback" class="notice hidden" role="status" aria-live="polite" aria-atomic="true"></div>
             <div class="operationbar">
               <div class="operationhead">
                 <div>
@@ -1243,6 +1267,21 @@
               </div>
             </section>
 
+            <div class="attention-filters" role="group" aria-label="Filtrar atenção na visão geral">
+              <button type="button" class="btn" data-attention="all" aria-pressed="true">Todos</button>
+              <button type="button" class="btn" data-attention="minimum" aria-pressed="false">Abaixo do mínimo</button>
+              <button type="button" class="btn" data-attention="replenish" aria-pressed="false">Repor geladeira</button>
+              <button type="button" class="btn" data-attention="near" aria-pressed="false">Próximos do vencimento</button>
+              <button type="button" class="btn" data-attention="expired" aria-pressed="false">Vencidos</button>
+            </div>
+            <p id="attentionFilterStatus" class="muted" role="status">Exibindo todos os produtos e lotes.</p>
+            <section class="panel replenishment-panel" aria-labelledby="replenishmentTitle">
+              <div class="panelhead">
+                <div><h2 id="replenishmentTitle">Reposição da geladeira</h2>
+                <div class="muted">Sugestões até a meta, limitadas ao estoque seco não vencido. Nenhuma movimentação automática.</div></div>
+              </div>
+              <div id="replenishmentList" class="replenishment-list"></div>
+            </section>
             <div id="alertsPanel" class="alerts-panel hidden">
               <div class="alerts-head">
                 <div>
@@ -1778,6 +1817,18 @@
       </div>
     </dialog>
 
+    <dialog id="operationConfirmDialog" role="alertdialog" aria-labelledby="operationConfirmTitle" aria-describedby="operationConfirmReason">
+      <div class="modal">
+        <h2 id="operationConfirmTitle">Confirmar operação</h2>
+        <p id="operationConfirmReason"></p>
+        <dl id="operationConfirmSummary" class="operation-summary"></dl>
+        <div class="modalactions">
+          <button type="button" id="cancelOperation" class="btn">Voltar e revisar</button>
+          <button type="button" id="confirmOperation" class="btn red">Confirmar registro</button>
+        </div>
+      </div>
+    </dialog>
+
     <!-- VENDA -->
 
     <dialog id="saleDialog">
@@ -1928,6 +1979,7 @@
           </div>
 
           <div id="adjustBalance" class="balancebox"></div>
+          <div id="adjustImpact" class="balancebox" role="status" aria-live="polite"></div>
 
           <div class="field">
             <label for="adjustQuantity">Quantidade física encontrada</label>
