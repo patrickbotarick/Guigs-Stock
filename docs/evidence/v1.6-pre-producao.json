@@ -1,0 +1,360 @@
+{
+  "date": "2026-10-23T20:07:49.306Z",
+  "source": {
+    "projectRef": "wddbhtxkbrhsjewuaekv",
+    "application": "v1.5.0",
+    "commit": "17cf2a832d26b7071452ee377d80e4b3f5efba2d",
+    "postgres": "17.6",
+    "writesByThisTask": 0
+  },
+  "backups": {
+    "application": {
+      "archive": "C:\\Users\\patrick.silva\\AppData\\Local\\GuigsStock-PreProducao\\Guigs-Stock\\2026-10-23_pre-v1.6\\guigs-stock-2026-10-23_16-43-55-3890a951\\application.dump",
+      "bytes": 87057,
+      "sha256": "0c92f78743346eab61cbe8f3f8af6138417a23116c7cc21dd91c3267b2dc24b2",
+      "scope": [
+        "public",
+        "guigs_private"
+      ],
+      "standalone": false
+    },
+    "recovery": {
+      "archive": "C:\\Users\\patrick.silva\\AppData\\Local\\GuigsStock-PreProducao\\Guigs-Stock\\2026-10-23_pre-v1.6\\recovery-snapshot-2026-10-23T19-45-00-866Z\\recovery.dump",
+      "bytes": 217062,
+      "sha256": "fda4171751ea9c216965b32d7e4e9e406a81dae7638e2af3c1fe3d136a1c7cfe",
+      "durationMs": 3813,
+      "schemas": [
+        "public",
+        "guigs_private",
+        "auth",
+        "extensions"
+      ],
+      "excludes": [
+        "global roles and role passwords",
+        "Auth runtime configuration/providers/API keys",
+        "Storage file objects",
+        "Vault/encryption root keys",
+        "other schemas and service configuration",
+        "extension-owned definitions/binaries; selected schema namespace does not make this a full extension backup"
+      ],
+      "singleExportedSnapshot": true
+    }
+  },
+  "restore": {
+    "restore": true,
+    "durationMs": 602,
+    "singleTransaction": true,
+    "errorCount": 0,
+    "structuralCounts": {
+      "policies": 6,
+      "indexes": 17,
+      "functions": 17
+    },
+    "counts": {
+      "guigs_shops": 1,
+      "guigs_memberships": 9,
+      "guigs_products": 20,
+      "guigs_lots": 42,
+      "guigs_movements": 216,
+      "guigs_suppliers": 8
+    },
+    "allTablesMatch": true,
+    "lotBalancesMatch": true,
+    "productBalancesMatch": true,
+    "historyMatch": true,
+    "authUsersMatch": true,
+    "authIdentitiesMatch": true,
+    "allFingerprintsMatch": true
+  },
+  "applicationRestore": {
+    "applicationArchiveRestored": true,
+    "authPrerequisiteFromRecoveryArchive": true,
+    "durationMs": 575,
+    "allFingerprintsMatch": true,
+    "sha256": "0c92f78743346eab61cbe8f3f8af6138417a23116c7cc21dd91c3267b2dc24b2",
+    "bytes": 87057,
+    "archive": "C:\\Users\\patrick.silva\\AppData\\Local\\GuigsStock-PreProducao\\Guigs-Stock\\2026-10-23_pre-v1.6\\guigs-stock-2026-10-23_16-43-55-3890a951\\application.dump"
+  },
+  "rehearsal": {
+    "legacyBefore": true,
+    "007_physical_inventory.sql": {
+      "applied": true,
+      "durationMs": 60,
+      "sha256": "820061529b67e9f9cd74f0b827b3d557fac40b4d261c7b94613327bf9cc01be4",
+      "notices": [],
+      "previousDataPreserved": true,
+      "balancesPreserved": true,
+      "legacyFunctionsAndACLsPreserved": true
+    },
+    "008_reporting.sql": {
+      "applied": true,
+      "durationMs": 23,
+      "sha256": "b0c8cf982712dd753aa24ba7814c2c383ebd1c310b8bc6857a867ffd2a80af25",
+      "notices": [],
+      "previousDataPreserved": true,
+      "balancesPreserved": true,
+      "legacyFunctionsAndACLsPreserved": true
+    },
+    "legacyAfter": true,
+    "reportsWorks": true,
+    "inventoryAvailable": true,
+    "catalog": {
+      "tables": 9,
+      "rls_tables": 9
+    },
+    "authRuntimeTested": false,
+    "productionWrites": 0,
+    "finalDataPreserved": true
+  },
+  "lockObservation": {
+    "isolatedOnly": true,
+    "probeRolledBack": true,
+    "statementWrappersRemovedOnly": true,
+    "results": [
+      {
+        "file": "007_physical_inventory.sql",
+        "durationMs": 33,
+        "locks": [
+          {
+            "schema": "auth",
+            "relation": "users",
+            "mode": "AccessShareLock",
+            "granted": true
+          },
+          {
+            "schema": "auth",
+            "relation": "users",
+            "mode": "ShareRowExclusiveLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_lots",
+            "mode": "AccessShareLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_lots",
+            "mode": "ShareRowExclusiveLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_lots_shop_id_id_key",
+            "mode": "AccessShareLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_products",
+            "mode": "AccessShareLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_products",
+            "mode": "ShareRowExclusiveLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_products_shop_id_id_key",
+            "mode": "AccessShareLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_shops",
+            "mode": "AccessShareLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_shops",
+            "mode": "ShareRowExclusiveLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_shops_pkey",
+            "mode": "AccessShareLock",
+            "granted": true
+          }
+        ],
+        "waitingLocks": 0
+      },
+      {
+        "file": "008_reporting.sql",
+        "durationMs": 2,
+        "locks": [
+          {
+            "schema": "auth",
+            "relation": "users",
+            "mode": "AccessShareLock",
+            "granted": true
+          },
+          {
+            "schema": "auth",
+            "relation": "users",
+            "mode": "ShareRowExclusiveLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_lots",
+            "mode": "AccessShareLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_lots",
+            "mode": "ShareRowExclusiveLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_lots_shop_id_id_key",
+            "mode": "AccessShareLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_products",
+            "mode": "AccessShareLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_products",
+            "mode": "ShareRowExclusiveLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_products_shop_id_id_key",
+            "mode": "AccessShareLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_shops",
+            "mode": "AccessShareLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_shops",
+            "mode": "ShareRowExclusiveLock",
+            "granted": true
+          },
+          {
+            "schema": "public",
+            "relation": "guigs_shops_pkey",
+            "mode": "AccessShareLock",
+            "granted": true
+          }
+        ],
+        "waitingLocks": 0
+      }
+    ]
+  },
+  "frontend": {
+    "passed": true,
+    "checks": 12,
+    "results": [
+      {
+        "label": "Frontend v1.5 carrega restauração guigs_application_drill",
+        "passed": true
+      },
+      {
+        "label": "Visão geral com produtos restaurados guigs_application_drill",
+        "passed": true
+      },
+      {
+        "label": "Lotes e saldos restaurados guigs_application_drill",
+        "passed": true
+      },
+      {
+        "label": "Fornecedores disponíveis em leitura guigs_application_drill",
+        "passed": true
+      },
+      {
+        "label": "Histórico restaurado visível guigs_application_drill",
+        "passed": true
+      },
+      {
+        "label": "Frontend v1.5 carrega restauração guigs_recovery_v15_clean",
+        "passed": true
+      },
+      {
+        "label": "Visão geral com produtos restaurados guigs_recovery_v15_clean",
+        "passed": true
+      },
+      {
+        "label": "Lotes e saldos restaurados guigs_recovery_v15_clean",
+        "passed": true
+      },
+      {
+        "label": "Fornecedores disponíveis em leitura guigs_recovery_v15_clean",
+        "passed": true
+      },
+      {
+        "label": "Histórico restaurado visível guigs_recovery_v15_clean",
+        "passed": true
+      },
+      {
+        "label": "Frontend v1.5 preserva produtos/lotes/fornecedores/histórico após 007/008",
+        "passed": true
+      },
+      {
+        "label": "Cópia real não transmitida para host externo",
+        "passed": true
+      }
+    ],
+    "authRuntime": false,
+    "bridge": "Read-only SQL with authenticated role; SDK/Auth shim; no production calls"
+  },
+  "productionFinal": {
+    "productionProjectRef": "wddbhtxkbrhsjewuaekv",
+    "readOnly": true,
+    "tlsValidated": true,
+    "migration007InProduction": false,
+    "migration008InProduction": false,
+    "applicationDataStillMatchesSnapshot": true,
+    "balancesStillMatchSnapshot": true,
+    "historyStillMatchesSnapshot": true,
+    "productionWritesByThisTask": 0
+  },
+  "managedBackups": {
+    "plan": "free",
+    "scheduledAvailable": false,
+    "pitrAvailable": false,
+    "retentionVisible": null,
+    "observedInDashboard": true,
+    "settingsChanged": false
+  },
+  "security": {
+    "backupACL": "Current user + SYSTEM + Administrators only; verified recursively",
+    "temporaryNetworkCopiesRemoved": true,
+    "credentialsCleanupPending": false,
+    "localClusterCleanupPending": false,
+    "temporaryCredentialsRemoved": true,
+    "localRealDataCopiesDestroyed": true,
+    "localClusterStopped": true,
+    "temporaryLibpqCASettingRemoved": true,
+    "backupHashesRechecked": true,
+    "cleanupUtc": "2026-10-23T20:09:57.322Z",
+    "repositoryAudit": {
+      "passed": true,
+      "findings": 0
+    }
+  },
+  "decision": "Recovery gates passed; deployment not executed",
+  "verification": {
+    "localSafetyChecks": 111,
+    "restoreFrontendReadOnlyChecks": 12,
+    "priorHomologationChecks": 1537,
+    "priorHomologationNotRerunHere": true
+  }
+}

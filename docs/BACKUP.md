@@ -1,5 +1,7 @@
 # Política de backup
 
+Ensaio posterior de 23/10/2026: [pré-produção v1.6](V1.6_PRE_PRODUCAO.md) registra backups reais, cobertura suplementar de dados Auth, restore privado, comparação e limpeza. As observações abaixo sobre a fase 1.6A preservam o histórico; o archive do script continua sendo somente da aplicação.
+
 ## Escopo e metas propostas
 
 Antes da próxima mudança de banco, o responsável deve confirmar plano Supabase, disponibilidade/retencão de backups/PITR, responsável e destino privado. Não há backup real gerado ou restauração ensaiada nesta fase.
