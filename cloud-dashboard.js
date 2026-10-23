@@ -2,6 +2,158 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const el = id => document.getElementById(id);
 
+// O select continua responsável pelo valor, pelas opções e pela validação.
+// A pesquisa só apresenta essas mesmas opções, sem alterar a ordem (inclusive FEFO).
+const searchableSelects = new Map();
+function enhanceSearchableSelect(id) {
+  const select = el(id);
+  const wrapper = document.createElement('div');
+  wrapper.className = 'searchable-select';
+  const input = document.createElement('input');
+  input.id = `${id}Search`;
+  input.type = 'search';
+  input.autocomplete = 'off';
+  input.placeholder = 'Digite para pesquisar';
+  input.setAttribute('role', 'combobox');
+  input.setAttribute('aria-autocomplete', 'list');
+  input.setAttribute('aria-expanded', 'false');
+  const list = document.createElement('div');
+  list.id = `${id}Options`;
+  list.className = 'searchable-options';
+  list.setAttribute('role', 'listbox');
+  list.hidden = true;
+  input.setAttribute('aria-controls', list.id);
+  const label = document.querySelector(`label[for="${id}"]`);
+  if (label) {
+    label.htmlFor = input.id;
+    label.id ||= `${id}Label`;
+    list.setAttribute('aria-labelledby', label.id);
+  } else {
+    // Filtros sem label visível recebem um nome acessível.
+    input.setAttribute('aria-label', select.getAttribute('aria-label') || 'Produto');
+    list.setAttribute('aria-label', input.getAttribute('aria-label'));
+  }
+  select.before(wrapper);
+  wrapper.append(input, list, select);
+  select.classList.add('searchable-native');
+  select.tabIndex = -1;
+  select.setAttribute('aria-hidden', 'true');
+  let shown = [];
+  let active = -1;
+  let opened = false;
+  let pointerOutside = false;
+  const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  function sync() {
+    input.value = select.selectedOptions[0]?.textContent || '';
+    input.disabled = select.disabled;
+    input.setAttribute('aria-required', String(select.required));
+    if (select.validity.valid) input.removeAttribute('aria-invalid');
+  }
+  function close() {
+    opened = false;
+    list.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+    sync();
+  }
+  function activate(index) {
+    active = index;
+    [...list.querySelectorAll('[role="option"]')].forEach((row, i) => {
+      row.classList.toggle('active', i === active);
+    });
+    const row = list.children[active];
+    if (row && shown.length) {
+      input.setAttribute('aria-activedescendant', row.id);
+      row.scrollIntoView({block: 'nearest'});
+    } else input.removeAttribute('aria-activedescendant');
+  }
+  function choose(index) {
+    const option = shown[index];
+    if (!option) return;
+    select.value = option.value;
+    input.focus();
+    close();
+    select.dispatchEvent(new Event('change', {bubbles: true}));
+  }
+  function render(term = '') {
+    opened = true;
+    shown = [...select.options].filter(option => !option.disabled && !option.hidden && normalize(option.textContent).includes(normalize(term)));
+    list.replaceChildren();
+    for (const [index, option] of shown.entries()) {
+      const row = document.createElement('div');
+      row.id = `${id}Option${index}`;
+      row.className = 'searchable-option';
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(option.selected));
+      row.textContent = option.textContent;
+      row.addEventListener('click', () => choose(index));
+      list.append(row);
+    }
+    if (!shown.length) {
+      const empty = document.createElement('div');
+      empty.className = 'searchable-empty';
+      empty.setAttribute('role', 'status');
+      empty.textContent = 'Nenhum resultado encontrado';
+      list.append(empty);
+    }
+    list.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+    activate(shown.length ? Math.max(0, shown.findIndex(option => option.selected)) : -1);
+  }
+  input.addEventListener('focus', () => { sync(); render(); input.select(); });
+  input.addEventListener('click', () => { if (!opened) { render(); input.select(); } });
+  input.addEventListener('input', () => render(input.value));
+  input.addEventListener('keydown', event => {
+    if (event.isComposing) return;
+    if (event.key === 'Escape' && opened) {
+      event.preventDefault(); event.stopPropagation(); close();
+    } else if (event.key === 'Enter' && opened) {
+      event.preventDefault(); choose(active);
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!opened) render();
+      else activate(Math.max(0, Math.min(shown.length - 1, active + (event.key === 'ArrowDown' ? 1 : -1))));
+    } else if (event.key === 'Tab') close();
+  });
+  wrapper.addEventListener('focusout', event => {
+    if (!pointerOutside && !wrapper.contains(event.relatedTarget)) close();
+  });
+  // Evita que o blur descarte o filtro antes do click; toque mantém scroll nativo.
+  list.addEventListener('mousedown', event => event.preventDefault());
+  // Fechar antes do click deslocaria os botões abaixo da lista entre down e up.
+  document.addEventListener('pointerdown', event => { pointerOutside = !wrapper.contains(event.target); });
+  document.addEventListener('keydown', () => { pointerOutside = false; }, true);
+  document.addEventListener('pointercancel', () => { pointerOutside = false; });
+  document.addEventListener('click', event => {
+    pointerOutside = false;
+    if (!wrapper.contains(event.target)) close();
+  });
+  select.addEventListener('change', close);
+  select.addEventListener('invalid', event => {
+    event.preventDefault();
+    input.setAttribute('aria-invalid', 'true');
+    // O navegador termina a validação de todos os campos antes de direcionar o foco.
+    queueMicrotask(() => {
+      if (!select.form || select.form.querySelector(':invalid') === select) {
+        input.focus(); render();
+      }
+    });
+  });
+  select.form?.addEventListener('reset', () => setTimeout(close, 0));
+  new MutationObserver(close).observe(select, {childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'selected', 'label']});
+  const dialog = select.closest('dialog');
+  if (dialog) {
+    new MutationObserver(close).observe(dialog, {attributes: true, attributeFilter: ['open']});
+    dialog.addEventListener('close', close);
+  }
+  searchableSelects.set(id, close);
+  sync();
+}
+
+['receiveProduct', 'receiveSupplier', 'transferLot', 'saleLot', 'lossLot',
+  'adjustLot', 'editProductSelect', 'historyProduct', 'supplierSelect']
+  .forEach(enhanceSearchableSelect);
+
 const cfg = window.GUIGS_SUPABASE_CONFIG || {};
 
 let client = null;
@@ -3041,6 +3193,7 @@ el('clearHistoryFilters')
 
 
       el('historyProduct').value = '';
+      searchableSelects.get('historyProduct')();
       el('historyType').value = '';
       el('historyActor').value = '';
       el('historyDateFrom').value = '';
