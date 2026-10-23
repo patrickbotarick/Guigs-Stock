@@ -12,3 +12,40 @@ Thumbs.db
 
 # VS Code local
 .vscode/
+
+# Produção: segredos, credenciais e exportações nunca entram no Git.
+.env
+.env.*
+!.env.example
+backups/
+backup/
+dumps/
+exports/
+credentials/
+secrets/
+*.dump
+*.backup
+*.bak
+*.sql.gz
+*.sql.zip
+*.dump.*
+*.backup.*
+*.export.*
+*.csv
+*.tsv
+*.csv.gz
+*.pgpass
+pgpass.conf
+.pgpass
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*.json
+*credentials*.txt
+*service-account*.json
+*.sql
+!supabase/migrations/*.sql
+!supabase/*_EXEMPLO.sql
+!supabase/902_verificar_permissoes_leitura.sql
+!scripts/audit-production-readonly.sql
