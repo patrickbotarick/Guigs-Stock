@@ -5,7 +5,7 @@ const {fixture}=require('./browser.cjs');const {createTestDatabase,callRPC,asUse
 let checks=0;const check=(value,message)=>{assert.ok(value,message);checks++;};
 let db;let rpcQueue=Promise.resolve();const calls=[];
 const root=path.resolve(__dirname,'..');
-const allowed=['index.html','cloud-dashboard.js','inventory.js','pwa.js','manifest.webmanifest','logo-guigs.png'];
+const allowed=['index.html','cloud-dashboard.js','inventory.js','reports.js','pwa.js','manifest.webmanifest','logo-guigs.png'];
 const server=http.createServer(async(req,res)=>{
  const file=new URL(req.url,'http://localhost').pathname.slice(1);
  res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.html')?'text/html':'application/json');
