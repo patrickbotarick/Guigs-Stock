@@ -1,0 +1,1475 @@
+{
+  "projectRef": "zthorgwmnigwceobbkoj",
+  "environment": "guigs-stock-homolog-v16",
+  "date": "2026-10-23T18:33:25.575Z",
+  "checks": 334,
+  "suites": [
+    {
+      "name": "auth-results",
+      "date": "2026-10-23T18:13:46.422Z",
+      "checks": 36,
+      "results": [
+        {
+          "label": "Auth artificial provisionado ownerA",
+          "passed": true
+        },
+        {
+          "label": "Auth artificial provisionado attendantA",
+          "passed": true
+        },
+        {
+          "label": "Auth artificial provisionado ownerB",
+          "passed": true
+        },
+        {
+          "label": "Auth artificial provisionado attendantB",
+          "passed": true
+        },
+        {
+          "label": "Auth artificial provisionado ownerA2",
+          "passed": true
+        },
+        {
+          "label": "Sessão real ownerA",
+          "passed": true
+        },
+        {
+          "label": "JWT validado ownerA",
+          "passed": true
+        },
+        {
+          "label": "Refresh real ownerA",
+          "passed": true
+        },
+        {
+          "label": "Membership real ownerA",
+          "passed": true
+        },
+        {
+          "label": "Logout real ownerA",
+          "passed": true
+        },
+        {
+          "label": "Refresh revogado após logout ownerA",
+          "passed": true
+        },
+        {
+          "label": "Sessão real attendantA",
+          "passed": true
+        },
+        {
+          "label": "JWT validado attendantA",
+          "passed": true
+        },
+        {
+          "label": "Refresh real attendantA",
+          "passed": true
+        },
+        {
+          "label": "Membership real attendantA",
+          "passed": true
+        },
+        {
+          "label": "Logout real attendantA",
+          "passed": true
+        },
+        {
+          "label": "Refresh revogado após logout attendantA",
+          "passed": true
+        },
+        {
+          "label": "Sessão real ownerB",
+          "passed": true
+        },
+        {
+          "label": "JWT validado ownerB",
+          "passed": true
+        },
+        {
+          "label": "Refresh real ownerB",
+          "passed": true
+        },
+        {
+          "label": "Membership real ownerB",
+          "passed": true
+        },
+        {
+          "label": "Logout real ownerB",
+          "passed": true
+        },
+        {
+          "label": "Refresh revogado após logout ownerB",
+          "passed": true
+        },
+        {
+          "label": "Sessão real attendantB",
+          "passed": true
+        },
+        {
+          "label": "JWT validado attendantB",
+          "passed": true
+        },
+        {
+          "label": "Refresh real attendantB",
+          "passed": true
+        },
+        {
+          "label": "Membership real attendantB",
+          "passed": true
+        },
+        {
+          "label": "Logout real attendantB",
+          "passed": true
+        },
+        {
+          "label": "Refresh revogado após logout attendantB",
+          "passed": true
+        },
+        {
+          "label": "Sessão real ownerA2",
+          "passed": true
+        },
+        {
+          "label": "JWT validado ownerA2",
+          "passed": true
+        },
+        {
+          "label": "Refresh real ownerA2",
+          "passed": true
+        },
+        {
+          "label": "Membership real ownerA2",
+          "passed": true
+        },
+        {
+          "label": "Logout real ownerA2",
+          "passed": true
+        },
+        {
+          "label": "Refresh revogado após logout ownerA2",
+          "passed": true
+        },
+        {
+          "label": "Recuperação: link real gerado sem enviar e-mail",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "api-results",
+      "date": "2026-10-23T18:16:20.297Z",
+      "checks": 91,
+      "results": [
+        {
+          "label": "ownerA RLS SELECT guigs_products",
+          "passed": true
+        },
+        {
+          "label": "ownerA RLS SELECT guigs_lots",
+          "passed": true
+        },
+        {
+          "label": "ownerA RLS SELECT guigs_movements",
+          "passed": true
+        },
+        {
+          "label": "ownerA RLS SELECT guigs_suppliers",
+          "passed": true
+        },
+        {
+          "label": "ownerA RLS SELECT guigs_inventories",
+          "passed": true
+        },
+        {
+          "label": "ownerA RLS SELECT guigs_inventory_items",
+          "passed": true
+        },
+        {
+          "label": "ownerA RLS SELECT guigs_inventory_audit",
+          "passed": true
+        },
+        {
+          "label": "ownerA inventário cross-shop bloqueado",
+          "passed": true
+        },
+        {
+          "label": "ownerA relatório cross-shop bloqueado",
+          "passed": true
+        },
+        {
+          "label": "attendantA RLS SELECT guigs_products",
+          "passed": true
+        },
+        {
+          "label": "attendantA RLS SELECT guigs_lots",
+          "passed": true
+        },
+        {
+          "label": "attendantA RLS SELECT guigs_movements",
+          "passed": true
+        },
+        {
+          "label": "attendantA RLS SELECT guigs_suppliers",
+          "passed": true
+        },
+        {
+          "label": "attendantA RLS SELECT guigs_inventories",
+          "passed": true
+        },
+        {
+          "label": "attendantA RLS SELECT guigs_inventory_items",
+          "passed": true
+        },
+        {
+          "label": "attendantA RLS SELECT guigs_inventory_audit",
+          "passed": true
+        },
+        {
+          "label": "attendantA inventário cross-shop bloqueado",
+          "passed": true
+        },
+        {
+          "label": "attendantA relatório cross-shop bloqueado",
+          "passed": true
+        },
+        {
+          "label": "ownerB RLS SELECT guigs_products",
+          "passed": true
+        },
+        {
+          "label": "ownerB RLS SELECT guigs_lots",
+          "passed": true
+        },
+        {
+          "label": "ownerB RLS SELECT guigs_movements",
+          "passed": true
+        },
+        {
+          "label": "ownerB RLS SELECT guigs_suppliers",
+          "passed": true
+        },
+        {
+          "label": "ownerB RLS SELECT guigs_inventories",
+          "passed": true
+        },
+        {
+          "label": "ownerB RLS SELECT guigs_inventory_items",
+          "passed": true
+        },
+        {
+          "label": "ownerB RLS SELECT guigs_inventory_audit",
+          "passed": true
+        },
+        {
+          "label": "ownerB inventário cross-shop bloqueado",
+          "passed": true
+        },
+        {
+          "label": "ownerB relatório cross-shop bloqueado",
+          "passed": true
+        },
+        {
+          "label": "attendantB RLS SELECT guigs_products",
+          "passed": true
+        },
+        {
+          "label": "attendantB RLS SELECT guigs_lots",
+          "passed": true
+        },
+        {
+          "label": "attendantB RLS SELECT guigs_movements",
+          "passed": true
+        },
+        {
+          "label": "attendantB RLS SELECT guigs_suppliers",
+          "passed": true
+        },
+        {
+          "label": "attendantB RLS SELECT guigs_inventories",
+          "passed": true
+        },
+        {
+          "label": "attendantB RLS SELECT guigs_inventory_items",
+          "passed": true
+        },
+        {
+          "label": "attendantB RLS SELECT guigs_inventory_audit",
+          "passed": true
+        },
+        {
+          "label": "attendantB inventário cross-shop bloqueado",
+          "passed": true
+        },
+        {
+          "label": "attendantB relatório cross-shop bloqueado",
+          "passed": true
+        },
+        {
+          "label": "Anônimo sem SELECT",
+          "passed": true
+        },
+        {
+          "label": "Atendente não cria inventário",
+          "passed": true
+        },
+        {
+          "label": "Relatório gerencial bloqueado para atendente no servidor",
+          "passed": true
+        },
+        {
+          "label": "Relatório inicial real",
+          "passed": true
+        },
+        {
+          "label": "Resumo inicial independente: 120 unidades, 2 recebimentos",
+          "passed": true
+        },
+        {
+          "label": "Recebimento RPC v1.5 após upgrade",
+          "passed": true
+        },
+        {
+          "label": "Transferência de atendente",
+          "passed": true
+        },
+        {
+          "label": "Venda de atendente",
+          "passed": true
+        },
+        {
+          "label": "Perda de atendente",
+          "passed": true
+        },
+        {
+          "label": "Relatório do intervalo conhecido",
+          "passed": true
+        },
+        {
+          "label": "Métrica real receipt_units = 5",
+          "passed": true
+        },
+        {
+          "label": "Métrica real receipt_operations = 1",
+          "passed": true
+        },
+        {
+          "label": "Métrica real transfer_units = 7",
+          "passed": true
+        },
+        {
+          "label": "Métrica real transfer_operations = 1",
+          "passed": true
+        },
+        {
+          "label": "Métrica real sale_units = 3",
+          "passed": true
+        },
+        {
+          "label": "Métrica real sale_operations = 1",
+          "passed": true
+        },
+        {
+          "label": "Métrica real loss_units = 2",
+          "passed": true
+        },
+        {
+          "label": "Métrica real loss_operations = 1",
+          "passed": true
+        },
+        {
+          "label": "Fornecedor histórico preservado",
+          "passed": true
+        },
+        {
+          "label": "Owner cria snapshot",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real",
+          "passed": true
+        },
+        {
+          "label": "Snapshot stock e fridge",
+          "passed": true
+        },
+        {
+          "label": "Atendente conta fridge",
+          "passed": true
+        },
+        {
+          "label": "Atendente conta stock",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real",
+          "passed": true
+        },
+        {
+          "label": "Salvar contagem não altera saldo",
+          "passed": true
+        },
+        {
+          "label": "Atendente não cancela",
+          "passed": true
+        },
+        {
+          "label": "Atendente não fecha",
+          "passed": true
+        },
+        {
+          "label": "Venda durante contagem",
+          "passed": true
+        },
+        {
+          "label": "Transferência durante contagem",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real",
+          "passed": true
+        },
+        {
+          "label": "Transição review",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real",
+          "passed": true
+        },
+        {
+          "label": "Movimento posterior identificado",
+          "passed": true
+        },
+        {
+          "label": "Fechamento bloqueado até recontagem",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real",
+          "passed": true
+        },
+        {
+          "label": "Transição open",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real",
+          "passed": true
+        },
+        {
+          "label": "Atendente reabre contagem",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real",
+          "passed": true
+        },
+        {
+          "label": "Recontagem real",
+          "passed": true
+        },
+        {
+          "label": "Atendente reabre contagem",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real",
+          "passed": true
+        },
+        {
+          "label": "Recontagem real",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real",
+          "passed": true
+        },
+        {
+          "label": "Transição review",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real",
+          "passed": true
+        },
+        {
+          "label": "Fechamento autorizado",
+          "passed": true
+        },
+        {
+          "label": "Duas divergências geram dois ajustes",
+          "passed": true
+        },
+        {
+          "label": "Retry de fechamento rejeitado",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real",
+          "passed": true
+        },
+        {
+          "label": "Histórico e vínculo de ajustes persistidos",
+          "passed": true
+        },
+        {
+          "label": "Novo inventário",
+          "passed": true
+        },
+        {
+          "label": "guigs_get_inventory",
+          "passed": true
+        },
+        {
+          "label": "Owner cancela",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "permissions-results",
+      "date": "2026-10-23T18:28:32.515Z",
+      "checks": 39,
+      "results": [
+        {
+          "label": "Anônimo sem dados/efeitos: guigs_adjust_stock",
+          "passed": true
+        },
+        {
+          "label": "RPC legada cross-shop: guigs_adjust_stock",
+          "passed": true
+        },
+        {
+          "label": "Anônimo sem dados/efeitos: guigs_create_product",
+          "passed": true
+        },
+        {
+          "label": "RPC legada cross-shop: guigs_create_product",
+          "passed": true
+        },
+        {
+          "label": "Anônimo sem dados/efeitos: guigs_update_product",
+          "passed": true
+        },
+        {
+          "label": "RPC legada cross-shop: guigs_update_product",
+          "passed": true
+        },
+        {
+          "label": "Anônimo sem dados/efeitos: guigs_receive_stock",
+          "passed": true
+        },
+        {
+          "label": "RPC legada cross-shop: guigs_receive_stock",
+          "passed": true
+        },
+        {
+          "label": "Anônimo sem dados/efeitos: guigs_transfer_stock",
+          "passed": true
+        },
+        {
+          "label": "RPC legada cross-shop: guigs_transfer_stock",
+          "passed": true
+        },
+        {
+          "label": "Anônimo sem dados/efeitos: guigs_register_sale",
+          "passed": true
+        },
+        {
+          "label": "RPC legada cross-shop: guigs_register_sale",
+          "passed": true
+        },
+        {
+          "label": "Anônimo sem dados/efeitos: guigs_register_loss",
+          "passed": true
+        },
+        {
+          "label": "RPC legada cross-shop: guigs_register_loss",
+          "passed": true
+        },
+        {
+          "label": "Anônimo sem dados/efeitos: guigs_get_history",
+          "passed": true
+        },
+        {
+          "label": "RPC legada cross-shop: guigs_get_history",
+          "passed": true
+        },
+        {
+          "label": "Anônimo sem dados/efeitos: guigs_get_history_actors",
+          "passed": true
+        },
+        {
+          "label": "RPC legada cross-shop: guigs_get_history_actors",
+          "passed": true
+        },
+        {
+          "label": "Anônimo sem dados/efeitos: guigs_get_lot_balances",
+          "passed": true
+        },
+        {
+          "label": "RPC legada cross-shop: guigs_get_lot_balances",
+          "passed": true
+        },
+        {
+          "label": "Administração negada ao atendente: guigs_adjust_stock",
+          "passed": true
+        },
+        {
+          "label": "Administração negada ao atendente: guigs_create_product",
+          "passed": true
+        },
+        {
+          "label": "Administração negada ao atendente: guigs_update_product",
+          "passed": true
+        },
+        {
+          "label": "INSERT direto negado guigs_inventories",
+          "passed": true
+        },
+        {
+          "label": "UPDATE direto negado guigs_inventories",
+          "passed": true
+        },
+        {
+          "label": "DELETE direto negado guigs_inventories",
+          "passed": true
+        },
+        {
+          "label": "INSERT direto negado guigs_inventory_items",
+          "passed": true
+        },
+        {
+          "label": "UPDATE direto negado guigs_inventory_items",
+          "passed": true
+        },
+        {
+          "label": "DELETE direto negado guigs_inventory_items",
+          "passed": true
+        },
+        {
+          "label": "INSERT direto negado guigs_inventory_audit",
+          "passed": true
+        },
+        {
+          "label": "UPDATE direto negado guigs_inventory_audit",
+          "passed": true
+        },
+        {
+          "label": "DELETE direto negado guigs_inventory_audit",
+          "passed": true
+        },
+        {
+          "label": "Atendente visualiza inventário da própria loja",
+          "passed": true
+        },
+        {
+          "label": "Owner B não lê detalhe do inventário A",
+          "passed": true
+        },
+        {
+          "label": "Atendente B não lê detalhe do inventário A",
+          "passed": true
+        },
+        {
+          "label": "FEFO real identifica lote anterior com saldo",
+          "passed": true
+        },
+        {
+          "label": "Owner administra produto",
+          "passed": true
+        },
+        {
+          "label": "Owner administra fornecedor",
+          "passed": true
+        },
+        {
+          "label": "Owner atualiza fornecedor",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "concurrency-race",
+      "date": "2026-10-23T18:16:58.101Z",
+      "checks": 8,
+      "results": [
+        {
+          "label": "A: duas sessões, uma contagem aceita e uma versão rejeitada",
+          "passed": true,
+          "details": {
+            "elapsedMs": 1182
+          }
+        },
+        {
+          "label": "A: versão incrementada uma única vez",
+          "passed": true
+        },
+        {
+          "label": "B: dois owners, um único fechamento",
+          "passed": true,
+          "details": {
+            "timesMs": [
+              2397,
+              2297
+            ]
+          }
+        },
+        {
+          "label": "C: transferência aguarda fechamento e conclui",
+          "passed": true,
+          "details": {
+            "elapsedMs": 2199
+          }
+        },
+        {
+          "label": "B/C: apenas dois ajustes e um par de transferência",
+          "passed": true
+        },
+        {
+          "label": "Retry não duplica ajustes",
+          "passed": true
+        },
+        {
+          "label": "B: conclusão persistida",
+          "passed": true
+        },
+        {
+          "label": "C: saldo final combina fechamento e transferência",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "concurrency-rollback-check",
+      "date": "2026-10-23T18:17:36.597Z",
+      "checks": 5,
+      "results": [
+        {
+          "label": "Erro injetado no segundo ajuste real",
+          "passed": true
+        },
+        {
+          "label": "Rollback: nenhum movimento parcial",
+          "passed": true
+        },
+        {
+          "label": "Rollback: cabeçalho inalterado",
+          "passed": true
+        },
+        {
+          "label": "Rollback: itens sem aplicação parcial",
+          "passed": true
+        },
+        {
+          "label": "Rollback: auditoria inalterada",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "concurrency-finish-rollback",
+      "date": "2026-10-23T18:18:06.701Z",
+      "checks": 1,
+      "results": [
+        {
+          "label": "Após retirar falha: fechamento com dois ajustes",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "performance-results",
+      "date": "2026-10-23T18:22:59.810Z",
+      "checks": 81,
+      "results": [
+        {
+          "label": "Leitura independente de movimentos artificiais",
+          "passed": true
+        },
+        {
+          "label": "Relatório período hoje",
+          "passed": true
+        },
+        {
+          "label": "hoje operações receipt",
+          "passed": true
+        },
+        {
+          "label": "hoje unidades receipt",
+          "passed": true
+        },
+        {
+          "label": "hoje operações sale",
+          "passed": true
+        },
+        {
+          "label": "hoje unidades sale",
+          "passed": true
+        },
+        {
+          "label": "hoje operações loss",
+          "passed": true
+        },
+        {
+          "label": "hoje unidades loss",
+          "passed": true
+        },
+        {
+          "label": "hoje operações transfer",
+          "passed": true
+        },
+        {
+          "label": "hoje unidades transfer",
+          "passed": true
+        },
+        {
+          "label": "hoje operações adjust",
+          "passed": true
+        },
+        {
+          "label": "hoje unidades adjust",
+          "passed": true
+        },
+        {
+          "label": "Relatório período dias7",
+          "passed": true
+        },
+        {
+          "label": "dias7 operações receipt",
+          "passed": true
+        },
+        {
+          "label": "dias7 unidades receipt",
+          "passed": true
+        },
+        {
+          "label": "dias7 operações sale",
+          "passed": true
+        },
+        {
+          "label": "dias7 unidades sale",
+          "passed": true
+        },
+        {
+          "label": "dias7 operações loss",
+          "passed": true
+        },
+        {
+          "label": "dias7 unidades loss",
+          "passed": true
+        },
+        {
+          "label": "dias7 operações transfer",
+          "passed": true
+        },
+        {
+          "label": "dias7 unidades transfer",
+          "passed": true
+        },
+        {
+          "label": "dias7 operações adjust",
+          "passed": true
+        },
+        {
+          "label": "dias7 unidades adjust",
+          "passed": true
+        },
+        {
+          "label": "Relatório período dias30",
+          "passed": true
+        },
+        {
+          "label": "dias30 operações receipt",
+          "passed": true
+        },
+        {
+          "label": "dias30 unidades receipt",
+          "passed": true
+        },
+        {
+          "label": "dias30 operações sale",
+          "passed": true
+        },
+        {
+          "label": "dias30 unidades sale",
+          "passed": true
+        },
+        {
+          "label": "dias30 operações loss",
+          "passed": true
+        },
+        {
+          "label": "dias30 unidades loss",
+          "passed": true
+        },
+        {
+          "label": "dias30 operações transfer",
+          "passed": true
+        },
+        {
+          "label": "dias30 unidades transfer",
+          "passed": true
+        },
+        {
+          "label": "dias30 operações adjust",
+          "passed": true
+        },
+        {
+          "label": "dias30 unidades adjust",
+          "passed": true
+        },
+        {
+          "label": "Relatório período mes",
+          "passed": true
+        },
+        {
+          "label": "mes operações receipt",
+          "passed": true
+        },
+        {
+          "label": "mes unidades receipt",
+          "passed": true
+        },
+        {
+          "label": "mes operações sale",
+          "passed": true
+        },
+        {
+          "label": "mes unidades sale",
+          "passed": true
+        },
+        {
+          "label": "mes operações loss",
+          "passed": true
+        },
+        {
+          "label": "mes unidades loss",
+          "passed": true
+        },
+        {
+          "label": "mes operações transfer",
+          "passed": true
+        },
+        {
+          "label": "mes unidades transfer",
+          "passed": true
+        },
+        {
+          "label": "mes operações adjust",
+          "passed": true
+        },
+        {
+          "label": "mes unidades adjust",
+          "passed": true
+        },
+        {
+          "label": "Relatório período anterior",
+          "passed": true
+        },
+        {
+          "label": "anterior operações receipt",
+          "passed": true
+        },
+        {
+          "label": "anterior unidades receipt",
+          "passed": true
+        },
+        {
+          "label": "anterior operações sale",
+          "passed": true
+        },
+        {
+          "label": "anterior unidades sale",
+          "passed": true
+        },
+        {
+          "label": "anterior operações loss",
+          "passed": true
+        },
+        {
+          "label": "anterior unidades loss",
+          "passed": true
+        },
+        {
+          "label": "anterior operações transfer",
+          "passed": true
+        },
+        {
+          "label": "anterior unidades transfer",
+          "passed": true
+        },
+        {
+          "label": "anterior operações adjust",
+          "passed": true
+        },
+        {
+          "label": "anterior unidades adjust",
+          "passed": true
+        },
+        {
+          "label": "Relatório período personalizado",
+          "passed": true
+        },
+        {
+          "label": "personalizado operações receipt",
+          "passed": true
+        },
+        {
+          "label": "personalizado unidades receipt",
+          "passed": true
+        },
+        {
+          "label": "personalizado operações sale",
+          "passed": true
+        },
+        {
+          "label": "personalizado unidades sale",
+          "passed": true
+        },
+        {
+          "label": "personalizado operações loss",
+          "passed": true
+        },
+        {
+          "label": "personalizado unidades loss",
+          "passed": true
+        },
+        {
+          "label": "personalizado operações transfer",
+          "passed": true
+        },
+        {
+          "label": "personalizado unidades transfer",
+          "passed": true
+        },
+        {
+          "label": "personalizado operações adjust",
+          "passed": true
+        },
+        {
+          "label": "personalizado unidades adjust",
+          "passed": true
+        },
+        {
+          "label": "Relatório real 50 mil movimentos 0",
+          "passed": true
+        },
+        {
+          "label": "Snapshot grande 0",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real 2002 itens 0",
+          "passed": true
+        },
+        {
+          "label": "Cancela benchmark 0",
+          "passed": true
+        },
+        {
+          "label": "Relatório real 50 mil movimentos 1",
+          "passed": true
+        },
+        {
+          "label": "Snapshot grande 1",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real 2002 itens 1",
+          "passed": true
+        },
+        {
+          "label": "Cancela benchmark 1",
+          "passed": true
+        },
+        {
+          "label": "Relatório real 50 mil movimentos 2",
+          "passed": true
+        },
+        {
+          "label": "Snapshot grande 2",
+          "passed": true
+        },
+        {
+          "label": "Detalhe real 2002 itens 2",
+          "passed": true
+        },
+        {
+          "label": "Contagem em inventário grande",
+          "passed": true
+        },
+        {
+          "label": "Recontagem em inventário grande",
+          "passed": true
+        },
+        {
+          "label": "Payload medido via PostgREST superior a 1 MB",
+          "passed": true,
+          "details": {
+            "report": [
+              1082,
+              1072,
+              1109
+            ],
+            "create": [
+              587,
+              506,
+              638
+            ],
+            "detail": [
+              1129,
+              382,
+              984
+            ],
+            "payloadBytes": 1481214,
+            "count": 258,
+            "recount": 270,
+            "reportP50": 1082,
+            "createP50": 587,
+            "detailP50": 984
+          }
+        }
+      ]
+    },
+    {
+      "name": "close-large-results",
+      "date": "2026-10-23T18:23:33.934Z",
+      "checks": 4,
+      "results": [
+        {
+          "label": "Massa de contagem grande preparada artificialmente",
+          "passed": true
+        },
+        {
+          "label": "Revisão de 2002 itens",
+          "passed": true
+        },
+        {
+          "label": "Fechamento real: 2002 ajustes atômicos",
+          "passed": true,
+          "details": {
+            "elapsedMs": 1288
+          }
+        },
+        {
+          "label": "2002 saldos reconciliados",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "browser-results",
+      "date": "2026-10-23T18:27:23.969Z",
+      "checks": 33,
+      "results": [
+        {
+          "label": "Login UI real em 390×844",
+          "passed": true
+        },
+        {
+          "label": "Visão geral com dados reais artificiais",
+          "passed": true
+        },
+        {
+          "label": "Mobile sem overflow horizontal",
+          "passed": true
+        },
+        {
+          "label": "dist exclui docs/V1.6_RELEASE_READINESS.md",
+          "passed": true
+        },
+        {
+          "label": "dist exclui scripts/homologation/live.cjs",
+          "passed": true
+        },
+        {
+          "label": "dist exclui tests/security.cjs",
+          "passed": true
+        },
+        {
+          "label": "dist exclui supabase/migrations/007_physical_inventory.sql",
+          "passed": true
+        },
+        {
+          "label": "dist exclui AGENTS.md",
+          "passed": true
+        },
+        {
+          "label": "Searchable por teclado seleciona produto real",
+          "passed": true
+        },
+        {
+          "label": "Recebimento real pela UI",
+          "passed": true
+        },
+        {
+          "label": "Confirmação com título acessível",
+          "passed": true
+        },
+        {
+          "label": "Transferência real pela UI",
+          "passed": true
+        },
+        {
+          "label": "Venda real pela UI",
+          "passed": true
+        },
+        {
+          "label": "Confirmação com título acessível",
+          "passed": true
+        },
+        {
+          "label": "Perda confirmada pela UI",
+          "passed": true
+        },
+        {
+          "label": "Confirmação com título acessível",
+          "passed": true
+        },
+        {
+          "label": "Ajuste confirmado pela UI",
+          "passed": true
+        },
+        {
+          "label": "Histórico real da operação",
+          "passed": true
+        },
+        {
+          "label": "Snapshot UI inclui lote recebido",
+          "passed": true
+        },
+        {
+          "label": "Confirmação com título acessível",
+          "passed": true
+        },
+        {
+          "label": "Inventário completo pela UI real",
+          "passed": true
+        },
+        {
+          "label": "Relatório UI inclui inventário real",
+          "passed": true
+        },
+        {
+          "label": "Viewport com teclado sem overflow",
+          "passed": true
+        },
+        {
+          "label": "Desktop exibe relatório real",
+          "passed": true
+        },
+        {
+          "label": "PWA v9 artificial instalada",
+          "passed": true
+        },
+        {
+          "label": "PWA atualiza v9 para v10",
+          "passed": true
+        },
+        {
+          "label": "Relatório bloqueado offline",
+          "passed": true
+        },
+        {
+          "label": "Inventário bloqueado offline",
+          "passed": true
+        },
+        {
+          "label": "Operações bloqueadas offline",
+          "passed": true
+        },
+        {
+          "label": "Reconexão restaura operação",
+          "passed": true
+        },
+        {
+          "label": "Nenhum destino externo além de homologação e SDK",
+          "passed": true
+        },
+        {
+          "label": "Sem erros JavaScript",
+          "passed": true
+        },
+        {
+          "label": "Mobile renderiza detalhe de 2002 itens",
+          "passed": true,
+          "details": {
+            "elapsedMs": 1051
+          }
+        }
+      ]
+    },
+    {
+      "name": "legacy-browser-results",
+      "date": "2026-10-23T18:27:46.114Z",
+      "checks": 3,
+      "results": [
+        {
+          "label": "Frontend v1.5 original autentica no schema 008",
+          "passed": true
+        },
+        {
+          "label": "Frontend v1.5 lê produtos e saldos após upgrade",
+          "passed": true
+        },
+        {
+          "label": "Histórico v1.5 original funciona após upgrade",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "views-results",
+      "date": "2026-10-23T18:30:38.141Z",
+      "checks": 5,
+      "results": [
+        {
+          "label": "Detalhe grande renderiza os 2002 itens",
+          "passed": true,
+          "details": {
+            "beforeHeapBytes": 6763810,
+            "usedJSHeapBytes": 6056163,
+            "totalJSHeapBytes": 11143871,
+            "visibleItems": 2002
+          }
+        },
+        {
+          "label": "Detalhe grande sem overflow em 390×844",
+          "passed": true
+        },
+        {
+          "label": "Teclado alcança controles do detalhe",
+          "passed": true
+        },
+        {
+          "label": "UI real de atendente oculta administração e relatórios",
+          "passed": true
+        },
+        {
+          "label": "UI de atendente não cria inventário",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "report-detail-results",
+      "date": "2026-10-23T18:33:15.017Z",
+      "checks": 28,
+      "results": [
+        {
+          "label": "Relatório detalhado real",
+          "passed": true
+        },
+        {
+          "label": "Bases artificiais independentes para conferência",
+          "passed": true
+        },
+        {
+          "label": "Saldo corrente conferido stock",
+          "passed": true
+        },
+        {
+          "label": "Saldo corrente conferido fridge",
+          "passed": true
+        },
+        {
+          "label": "Saldo corrente conferido stock",
+          "passed": true
+        },
+        {
+          "label": "Saldo corrente conferido fridge",
+          "passed": true
+        },
+        {
+          "label": "Saldo corrente conferido stock",
+          "passed": true
+        },
+        {
+          "label": "Saldo corrente conferido fridge",
+          "passed": true
+        },
+        {
+          "label": "Saldo corrente conferido stock",
+          "passed": true
+        },
+        {
+          "label": "Saldo corrente conferido fridge",
+          "passed": true
+        },
+        {
+          "label": "Datas de validade reais preservadas no relatório",
+          "passed": true
+        },
+        {
+          "label": "Parâmetros reais de reposição preservados",
+          "passed": true
+        },
+        {
+          "label": "Atividade do autor ownerA",
+          "passed": true
+        },
+        {
+          "label": "Atividade real ownerA receipts",
+          "passed": true
+        },
+        {
+          "label": "Atividade real ownerA transfers",
+          "passed": true
+        },
+        {
+          "label": "Atividade real ownerA sales",
+          "passed": true
+        },
+        {
+          "label": "Atividade real ownerA losses",
+          "passed": true
+        },
+        {
+          "label": "Atividade real ownerA adjustments",
+          "passed": true
+        },
+        {
+          "label": "Atividade do autor attendantA",
+          "passed": true
+        },
+        {
+          "label": "Atividade real attendantA receipts",
+          "passed": true
+        },
+        {
+          "label": "Atividade real attendantA transfers",
+          "passed": true
+        },
+        {
+          "label": "Atividade real attendantA sales",
+          "passed": true
+        },
+        {
+          "label": "Atividade real attendantA losses",
+          "passed": true
+        },
+        {
+          "label": "Atividade real attendantA adjustments",
+          "passed": true
+        },
+        {
+          "label": "Fornecedores conferidos pelo snapshot histórico",
+          "passed": true
+        },
+        {
+          "label": "Perdas e motivos conferidos com movimentos",
+          "passed": true
+        },
+        {
+          "label": "Histórico gerencial confere com inventários reais",
+          "passed": true
+        },
+        {
+          "label": "Último inventário concluído correto",
+          "passed": true
+        }
+      ]
+    }
+  ]
+}

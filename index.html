@@ -2,7 +2,7 @@
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content" />
     <meta name="theme-color" content="#111111" />
 
     <link rel="manifest" href="manifest.webmanifest" />
@@ -715,7 +715,7 @@
         border-radius: 20px;
         padding: 0;
         width: min(520px, calc(100% - 30px));
-        max-height: calc(100dvh - 24px);
+        max-height: min(calc(100dvh - 24px), calc(var(--dialog-viewport-height, 100dvh) - 24px));
         overflow-y: auto;
         box-shadow: 0 25px 80px rgba(0, 0, 0, 0.28);
       }
@@ -864,7 +864,40 @@
         justify-content: flex-end;
         gap: 8px;
         margin-top: 8px;
+        position: sticky;
+        bottom: 0;
+        background: white;
+        padding: 10px 0;
+        z-index: 2;
       }
+
+      .attention-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+      .attention-filters .btn { min-height: 44px; }
+      .attention-filters [aria-pressed="true"] { background: #fff0d2; color: #8c5816; border-color: #8c5816; }
+      .replenishment-panel { margin: 16px 0; }
+      .replenishment-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 12px; }
+      .replenishment-card { border: 1px solid #e7e3df; border-radius: 11px; padding: 14px; min-width: 0; overflow-wrap: anywhere; }
+      .replenishment-card.warning { background: #fffdf7; }
+      .replenishment-card p { margin: 8px 0; }
+      .operation-summary { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(0, 2fr); gap: 10px; }
+      .operation-summary dt { font-weight: 750; }
+      .operation-summary dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+      #operationFeedback { overflow-wrap: anywhere; }
+      .stock-thresholds { display: block; margin-top: 4px; line-height: 1.5; }
+      .inventory-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+      .inventory-actions .btn, .inventory-item .btn, #inventoryComplete, #inventoryNextItem { min-height: 44px; }
+      .inventory-filters { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr)); align-items: end; gap: 12px; margin: 20px 0; }
+      .inventory-items { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,300px),1fr)); gap: 12px; margin: 16px 0; }
+      .inventory-item, .inventory-history-card { border: 1px solid #e7e3df; border-radius: 12px; padding: 16px; min-width: 0; overflow-wrap: anywhere; }
+      .inventory-history-card { margin: 10px 0; }
+      .inventory-item h3 { margin-top: 0; }
+      .inventory-positive { background: #e7f5ec; }
+      .inventory-negative { background: #fff0d2; }
+      .inventory-pending { background: #f7f6f4; }
+      .inventory-count-form { display: grid; gap: 8px; margin: 14px 0; }
+      .inventory-count-input { min-width: 0; width: 100%; font-size: 20px; padding: 12px; border: 1px solid #dcd8d3; border-radius: 10px; }
+      #inventoryReviewGate input { width: 22px; height: 22px; vertical-align: middle; }
+      #inventoryAudit p { overflow-wrap: anywhere; }
 
       .formmsg {
         font-size: 12px;
@@ -1004,8 +1037,12 @@
 
         dialog {
           width: calc(100% - 16px);
-          max-height: calc(100vh - 16px);
+          max-height: min(calc(100dvh - 16px), calc(var(--dialog-viewport-height, 100dvh) - 16px));
+          top: var(--dialog-viewport-top, 0px);
+          bottom: auto;
+          margin: 8px auto;
         }
+        .field input, .field select, .field textarea { font-size: 16px; }
 
         .modal {
           padding: 18px;
@@ -1129,6 +1166,17 @@
           padding: 10px 12px;
         }
       }
+      #reportsView { min-width: 0; }
+      #reportsView .panel { margin-bottom: 16px; }
+      .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 12px; }
+      .report-card { border: 1px solid var(--line, #ddd); border-radius: 12px; padding: 14px; min-width: 0; overflow-wrap: anywhere; }
+      .report-card h3 { margin: 0 0 10px; font-size: 16px; }
+      .report-card p { margin: 6px 0; }
+      .report-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+      .report-filters .field { flex: 1 1 160px; min-width: 0; }
+      .report-filters input, .report-filters select { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; }
+      #reportsView button { min-height: 44px; max-width: 100%; white-space: normal; }
+      @media (max-width: 600px) { .report-filters { display: grid; grid-template-columns: minmax(0, 1fr); } }
     </style>
   </head>
 
@@ -1147,6 +1195,8 @@
           <span class="nav-label">NAVEGAÇÃO</span>
           <a id="navOverview" class="menu" href="#visao-geral" aria-current="page">◫ Visão geral</a>
           <a id="navHistory" class="menu" href="#historico">↻ Histórico</a>
+          <a id="navInventory" class="menu" href="#inventario">▤ Inventário</a>
+          <a id="navReports" class="menu hidden" href="#relatorios">▥ Relatórios</a>
         </nav>
 
         <p>
@@ -1177,6 +1227,7 @@
 
         <section id="content" class="hidden">
           <section id="overviewView" aria-label="Visão geral">
+            <div id="operationFeedback" class="notice hidden" role="status" aria-live="polite" aria-atomic="true"></div>
             <div class="operationbar">
               <div class="operationhead">
                 <div>
@@ -1243,6 +1294,21 @@
               </div>
             </section>
 
+            <div class="attention-filters" role="group" aria-label="Filtrar atenção na visão geral">
+              <button type="button" class="btn" data-attention="all" aria-pressed="true">Todos</button>
+              <button type="button" class="btn" data-attention="minimum" aria-pressed="false">Abaixo do mínimo</button>
+              <button type="button" class="btn" data-attention="replenish" aria-pressed="false">Repor geladeira</button>
+              <button type="button" class="btn" data-attention="near" aria-pressed="false">Próximos do vencimento</button>
+              <button type="button" class="btn" data-attention="expired" aria-pressed="false">Vencidos</button>
+            </div>
+            <p id="attentionFilterStatus" class="muted" role="status">Exibindo todos os produtos e lotes.</p>
+            <section class="panel replenishment-panel" aria-labelledby="replenishmentTitle">
+              <div class="panelhead">
+                <div><h2 id="replenishmentTitle">Reposição da geladeira</h2>
+                <div class="muted">Sugestões até a meta, limitadas ao estoque seco não vencido. Nenhuma movimentação automática.</div></div>
+              </div>
+              <div id="replenishmentList" class="replenishment-list"></div>
+            </section>
             <div id="alertsPanel" class="alerts-panel hidden">
               <div class="alerts-head">
                 <div>
@@ -1390,11 +1456,75 @@
             </div>
           </section>
 
+          <section id="inventoryView" class="hidden" aria-label="Inventário físico">
+            <div id="inventoryOffline" class="notice danger hidden" role="status">Sem internet: criação, contagem e fechamento bloqueados. Os dados exibidos podem estar desatualizados.</div>
+            <div id="inventoryMessage" class="notice hidden" role="status" aria-live="polite"></div>
+            <div class="panel">
+              <div class="panelhead"><div><h2>Inventários físicos</h2><p class="muted">Contar não altera estoque. Somente o proprietário pode fechar e aplicar divergências após revisão.</p></div>
+                <div class="inventory-actions"><button type="button" id="newInventory" class="btn green hidden" data-inventory-write>Novo inventário</button><button type="button" id="inventoryReload" class="btn">Atualizar inventários</button></div>
+              </div>
+              <p id="inventoryOpenSummary"></p><p id="inventoryLastCompleted" class="muted"></p>
+              <h3>Histórico de inventários</h3><div id="inventoryList"></div>
+              <div class="inventory-actions"><button type="button" id="inventoryPrevious" class="btn">Anterior</button><span id="inventoryPage"></span><button type="button" id="inventoryNext" class="btn">Próxima</button></div>
+            </div>
+            <section id="inventoryDetail" class="panel hidden" aria-labelledby="inventoryDetailTitle">
+              <h2 id="inventoryDetailTitle"></h2><p id="inventoryDetailInfo" class="muted"></p>
+              <p id="inventoryTotals" tabindex="-1" role="status"></p>
+              <div id="inventoryMovementWarning" class="notice danger hidden" role="status"></div>
+              <div class="inventory-actions">
+                <button type="button" id="inventoryReview" class="btn" data-inventory-write>Revisar inventário</button>
+                <button type="button" id="inventoryReopen" class="btn" data-inventory-write>Reabrir para contagem</button>
+                <button type="button" id="inventoryScope" class="btn" data-inventory-write>Incluir novos lotes</button>
+                <button type="button" id="inventoryCancel" class="btn red" data-inventory-write>Cancelar inventário</button>
+              </div>
+              <section id="inventoryDifferencesPanel" class="balancebox hidden"><h3>Divergências para revisão</h3><div id="inventoryDifferences"></div></section>
+              <div id="inventoryReviewGate" class="balancebox hidden"><label><input id="inventoryReviewCheck" type="checkbox" /> Revisei cada divergência e os avisos de movimentação.</label></div>
+              <button type="button" id="inventoryComplete" class="btn red hidden" data-inventory-write>Fechar inventário e aplicar ajustes</button>
+              <div class="inventory-filters">
+                <div class="field"><label for="inventoryItemSelect">Pesquisar produto / lote</label><select id="inventoryItemSelect"><option value="">Todos os produtos / lotes</option></select></div>
+                <div class="field"><label for="inventoryLocation">Localização</label><select id="inventoryLocation"><option value="">Ambas</option><option value="stock">Estoque seco</option><option value="fridge">Geladeira</option></select></div>
+                <div class="field"><label for="inventoryFilter">Conferência</label><select id="inventoryFilter"><option value="all">Todos</option><option value="divergent">Divergentes</option><option value="pending">Não contados</option><option value="counted">Conferidos</option></select></div>
+                <button type="button" id="inventoryNextItem" class="btn">Próxima contagem pendente</button>
+              </div>
+              <div id="inventoryItems" class="inventory-items"></div>
+              <details><summary>Auditoria das contagens e estados</summary><div id="inventoryAudit"></div></details>
+            </section>
+          </section>
+          <section id="reportsView" class="hidden" aria-label="Relatórios operacionais">
+            <div id="reportsOffline" class="notice danger hidden" role="status">Sem internet: atualização e exportação indisponíveis. Dados já exibidos podem estar desatualizados.</div>
+            <div class="panel">
+              <h2>Relatórios operacionais</h2><p class="muted">Gestão de estoque físico · Acesso do proprietário</p>
+              <div class="report-filters">
+                <div class="field"><label for="reportsPeriod">Período</label><select id="reportsPeriod"><option value="today">Hoje</option><option value="7">7 dias</option><option value="30" selected>30 dias</option><option value="month">Este mês</option><option value="previous">Mês anterior</option><option value="custom">Personalizado</option></select></div>
+                <div class="field"><label for="reportsFrom">Data inicial</label><input id="reportsFrom" type="date" required></div>
+                <div class="field"><label for="reportsTo">Data final</label><input id="reportsTo" type="date" required></div>
+                <button id="reportsReload" class="btn" type="button">Atualizar relatórios</button>
+              </div>
+              <p id="reportsMessage" role="status" aria-live="polite"></p>
+            </div>
+            <section class="panel"><h2>Resumo do período</h2><p class="muted">Operações são eventos distintos. Transferências contam uma vez, somando somente a entrada no destino.</p><div id="reportsSummary" class="report-grid" data-report-content></div></section>
+            <section class="panel"><h2>Mais saídos por venda</h2><div id="reportsSales" class="report-grid" data-report-content></div></section>
+            <section class="panel"><h2>Produtos com maior perda</h2><div id="reportsLossRanking" class="report-grid" data-report-content></div></section>
+            <section class="panel"><h2>Perdas do período</h2><button id="reportsExport" type="button" class="btn">Exportar CSV das perdas desta página</button><p class="muted">Exporta somente os até 50 registros da página exibida, no período aplicado.</p><div id="reportsLosses" class="report-grid" data-report-content></div><div class="inventory-actions"><button id="reportsLossPrevious" class="btn" type="button">Anterior</button><span id="reportsLossPage" data-report-content></span><button id="reportsLossNext" class="btn" type="button">Próxima</button></div></section>
+            <section class="panel"><h2>Recebimentos por fornecedor</h2><p class="muted">Nome registrado no recebimento. Registros antigos sem fornecedor: Não informado. Nomes iguais são agrupados; renomeações preservam o nome histórico.</p><div id="reportsSuppliers" class="report-grid" data-report-content></div></section>
+            <section class="panel"><h2>Atividade por responsável</h2><p class="muted">Contagem de operações para rastreabilidade. Ordem alfabética; sem pontuação de produtividade.</p><div id="reportsActivity" class="report-grid" data-report-content></div></section>
+            <section class="panel"><h2>Inventários</h2><h3>Último iniciado, independente do período</h3><div id="reportsLatestInventory" data-report-content></div><h3>Concluídos / cancelados no período</h3><p class="muted">Filtro pela data de encerramento. Responsável é quem iniciou. Divergências comparam a última contagem com a base de conferência.</p><div id="reportsInventories" class="report-grid" data-report-content></div><div class="inventory-actions"><button id="reportsInventoryPrevious" class="btn" type="button">Anterior</button><span id="reportsInventoryPage" data-report-content></span><button id="reportsInventoryNext" class="btn" type="button">Próxima</button></div></section>
+            <section class="panel"><h2>Estoque atual · fora do filtro de período</h2><p id="reportsStockDate" class="muted" data-report-content></p><h3>Validades</h3><div id="reportsExpiry" class="report-grid" data-report-content></div><p id="reportsExpiryNote" class="muted" data-report-content></p><h3>Mínimos e reposição da geladeira</h3><div id="reportsRestock" class="report-grid" data-report-content></div></section>
+          </section>
           <div class="foot" id="updated"></div>
         </section>
       </main>
     </div>
 
+    <dialog id="inventoryCreateDialog" aria-labelledby="inventoryCreateTitle">
+      <div class="modal"><h2 id="inventoryCreateTitle">Novo inventário físico</h2><p>Capturar os lotes e os saldos dos dois locais. Nenhum saldo será alterado.</p>
+        <form id="inventoryCreateForm" class="modalform">
+          <div class="field"><label for="inventoryObservation">Observação</label><textarea id="inventoryObservation" maxlength="1000" placeholder="Ex.: contagem de fechamento"></textarea></div>
+          <div id="inventoryCreateMessage" class="formmsg" role="alert"></div>
+          <div class="modalactions"><button type="button" class="btn" data-close="inventoryCreateDialog">Cancelar</button><button id="inventoryCreateSubmit" type="submit" class="btn green">Criar inventário</button></div>
+        </form>
+      </div>
+    </dialog>
     <!-- NOVO PRODUTO -->
 
     <dialog id="productDialog">
@@ -1778,6 +1908,18 @@
       </div>
     </dialog>
 
+    <dialog id="operationConfirmDialog" role="alertdialog" aria-labelledby="operationConfirmTitle" aria-describedby="operationConfirmReason">
+      <div class="modal">
+        <h2 id="operationConfirmTitle">Confirmar operação</h2>
+        <p id="operationConfirmReason"></p>
+        <dl id="operationConfirmSummary" class="operation-summary"></dl>
+        <div class="modalactions">
+          <button type="button" id="cancelOperation" class="btn">Voltar e revisar</button>
+          <button type="button" id="confirmOperation" class="btn red">Confirmar registro</button>
+        </div>
+      </div>
+    </dialog>
+
     <!-- VENDA -->
 
     <dialog id="saleDialog">
@@ -1928,6 +2070,7 @@
           </div>
 
           <div id="adjustBalance" class="balancebox"></div>
+          <div id="adjustImpact" class="balancebox" role="status" aria-live="polite"></div>
 
           <div class="field">
             <label for="adjustQuantity">Quantidade física encontrada</label>
