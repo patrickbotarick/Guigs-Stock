@@ -1,5 +1,6 @@
 # Configuração local do Supabase
 config.js
+dist/
 
 # Links temporários do Cloudflare
 LINK-CLOUDFLARE-ATUAL.txt

@@ -23,7 +23,7 @@ const ignored = file => {
   try {execFileSync('git',['check-ignore','--no-index','-q',file],{cwd:root});return true;}
   catch (error) {if(error.status===1)return false;throw error;}
 };
-for (const file of ['config.js','.env','.env.production','backups/data.sql','dumps/data.sql','exports/data.csv','random.sql','private.dump','private.backup','pgpass.conf','private.pem','credentials/api.json','credentials.json','export.csv','export.tsv','credentials.txt']) check(ignored(file),`${file} deve ser ignorado`);
+for (const file of ['config.js','dist/index.html','.env','.env.production','backups/data.sql','dumps/data.sql','exports/data.csv','random.sql','private.dump','private.backup','pgpass.conf','private.pem','credentials/api.json','credentials.json','export.csv','export.tsv','credentials.txt']) check(ignored(file),`${file} deve ser ignorado`);
 for (const file of ['.env.example','supabase/migrations/001_schema_rls.sql','supabase/migrations/007_future.sql','scripts/audit-production-readonly.sql']) check(!ignored(file),`${file} deve continuar versionável`);
 check(!execFileSync('git',['ls-files','config.js'],{cwd:root,encoding:'utf8'}).trim(),'Config real não rastreado');
 const sql = fs.readFileSync(path.join(root,'scripts/audit-production-readonly.sql'),'utf8').replace(/--[^\n]*/g,'');
