@@ -15,6 +15,22 @@ const denied=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
     const x=await save('slot',{name:'A',fridge_id:f.id,shelf_id:h.id,product_id:product,capacity_quantity:10});
     const y=await save('slot',{name:'B',fridge_id:f.id,shelf_id:h.id,product_id:product,capacity_quantity:4});
     const z=await save('slot',{name:'Incompatível',fridge_id:f.id,shelf_id:h.id,product_id:id(21)});
+    const migrationDir=path.join(__dirname,'../supabase/migrations');
+    for(const file of fs.readdirSync(migrationDir).filter(f=>/^20261104.*spatial_fridge/.test(f)).sort().slice(filenames.length))
+      await db.exec(fs.readFileSync(path.join(migrationDir,file),'utf8'));
+    const layout={name:'Pendente',fridge_id:f.id,shelf_id:h.id,product_id:product};
+    const update=(slot,capacity)=>query('owner','select public.guigs_save_fridge_layout($1,$2,$3,$4,$5) as data',
+      [shop,'slot',JSON.stringify({...layout,capacity_quantity:capacity}),slot.id,slot.revision]);
+    const oldCapacity=await db.query('select capacity_quantity from public.guigs_fridge_slots where id=$1',[z.id]);
+    eq(oldCapacity.rows[0].capacity_quantity,24);
+    let pending=await save('slot',layout);
+    eq(pending.capacity_quantity,null);
+    for(const invalid of [0,-1,'inválido',1.5])
+      await denied(()=>save('slot',{...layout,capacity_quantity:invalid}),/capacidade inteira positiva/);
+    pending=await update(pending,9);
+    eq(pending.capacity_quantity,9);
+    pending=await update(pending,null);
+    eq(pending.capacity_quantity,null);
     const entry=(s,q)=>({lot_id:lot,slot_id:s,quantity:q});
     const allocate=(entries,key=crypto.randomUUID(),role='owner',s=shop)=>query(role,
       'select public.guigs_allocate_fridge_stock($1,$2,$3) as data',[s,key,JSON.stringify(entries)]);
@@ -23,6 +39,14 @@ const denied=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
     const count=()=>db.query("select count(*)::int as n from public.guigs_movements where movement_type='relocate'").then(r=>r.rows[0].n);
     eq(await balances(),{stock:10,fridge:8});
     await denied(()=>allocate([entry(x.id,1)],undefined,'attendant'),/proprietários/);
+    await denied(()=>allocate([entry(x.id,1),entry(pending.id,1)]),/Defina a capacidade do slot antes de alocar estoque/);
+    await denied(()=>query('attendant','select public.guigs_get_fridge_replenishment($1,$2) as data',[shop,pending.id]),/capacidade do slot/);
+    await denied(()=>query('owner','select public.guigs_get_fridge_operation($1,$2) as data',[shop,JSON.stringify({kind:'adjust',origin:'slot',slot_id:pending.id,lot_id:lot,quantity:1})]),/capacidade do slot/);
+    const scope=await db.query('select count(*)::int as n from guigs_private.spatial_inventory_scope($1) where slot_id=$2',[shop,pending.id]);
+    eq(scope.rows[0].n,0);
+    eq((await map()).slots.find(s=>s.id===pending.id).quantity,0);
+    eq(await balances(),{stock:10,fridge:8});
+    eq(await count(),0);
     await denied(()=>allocate([entry(x.id,1)],undefined,'owner',id(11)),/proprietários/);
     await denied(()=>allocate([entry(id(700),1)]),/indisponível/);
     await denied(()=>allocate([entry(x.id,-1)]),/quantidade positiva/);
@@ -37,6 +61,7 @@ const denied=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
     const partial=[entry(x.id,3),entry(y.id,2)];
     const first=await allocate(partial,rollbackKey);
     eq(first.quantity,5);
+    await denied(()=>update(x,null),/saldo|capacidade/i);
     eq(await allocate(partial,rollbackKey),first);
     eq(await count(),4);
     await denied(()=>allocate([entry(x.id,1)],rollbackKey),/já utilizado/);

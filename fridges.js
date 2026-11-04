@@ -4,7 +4,8 @@ const safeError=e=>typeof e?.message==='string'?e.message:'Não foi possível co
 const percent=ratio=>Math.round(Number(ratio)*10000)/100;
 const imageBucket='guigs-product-images';
 const imageExtensions={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'};
-export function fridgeSlotState({quantity,min_quantity,target_quantity}){
+export function fridgeSlotState({quantity,min_quantity,target_quantity,capacity_quantity}){
+  if(capacity_quantity===null)return 'Capacidade pendente';
   const current=Number(quantity);
   return current===0?'VAZIO':current<Number(min_quantity)?'CRÍTICO':current<Number(target_quantity)?'ATENÇÃO':'OK';
 }
@@ -15,7 +16,7 @@ export function fridgeReplenishmentRows(data,today){
   const dry=new Map();
   for(const lot of data.dry)if(lot.expiry>=today&&lot.product_active&&lot.quantity>0)
     dry.set(lot.product_id,(dry.get(lot.product_id)||0)+Number(lot.quantity));
-  const rows=data.slots.filter(x=>x.active&&x.product_active&&x.product_id&&f.has(x.fridge_id)&&h.has(x.shelf_id))
+  const rows=data.slots.filter(x=>x.active&&x.capacity_quantity!==null&&x.product_active&&x.product_id&&f.has(x.fridge_id)&&h.has(x.shelf_id))
     .map(slot=>({slot,fridge:f.get(slot.fridge_id),shelf:h.get(slot.shelf_id),
       demand:Math.max(0,Math.min(slot.target_quantity,slot.capacity_quantity)-Number(slot.quantity))}))
     .filter(x=>x.demand>0)
@@ -128,9 +129,11 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
         field('width_ratio','Largura relativa (%)',{type:'number',value:percent(item?.width_ratio??1),min:5,max:100,step:.01,required:true});
         const products=(getContext().products||[]).filter(p=>p.active||p.id===item?.product_id);
         field('product_id','Produto associado',{options:[['','Sem associação'],...products.map(p=>[p.id,p.name+(p.active?'':' (inativo)')])],value:item?.product_id});
-        for(const [key,label,value,min] of [['min_quantity','Mínimo',0,0],['target_quantity','Meta',0,0],['capacity_quantity','Capacidade',24,1]]){
-          field(key,label,{type:'number',value:item?.[key]??value,min,max:1000000,step:1,required:true});
+        for(const [key,label] of [['min_quantity','Mínimo'],['target_quantity','Meta']]){
+          field(key,label,{type:'number',value:item?.[key]??0,min:0,max:1000000,step:1,required:true});
         }
+        const capacity=field('capacity_quantity','Capacidade',{type:'number',value:item?.capacity_quantity,min:1,max:1000000,step:1});
+        capacity.placeholder='Capacidade pendente';
       }
     }
   }
@@ -193,11 +196,16 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
           if(image){const img=node('img');img.className='fridge-photo';img.src=image;img.alt='';img.loading='lazy';img.addEventListener('error',()=>img.replaceWith(placeholder()),{once:true});card.append(img);}
           else card.append(placeholder());
           const state=fridgeSlotState(x),badge=node('span',state);badge.className='fridge-state';badge.dataset.state=state;
-          const meter=node('meter');meter.min=0;meter.max=x.capacity_quantity;meter.value=x.quantity;
-          meter.setAttribute('aria-label','Ocupação de '+x.name);meter.textContent=x.quantity+' de '+x.capacity_quantity;
-          card.append(name,node('p',label+(x.product_active===false?' (inativo)':'')),node('p',x.quantity+' / '+x.capacity_quantity+' un.'),
-            meter,badge,node('p','Mínimo '+x.min_quantity+' · Meta '+x.target_quantity));
-          if(x.product_id&&x.product_active){
+          card.append(name,node('p',label+(x.product_active===false?' (inativo)':'')));
+          if(x.capacity_quantity!==null){
+            const meter=node('meter');meter.min=0;meter.max=x.capacity_quantity;meter.value=x.quantity;
+            meter.setAttribute('aria-label','Ocupação de '+x.name);meter.textContent=x.quantity+' de '+x.capacity_quantity;
+            card.append(node('p',x.quantity+' / '+x.capacity_quantity+' un.'),meter,badge,
+              node('p','Mínimo '+x.min_quantity+' · Meta '+x.target_quantity));
+          }else{
+            card.append(badge);
+          }
+          if(x.capacity_quantity!==null&&x.product_id&&x.product_active){
             const replenish=node('button','Repor');replenish.className='btn';replenish.type='button';replenish.dataset.replenish=x.id;
             replenish.setAttribute('aria-label','Repor '+x.name);
             replenish.disabled=busy||!navigator.onLine;
@@ -361,7 +369,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
   }
   function stockOrigins(){
     const product=el('fridgeStockProduct').value, op=stockKind();
-    const slots=data.slots.filter(s=>s.active&&data.fridges.some(f=>f.active&&f.id===s.fridge_id)&&data.shelves.some(h=>h.active&&h.id===s.shelf_id))
+    const slots=data.slots.filter(s=>s.active&&s.capacity_quantity!==null&&data.fridges.some(f=>f.active&&f.id===s.fridge_id)&&data.shelves.some(h=>h.active&&h.id===s.shelf_id))
       .filter(s=>op==='adjust'?(!s.product_id||s.product_id===product):s.lots.some(l=>l.product_id===product&&l.quantity>0));
     const choices=slots.map(s=>[s.id,[data.fridges.find(f=>f.id===s.fridge_id)?.name,data.shelves.find(h=>h.id===s.shelf_id)?.name,s.name].filter(Boolean).join(' / ')]);
     if(op==='adjust'||data.unallocated.some(l=>l.product_id===product&&l.quantity>0))choices.push(['unallocated','Geladeira — não alocado']);
@@ -525,6 +533,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
     if(lot){
       for(const slot of data.slots){
         const f=data.fridges.find(f=>f.id===slot.fridge_id),h=data.shelves.find(h=>h.id===slot.shelf_id);
+        if(slot.capacity_quantity===null)continue;
         const max=Math.min(Number(lot.quantity),slot.capacity_quantity-Number(slot.quantity));
         if(!slot.active||!f?.active||!h?.active||max<1||(slot.product_id&&slot.product_id!==lot.product_id))continue;
         const field=node('div');field.className='field';
@@ -572,7 +581,10 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
     const form=event.currentTarget;
     const values=Object.fromEntries(new FormData(form));
     values.active=form.elements.active.checked;
-    if(type==='slot')values.product_id=values.product_id||null;
+    if(type==='slot'){
+      values.product_id=values.product_id||null;
+      values.capacity_quantity=values.capacity_quantity===''?null:Number(values.capacity_quantity);
+    }
     for(const key of ['width_ratio','height_ratio','x_ratio','y_ratio'])if(key in values)values[key]=Number(values[key])/100;
     if(!String(values.name||'').trim()){msg('Informe um nome.');return;}
     busy=true;sync();msg('Salvando layout…');

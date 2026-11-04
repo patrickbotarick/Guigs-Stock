@@ -11,8 +11,8 @@ const eq=(a,b)=>{assert.deepEqual(a,b);checks++;};
   const get=(role,sql,args)=>asUser(db,role,async tx=>(await tx.query(sql,args)).rows[0].data);
   const save=(kind,v,id=null,rev=null)=>get('owner','select public.guigs_save_fridge_layout($1,$2,$3,$4,$5) as data',[shop,kind,JSON.stringify(v),id,rev]);
   const f=await save('fridge',{name:'Geladeira auditável'}),h=await save('shelf',{name:'Prateleira 1',fridge_id:f.id});
-  const a=await save('slot',{name:'Posição original',fridge_id:f.id,shelf_id:h.id,product_id:product,target_quantity:9});
-  const b=await save('slot',{name:'Posição B',fridge_id:f.id,shelf_id:h.id,product_id:product,sort_order:2});
+  const a=await save('slot',{name:'Posição original',fridge_id:f.id,shelf_id:h.id,product_id:product,target_quantity:9,capacity_quantity:24});
+  const b=await save('slot',{name:'Posição B',fridge_id:f.id,shelf_id:h.id,product_id:product,sort_order:2,capacity_quantity:24});
   const allocation=await get('owner','select public.guigs_allocate_fridge_stock($1,$2,$3) as data',[shop,randomUUID(),JSON.stringify([
     {lot_id:lot,slot_id:a.id,quantity:3},{lot_id:lot,slot_id:b.id,quantity:4}])]);
   const quote=await get('attendant','select public.guigs_get_fridge_replenishment($1,$2,2) as data',[shop,a.id]);
