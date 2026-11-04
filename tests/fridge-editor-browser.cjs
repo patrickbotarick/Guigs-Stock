@@ -12,7 +12,9 @@ async function dispatch({role,table,name,args}){
   const calls={
     guigs_get_fridge_map:['select public.guigs_get_fridge_map($1) as data',[args?.p_shop_id]],
     guigs_save_fridge_layout:['select public.guigs_save_fridge_layout($1,$2,$3,$4,$5) as data',
-      [args?.p_shop_id,args?.p_kind,JSON.stringify(args?.p_values??null),args?.p_id,args?.p_revision]]
+      [args?.p_shop_id,args?.p_kind,JSON.stringify(args?.p_values??null),args?.p_id,args?.p_revision]],
+    guigs_allocate_fridge_stock:['select public.guigs_allocate_fridge_stock($1,$2,$3) as data',
+      [args?.p_shop_id,args?.p_request_id,JSON.stringify(args?.p_entries??null)]]
   };
   return asUser(db,role,async tx=>{
     if(tables[table])return (await tx.query('select * from '+tables[table]+' where shop_id=$1 order by id',[shop])).rows;
@@ -40,7 +42,7 @@ const server=http.createServer(async(req,res)=>{
 function bridge({role,shop}){
   const c=window.__mockClient, original=c.rpc.bind(c), originalFrom=c.from.bind(c);
   const send=data=>fetch('/fixture',{method:'POST',body:JSON.stringify({role,...data})}).then(r=>r.json());
-  c.rpc=(name,args)=>/^(guigs_get_fridge_map|guigs_save_fridge_layout)$/.test(name)?send({name,args}):original(name,args);
+  c.rpc=(name,args)=>/^(guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock)$/.test(name)?send({name,args}):original(name,args);
   c.from=table=>{
     if(table==='guigs_memberships')return {select(){return this},eq(){return this},then(a,b){return Promise.resolve({data:[{shop_id:shop,role,active:true}],error:null}).then(a,b)}};
     if(!['guigs_products','guigs_lots','guigs_suppliers'].includes(table))return originalFrom(table);
@@ -52,6 +54,7 @@ function bridge({role,shop}){
   try{
     db=await createTestDatabase();
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104123035_spatial_fridge_foundation.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104124433_spatial_fridge_allocation.sql'),'utf8'));
     const ledger=()=>db.query('select id,delta,slot_id from public.guigs_movements order by id').then(r=>r.rows);
     const before=await ledger();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -150,7 +153,20 @@ function bridge({role,shop}){
     check(await small.page.locator('.fridge-cabinet').evaluateAll(ns=>ns.every((n,i)=>i===0||n.getBoundingClientRect().top>ns[i-1].getBoundingClientRect().top)),'Geladeiras empilhadas no celular');
     check(await small.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Celular sem rolagem horizontal global');
     await small.context.close();
-    console.log(`Editor e mapa espacial: ${editorChecks+checks} verificações passaram (${editorChecks} editor, ${checks} mapa); navegador e PGlite artificiais.`);
+    const mapChecks=checks;checks=0;
+    const owner=await open('owner',{width:390,height:844});await waitMap(owner.page);
+    const beforeCancel=await ledger();
+    await owner.page.click('#fridgeAllocate');await owner.page.fill('#allocate-'+x,'1');await owner.page.click('#fridgeCancelAllocation');
+    assert.deepEqual(await ledger(),beforeCancel);checks++;
+    await owner.page.click('#fridgeAllocate');await owner.page.fill('#allocate-'+x,'1');
+    check((await owner.page.textContent('#fridgeAllocationSummary')).includes('Restam não alocadas: 0'),'Resumo antes da confirmação');
+    await owner.page.click('#fridgeConfirmAllocation');
+    await owner.page.waitForFunction(()=>document.querySelector('.fridge-unallocated').textContent.includes('0 un. sem posição física'));
+    check((await owner.page.locator('[data-slot-id="'+x+'"]').textContent()).includes('5 / 18 un.'),'Mapa atualizado depois da distribuição');
+    check((await db.query("select sum(delta)::int as n from public.guigs_movements where location='fridge'")).rows[0].n===8,'Saldo global preservado pelo fluxo UI');
+    check(owner.errors.length===0,'Fluxo de distribuição sem erro JavaScript');
+    await owner.context.close();
+    console.log(`Editor, mapa e distribuição: ${editorChecks+mapChecks+checks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${checks} distribuição); navegador e PGlite artificiais.`);
   }finally{
     if(browser)await browser.close();
     if(server.listening)await new Promise(resolve=>server.close(resolve));

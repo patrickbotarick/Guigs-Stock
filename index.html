@@ -1489,6 +1489,7 @@
                 <button id="fridgeOperate" class="btn" type="button" aria-pressed="true">Operação</button>
                 <button id="fridgeEdit" class="btn hidden" type="button" aria-pressed="false">Editar layout</button>
                 <button id="fridgeReload" class="btn" type="button">Atualizar mapa</button>
+                <button id="fridgeAllocate" class="btn hidden" type="button">Distribuir estoque existente</button>
               </div>
               <p id="fridgeOffline" class="notice hidden">Sem conexão. O mapa exibido pode estar desatualizado; edição bloqueada.</p>
               <p id="fridgeMessage" role="status" aria-live="polite"></p>
@@ -1567,6 +1568,22 @@
       </main>
     </div>
 
+    <dialog id="fridgeAllocationDialog" aria-labelledby="fridgeAllocationTitle">
+      <div class="modal">
+        <h2 id="fridgeAllocationTitle">Distribuir estoque existente</h2>
+        <p>Mova unidades de um lote não alocado para as posições onde ele está fisicamente. O total da geladeira permanece igual.</p>
+        <form id="fridgeAllocationForm" class="modalform">
+          <div class="field"><label for="fridgeAllocationLot">Lote não alocado</label><select id="fridgeAllocationLot" required></select></div>
+          <div id="fridgeAllocationDestinations"></div>
+          <p id="fridgeAllocationSummary" aria-live="polite"></p>
+          <p id="fridgeAllocationMessage" role="status"></p>
+          <div class="modalactions">
+            <button id="fridgeCancelAllocation" class="btn" type="button">Cancelar</button>
+            <button id="fridgeConfirmAllocation" class="btn green" type="submit">Confirmar distribuição</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
     <dialog id="inventoryCreateDialog" aria-labelledby="inventoryCreateTitle">
       <div class="modal"><h2 id="inventoryCreateTitle">Novo inventário físico</h2><p>Capturar os lotes e os saldos dos dois locais. Nenhum saldo será alterado.</p>
         <form id="inventoryCreateForm" class="modalform">
