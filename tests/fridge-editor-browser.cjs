@@ -193,7 +193,8 @@ function bridge({role,shop}){
     for(const selector of ['#fridgeEdit','#fridgeAllocate','#fridgeOperateStock','[data-replenish="'+x+'"]'])
       offline(await owner.page.isDisabled(selector),'Operação bloqueada offline: '+selector);
     await owner.context.setOffline(false);
-    await owner.page.waitForFunction(()=>!document.querySelector('#fridgeOperateStock').disabled);
+    await owner.page.waitForFunction(()=>document.querySelector('#status').textContent.includes('sincronizado')
+      &&!document.querySelector('#fridgeOperateStock').disabled&&!document.querySelector('#fridgeEdit').disabled);
     offline(await owner.page.isEnabled('#fridgeEdit'),'Reconexão restaura ações');
     await owner.context.close();
     const allocationChecks=checks;checks=0;

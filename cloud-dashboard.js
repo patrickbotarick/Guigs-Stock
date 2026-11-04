@@ -2743,7 +2743,8 @@ function applyView() {
 const inventoryUI = createInventoryUI({getContext:()=>({client,shop}),enhanceSelect:enhanceSearchableSelect,
   confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[]),refreshStock:refresh});
 const reportsUI = createReportsUI({getContext:()=>({client,shop}),dayDifference,replenishmentFor});
-const fridgesUI = createFridgesUI({getContext:()=>({client,shop,products,lots}),refreshStock:refresh});
+const fridgesUI = createFridgesUI({getContext:()=>({client,shop,products,lots}),refreshStock:refresh,
+  confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[])});
 window.addEventListener('hashchange', applyView);
 applyView();
 

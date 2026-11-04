@@ -19,28 +19,36 @@ async function legacyBrowser(user){
     res.end(assets.get(f));
   });
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
-  let browser;
+  let browser,stage='abrir navegador';
   try{
     browser=await chromium.launch({headless:true,executablePath:'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'});
     const context=await browser.newContext({serviceWorkers:'block'});
     const allowed=new Set(['127.0.0.1',new URL(URL_BASE).hostname,'esm.sh']);
     await context.route('**/*',route=>allowed.has(new URL(route.request().url()).hostname)?route.continue():route.abort());
     const page=await context.newPage(); page.setDefaultTimeout(25000);
+    stage='abrir tela de acesso';
     await page.goto('http://127.0.0.1:'+server.address().port+'/auth-preview.html');
+    stage='autenticar e sincronizar painel';
     await page.fill('#email',user.email); await page.fill('#password',user.password); await page.click('#enter');
     await page.waitForSelector('#content:not(.hidden)');
     await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('sincronizado'));
     check((await page.locator('#products tr').count())>0,'Frontend original v1.6 autentica e sincroniza produtos/saldos');
+    stage='carregar histórico';
     await page.click('#navHistory');
     await page.waitForSelector('#historyView:not(.hidden) #history tr');
     check((await page.locator('#history tr').count())>0,'Histórico v1.6 após migration espacial');
+    stage='carregar inventário';
     await page.click('#navInventory');
     await page.waitForFunction(()=>document.querySelector('#inventoryList').textContent.trim().length>0);
     check(!(await page.textContent('#inventoryMessage')).trim(),'Inventário v1.6 lista sem erro');
+    stage='carregar relatórios';
     await page.click('#navReports');
     await page.waitForFunction(()=>document.querySelector('#reportsMessage').textContent.includes('Período aplicado'));
     check((await page.locator('#reportsSummary').textContent()).trim().length>0,'Relatórios v1.6 carregam após migration espacial');
     await context.close();
+  }catch(error){
+    console.error('Falha v1.6 ao '+stage+(error.name==='TimeoutError'?' (tempo limite).':'.'));
+    throw error;
   }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 }
 async function run(){
@@ -73,4 +81,7 @@ async function run(){
   check(!!(await client().rpc('guigs_get_fridge_map',p(ids.shopA))).error,'Anônimo não executa mapa');
   await legacyBrowser(state.users.ownerA);
 }
-run().catch(()=>{console.error('Gate 2: falha no último check de homologação; respostas e credenciais omitidas.');process.exitCode=1;});
+module.exports={legacyBrowser};
+if(require.main===module){
+  run().catch(()=>{console.error('Falha no check de compatibilidade; respostas e credenciais omitidas.');process.exitCode=1;});
+}

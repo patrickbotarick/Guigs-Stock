@@ -1526,6 +1526,19 @@
                 <fieldset id="fridgeLayoutFields"></fieldset>
                 <button id="fridgeSaveLayout" class="btn green" type="submit">Salvar layout</button>
               </form>
+              <section aria-labelledby="fridgeImageTitle">
+                <h3 id="fridgeImageTitle">Foto de produto</h3>
+                <p>PNG, JPEG ou WebP de até 2 MiB. A foto fica disponível para membros da loja. Remover desvincula a foto do mapa.</p>
+                <form id="fridgeImageForm" class="modalform">
+                  <div class="field"><label for="fridgeImageProduct">Produto em uma posição</label><select id="fridgeImageProduct" required></select></div>
+                  <div class="field"><label for="fridgeImageFile">Arquivo de imagem</label><input id="fridgeImageFile" type="file" accept="image/png,image/jpeg,image/webp" required></div>
+                  <div class="inventory-actions">
+                    <button id="fridgeImageUpload" class="btn" type="submit">Salvar foto</button>
+                    <button id="fridgeImageRemove" class="btn" type="button">Remover foto do mapa</button>
+                  </div>
+                  <p id="fridgeImageMessage" role="status" aria-live="polite"></p>
+                </form>
+              </section>
             </section>
           </section>
           <section id="inventoryView" class="hidden" aria-label="Inventário físico">

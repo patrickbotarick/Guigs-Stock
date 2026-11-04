@@ -2,6 +2,8 @@ const nouns={fridge:'Geladeira',shelf:'Prateleira',slot:'Posição'};
 const collections={fridge:'fridges',shelf:'shelves',slot:'slots'};
 const safeError=e=>typeof e?.message==='string'?e.message:'Não foi possível concluir a solicitação.';
 const percent=ratio=>Math.round(Number(ratio)*10000)/100;
+const imageBucket='guigs-product-images';
+const imageExtensions={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'};
 export function fridgeSlotState({quantity,min_quantity,target_quantity}){
   const current=Number(quantity);
   return current===0?'VAZIO':current<Number(min_quantity)?'CRÍTICO':current<Number(target_quantity)?'ATENÇÃO':'OK';
@@ -32,7 +34,7 @@ export function fridgeReplenishmentRows(data,today){
   return rows;
 }
 
-export function createFridgesUI({getContext,refreshStock}){
+export function createFridgesUI({getContext,refreshStock,confirmAction}){
   const el=id=>document.getElementById(id);
   const node=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
   const owner=()=>getContext().shop?.role==='owner';
@@ -66,6 +68,10 @@ export function createFridgesUI({getContext,refreshStock}){
     el('fridgeSaveLayout').disabled=locked||!editing||!data;
     el('fridgeEditKind').disabled=locked;
     el('fridgeEditItem').disabled=locked;
+    el('fridgeImageProduct').disabled=locked;
+    el('fridgeImageFile').disabled=locked;
+    el('fridgeImageUpload').disabled=locked||!editing||!owner()||!imageProduct();
+    el('fridgeImageRemove').disabled=locked||!editing||!owner()||!imageProduct()?.image_path;
     const allocating=el('fridgeAllocationDialog').open;
     if(allocating){
       el('fridgeAllocationLot').disabled=locked;
@@ -138,6 +144,15 @@ export function createFridgesUI({getContext,refreshStock}){
     el('fridgeEditItem').replaceChildren(option('','Criar: '+nouns[type]),...items.map(item=>option(item.id,label(item))));
     el('fridgeEditItem').value=items.some(i=>i.id===id)?id:'';
     renderForm();
+    renderImageProducts();
+  }
+  function imageProduct(){return data?.slots.find(x=>x.product_id===el('fridgeImageProduct').value);}
+  function renderImageProducts(){
+    const select=el('fridgeImageProduct'),previous=select.value;
+    const choices=new Map();
+    for(const row of data?.slots||[])if(row.product_id&&row.product_name)choices.set(row.product_id,row.product_name);
+    select.replaceChildren(...[...choices].map(([id,name])=>option(id,name)));
+    if(choices.has(previous))select.value=previous;
   }
   function renderMap(){
     const map=el('fridgeMap');map.replaceChildren();
@@ -214,7 +229,7 @@ export function createFridgesUI({getContext,refreshStock}){
     const paths=[...new Set(next.slots.flatMap(x=>[x.image_path,...x.lots.map(l=>l.image_path)]).filter(Boolean))];
     if(!paths.length||!client.storage||!client.supabaseUrl)return;
     try{
-      const {data:signed}=await client.storage.from('guigs-product-images').createSignedUrls(paths,300);
+      const {data:signed}=await client.storage.from(imageBucket).createSignedUrls(paths,300);
       if(stamp!==generation||next!==data)return;
       const origin=new URL(client.supabaseUrl).origin;
       for(const entry of signed||[]){
@@ -280,6 +295,43 @@ export function createFridgesUI({getContext,refreshStock}){
     }
   }
   const allocationMessage=text=>{el('fridgeAllocationMessage').textContent=text;};
+  async function setImage(file){
+    if(busy||!editing||!owner()||!navigator.onLine)return;
+    const target=imageProduct(),{client,shop}=getContext(),stamp=generation;
+    const status=text=>{el('fridgeImageMessage').textContent=text;};
+    if(!target||!client||!shop)return;
+    const extension=file&&imageExtensions[file.type];
+    if(file&&(!extension||file.size<1||file.size>2*1024*1024)){
+      status('Escolha PNG, JPEG ou WebP de até 2 MiB.');return;
+    }
+    if(file&&!client.storage){status('Storage indisponível neste ambiente.');return;}
+    busy=true;sync();let saved=false;
+    try{
+      const imagePath=file?shop.shop_id+'/'+target.product_id+'/'+crypto.randomUUID()+'.'+extension:null;
+      if(file){
+        status('Enviando foto…');
+        const uploaded=await client.storage.from(imageBucket).upload(imagePath,file,{contentType:file.type,upsert:false});
+        if(uploaded.error)throw uploaded.error;
+      }
+      if(stamp!==generation)return;
+      if(!navigator.onLine)throw Error('Conexão indisponível. Atualize o mapa antes de tentar novamente.');
+      const r=await client.rpc('guigs_set_product_image',{p_shop_id:shop.shop_id,p_product_id:target.product_id,
+        p_path:imagePath,p_expected_path:target.image_path??null});
+      if(r.error)throw r.error;
+      if(stamp!==generation)return;
+      saved=true;el('fridgeImageFile').value='';status(file?'Foto salva.':'Foto desvinculada do mapa.');
+    }catch(error){if(stamp===generation)status(safeError(error));}
+    finally{if(stamp===generation){busy=false;sync();}}
+    if(saved&&stamp===generation)await load({announce:false});
+  }
+  el('fridgeImageProduct').addEventListener('change',()=>{el('fridgeImageMessage').textContent='';sync();});
+  el('fridgeImageForm').addEventListener('submit',event=>{
+    event.preventDefault();const file=el('fridgeImageFile').files[0];if(file)void setImage(file);
+  });
+  el('fridgeImageRemove').addEventListener('click',async()=>{
+    if(!owner()||busy||!navigator.onLine||!imageProduct()?.image_path)return;
+    if(confirmAction&&await confirmAction('Remover foto do mapa','A foto será desvinculada. Nenhum saldo será alterado.'))await setImage(null);
+  });
   const stockMessage=text=>{el('fridgeStockMessage').textContent=text;};
   const stockKind=()=>el('fridgeStockKind').value;
   const stockSource=()=>el('fridgeStockOrigin').value;
@@ -539,12 +591,11 @@ export function createFridgesUI({getContext,refreshStock}){
   el('fridgeEditKind').addEventListener('change',()=>renderEditor());
   el('fridgeEditItem').addEventListener('change',renderForm);
   el('fridgeEdit').addEventListener('click',()=>{if(owner()&&navigator.onLine&&data&&!busy){editing=true;restocking=false;renderEditor();sync();}});
-  el('fridgeOperate').addEventListener('click',()=>{editing=false;restocking=false;sync();});
+  el('fridgeOperate').addEventListener('click',()=>{editing=false;restocking=false;renderMap();sync();});
   el('fridgeRestockMode').addEventListener('click',()=>{editing=false;restocking=true;renderRestock();sync();});
   el('fridgeRestockFilter').addEventListener('change',()=>{renderRestock();sync();});
   el('fridgeReload').addEventListener('click',()=>void load());
   window.addEventListener('offline',sync);
-  window.addEventListener('online',()=>{sync();if(view())void load();});
   return {
     activate(){sync();if(view()&&getContext().shop&&navigator.onLine)void load();},
     reset(){generation++;data=null;photoUrls=new Map();allocationRetry=null;replenishRetry=null;replenishQuote=null;replenishSlot=null;stockQuote=null;stockRetry=null;editing=false;restocking=false;busy=false;pendingRefresh=false;el('fridgeStockDialog').close();el('fridgeReplenishDialog').close();el('fridgeAllocationDialog').close();el('fridgeLayoutFields').replaceChildren();renderMap();renderRestock();msg('');sync();}
