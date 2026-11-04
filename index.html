@@ -1491,6 +1491,7 @@
                 <button id="fridgeEdit" class="btn hidden" type="button" aria-pressed="false">Editar layout</button>
                 <button id="fridgeReload" class="btn" type="button">Atualizar mapa</button>
                 <button id="fridgeAllocate" class="btn hidden" type="button">Distribuir estoque existente</button>
+                <button id="fridgeOperateStock" class="btn" type="button">Venda, perda, ajuste ou retorno</button>
               </div>
               <p id="fridgeOffline" class="notice hidden">Sem conexão. O mapa exibido pode estar desatualizado; edição bloqueada.</p>
               <p id="fridgeMessage" role="status" aria-live="polite"></p>
@@ -1569,6 +1570,29 @@
       </main>
     </div>
 
+    <dialog id="fridgeStockDialog" aria-labelledby="fridgeStockTitle">
+      <div class="modal">
+        <h2 id="fridgeStockTitle">Movimentar saldo da geladeira</h2>
+        <form id="fridgeStockForm" class="modalform">
+          <fieldset id="fridgeStockFields" style="border:0;padding:0;margin:0;min-inline-size:0">
+            <div class="field"><label for="fridgeStockKind">Operação</label><select id="fridgeStockKind"></select></div>
+            <div class="field"><label for="fridgeStockProduct">Produto</label><select id="fridgeStockProduct" required></select></div>
+            <div class="field"><label for="fridgeStockOrigin">Origem</label><select id="fridgeStockOrigin" required></select></div>
+            <div id="fridgeStockLotField" class="field"><label for="fridgeStockLot">Lote</label><select id="fridgeStockLot"></select></div>
+            <div class="field"><label id="fridgeStockQuantityLabel" for="fridgeStockQuantity">Quantidade</label><input id="fridgeStockQuantity" type="number" min="1" max="1000000" step="1" required></div>
+            <div class="field"><label for="fridgeStockNote">Motivo / observação</label><textarea id="fridgeStockNote" maxlength="1000"></textarea></div>
+          </fieldset>
+          <p id="fridgeStockRule"></p>
+          <button id="fridgeStockQuote" class="btn" type="button">Conferir impacto</button>
+          <ol id="fridgeStockPlan" aria-label="Origens e deltas previstos"></ol>
+          <p id="fridgeStockMessage" role="status" aria-live="polite"></p>
+          <div class="modalactions">
+            <button id="fridgeStockCancel" class="btn" type="button">Cancelar</button>
+            <button id="fridgeStockConfirm" class="btn green" type="submit">Confirmar movimentação</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
     <dialog id="fridgeReplenishDialog" aria-labelledby="fridgeReplenishTitle">
       <div class="modal">
         <h2 id="fridgeReplenishTitle">Repor posição</h2>

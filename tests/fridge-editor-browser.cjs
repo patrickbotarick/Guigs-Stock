@@ -18,7 +18,10 @@ async function dispatch({role,table,name,args}){
     guigs_get_fridge_replenishment:['select public.guigs_get_fridge_replenishment($1,$2,$3) as data',
       [args?.p_shop_id,args?.p_slot_id,args?.p_quantity]],
     guigs_replenish_fridge_slot:['select public.guigs_replenish_fridge_slot($1,$2,$3,$4,$5) as data',
-      [args?.p_shop_id,args?.p_request_id,args?.p_slot_id,args?.p_quantity,JSON.stringify(args?.p_plan??null)]]
+      [args?.p_shop_id,args?.p_request_id,args?.p_slot_id,args?.p_quantity,JSON.stringify(args?.p_plan??null)]],
+    guigs_get_fridge_operation:['select public.guigs_get_fridge_operation($1,$2) as data',[args?.p_shop_id,JSON.stringify(args?.p_spec)]],
+    guigs_apply_fridge_operation:['select public.guigs_apply_fridge_operation($1,$2,$3,$4,$5) as data',
+      [args?.p_shop_id,args?.p_request_id,JSON.stringify(args?.p_spec),JSON.stringify(args?.p_expected),args?.p_note]]
   };
   return asUser(db,role,async tx=>{
     if(tables[table])return (await tx.query('select * from '+tables[table]+' where shop_id=$1 order by id',[shop])).rows;
@@ -46,7 +49,7 @@ const server=http.createServer(async(req,res)=>{
 function bridge({role,shop}){
   const c=window.__mockClient, original=c.rpc.bind(c), originalFrom=c.from.bind(c);
   const send=data=>fetch('/fixture',{method:'POST',body:JSON.stringify({role,...data})}).then(r=>r.json());
-  c.rpc=(name,args)=>/^(guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot)$/.test(name)?send({name,args}):original(name,args);
+  c.rpc=(name,args)=>/^(guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation)$/.test(name)?send({name,args}):original(name,args);
   c.from=table=>{
     if(table==='guigs_memberships')return {select(){return this},eq(){return this},then(a,b){return Promise.resolve({data:[{shop_id:shop,role,active:true}],error:null}).then(a,b)}};
     if(!['guigs_products','guigs_lots','guigs_suppliers'].includes(table))return originalFrom(table);
@@ -60,6 +63,7 @@ function bridge({role,shop}){
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104123035_spatial_fridge_foundation.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104124433_spatial_fridge_allocation.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104124855_spatial_fridge_replenishment.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104125329_spatial_fridge_operations.sql'),'utf8'));
     const ledger=()=>db.query('select id,delta,slot_id from public.guigs_movements order by id').then(r=>r.rows);
     const before=await ledger();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -198,8 +202,20 @@ function bridge({role,shop}){
     check(keys.length===2&&keys[0]===keys[1],'Retry após resposta perdida preserva a chave');
     check((await db.query("select count(*)::int as n from public.guigs_movements where movement_type='transfer' and spatial")).rows[0].n===2,'Retry não duplica o débito/crédito');
     check(worker.errors.length===0,'Reposição sem erro JavaScript');
+    const replenishChecks=checks;checks=0;
+    await worker.page.click('#fridgeOperateStock');
+    check(await worker.page.locator('#fridgeStockKind option[value="adjust"]').count()===0,'Atendente não vê ajuste');
+    check(await worker.page.inputValue('#fridgeStockOrigin')==='auto','Origem automática FEFO por padrão');
+    await worker.page.fill('#fridgeStockQuantity','4');await worker.page.click('#fridgeStockQuote');
+    await worker.page.waitForFunction(()=>!document.querySelector('#fridgeStockConfirm').disabled);
+    check(await worker.page.locator('#fridgeStockPlan li').count()===3,'Venda apresenta split antes de confirmar');
+    await worker.page.click('#fridgeStockConfirm');
+    await worker.page.waitForFunction(slot=>document.querySelector('[data-slot-id="'+slot+'"]').textContent.includes('7 / 18 un.'),x);
+    check((await db.query("select count(distinct event_id)::int as events,count(*)::int as lines from public.guigs_movements where movement_type='sale' and spatial")).rows[0].lines===3,'Venda split gravada no ledger');
+    check((await db.query("select count(distinct event_id)::int as n from public.guigs_movements where movement_type='sale' and spatial")).rows[0].n===1,'Split tem um único evento');
+    check(worker.errors.length===0,'Saída sem erro JavaScript');
     await worker.context.close();
-    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+checks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${checks} reposição); navegador e PGlite artificiais.`);
+    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+replenishChecks+checks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${replenishChecks} reposição, ${checks} saída); navegador e PGlite artificiais.`);
   }finally{
     if(browser)await browser.close();
     if(server.listening)await new Promise(resolve=>server.close(resolve));
