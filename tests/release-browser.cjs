@@ -4,8 +4,8 @@ const {execFileSync}=require('node:child_process');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const {build,files}=require('../scripts/build.cjs');const {fixture}=require('./browser.cjs');
 const {createTestDatabase,asUser,callRPC,id}=require('./inventory-support.cjs');const {report}=require('./reports-support.cjs');
-let checks=0,db,queue=Promise.resolve(),workerVersion=10;const check=(v,m)=>{assert.ok(v,m);checks++;};
-const legacyWorker=execFileSync('git',['show','a0079a192597252a283a0e70f4f945db27275793:service-worker.js'],{cwd:path.resolve(__dirname,'..')});
+let checks=0,db,queue=Promise.resolve(),workerVersion=11, redirectAsset=false;const check=(v,m)=>{assert.ok(v,m);checks++;};
+const legacyWorker=execFileSync('git',['show','5d667eb0b3687869c316fcfb7ca539243a078bb0:service-worker.js'],{cwd:path.resolve(__dirname,'..')});
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'guigs-release-browser-'));
 for(const file of files){const out=path.join(temp,file);fs.mkdirSync(path.dirname(out),{recursive:true});fs.copyFileSync(path.join(__dirname,'..',file),out);}
 const artifact=build({sourceRoot:temp,env:{GUIGS_SUPABASE_URL:'https://test.supabase.co',GUIGS_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_TEST_ONLY'}});
@@ -23,7 +23,12 @@ async function dispatch(request){
  throw Error('RPC de teste não permitida');
 }
 const server=http.createServer(async(req,res)=>{
- const file=new URL(req.url,'http://localhost').pathname.slice(1)||'index.html';
+ const url=new URL(req.url,'http://localhost');
+ const canonical={'/index.html':'/','/auth-preview.html':'/auth-preview','/reset-password.html':'/reset-password'};
+ if(canonical[url.pathname]){res.writeHead(308,{Location:canonical[url.pathname]+url.search});return res.end();}
+ if(redirectAsset&&url.pathname==='/fridges.js'){res.writeHead(302,{Location:'/redirected.js'});return res.end();}
+ if(url.pathname==='/redirected.js'){res.setHeader('Content-Type','text/javascript');return res.end('/* resposta redirecionada */');}
+ const file=({'/auth-preview':'auth-preview.html','/reset-password':'reset-password.html'})[url.pathname]||url.pathname.slice(1)||'index.html';
  if(file==='test-api'&&req.method==='POST'){
   let body='';for await(const chunk of req)body+=chunk;const request=JSON.parse(body);
   const run=queue.then(()=>dispatch(request));queue=run.catch(()=>{});
@@ -35,7 +40,7 @@ const server=http.createServer(async(req,res)=>{
  if(!artifact.files.includes(file)){res.statusCode=404;return res.end();}
  res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.html')?'text/html':file.endsWith('.png')?'image/png':'application/json');
  let content=fs.readFileSync(path.join(artifact.directory,file));if(file.endsWith('.js'))content=content.toString().replace('https://esm.sh/@supabase/supabase-js@2','./fake.js');
- if(file==='service-worker.js'){res.setHeader('Cache-Control','no-store');if(workerVersion===10)content=legacyWorker;}
+ if(file==='service-worker.js'){res.setHeader('Cache-Control','no-store');if(workerVersion===11)content=legacyWorker;}
  res.end(content);
 });
 function bridge(shopId){
@@ -85,10 +90,14 @@ function bridge(shopId){
     await page.click('#navOverview');await page.click('#refresh');await page.waitForFunction(()=>!document.getElementById('refresh').disabled);
     check((await db.query("select sum(delta)::int as n from public.guigs_movements where lot_id=$1 and location='stock'",[id(30)])).rows[0].n===8,'Saldo permanece reconciliado após navegar/atualizar');
     await page.evaluate(()=>navigator.serviceWorker.ready);await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
-    check(await page.evaluate(async()=>(await caches.keys()).includes('guigs-stock-shell-v10')),'Cache anterior artificial instalado');
+    check(await page.evaluate(async()=>(await caches.keys()).includes('guigs-stock-shell-v11')),'Cache anterior artificial instalado');
+    check(await page.evaluate(async()=>{
+      const cache=await caches.open('guigs-stock-shell-v11');
+      return (await cache.match('/auth-preview.html')).redirected;
+    }),'v11 reproduz o 200 redirecionado do Pages no cache');
     await page.evaluate(()=>caches.open('outro-cache-fixture'));
     await page.waitForLoadState('networkidle');
-    workerVersion=11;await page.evaluate(async()=>{
+    workerVersion=12;await page.evaluate(async()=>{
      const registration=await navigator.serviceWorker.getRegistration(),previous=registration.active;
      await registration.update();
      const next=registration.installing||registration.waiting||(registration.active!==previous?registration.active:null);
@@ -104,18 +113,45 @@ function bridge(shopId){
     });
     await page.waitForFunction(async()=>{
      const keys=await caches.keys(),registration=await navigator.serviceWorker.getRegistration();
-     return registration?.active?.state==='activated'&&keys.includes('guigs-stock-shell-v11')&&!keys.includes('guigs-stock-shell-v10');
+     return registration?.active?.state==='activated'&&keys.includes('guigs-stock-shell-v12')&&!keys.includes('guigs-stock-shell-v11');
     });
-    check(true,'Atualização remove v10 e ativa v11');
+    check(true,'Atualização remove v11 e ativa v12');
     check(await page.evaluate(async()=>(await caches.keys()).includes('outro-cache-fixture')),'Cache alheio preservado');
     for(const file of ['inventory.js','reports.js','fridges.js','config.js','pwa.js','icons/guigs-stock-192.png'])check(await page.evaluate(async name=>{
-     const cache=await caches.open('guigs-stock-shell-v11');return !!await cache.match(new URL('./'+name,location.href).href);
+     const cache=await caches.open('guigs-stock-shell-v12');return !!await cache.match(new URL('./'+name,location.href).href);
     },file),'Shell contém '+file);
     check(await page.evaluate(async()=>{
       await fetch('/auth-preview.html?audit=fixture-only');
-      const cache=await caches.open('guigs-stock-shell-v11');
+      const cache=await caches.open('guigs-stock-shell-v12');
       return !(await cache.keys()).some(request=>new URL(request.url).search);
     }),'URL com query de Auth não é armazenada');
+    redirectAsset=true;
+    check(await page.evaluate(async()=> (await fetch('/fridges.js')).redirected),'Redirect online continua navegável');
+    redirectAsset=false;
+    check(await page.evaluate(async()=>{
+      const cache=await caches.open('guigs-stock-shell-v12');
+      const responses=await Promise.all((await cache.keys()).map(key=>cache.match(key)));
+      return responses.every(r=>r.ok&&!r.redirected)&&!(await cache.match('/redirected.js'));
+    }),'Shell só contém respostas OK sem redirecionamento');
+    const login=await context.newPage();
+    await login.goto(base+'/auth-preview.html');
+    check(new URL(login.url()).pathname==='/auth-preview','Rota canônica online');
+    await context.setOffline(true);
+    await login.reload({waitUntil:'domcontentloaded'});
+    await login.waitForFunction(()=>document.querySelector('#enter').disabled);
+    check(await login.isVisible('#message'),'Reload offline da tela de acesso');
+    await login.goto(base+'/index.html',{waitUntil:'domcontentloaded'});
+    await login.waitForFunction(()=>document.querySelector('#status').textContent.includes('sem conexão'));
+    check(await login.isVisible('#status'),'Index abre offline pela URL .html com aviso');
+    check(await login.evaluate(async()=>{
+      const asset=await fetch('/fridges.js');
+      const api=await fetch('/rest/v1/guigs_products').then(()=>false,()=>true);
+      return asset.ok&&!asset.redirected&&api;
+    }),'Asset offline funciona e API não recebe fallback HTML');
+    await context.setOffline(false);
+    await login.waitForFunction(()=>document.querySelector('#status').textContent.includes('sincronizado'));
+    check(true,'Painel que abriu offline autentica e sincroniza na reconexão');
+    await login.close();
    }
    check(errors.length===0,'Sem erros JS: '+errors);check(external.length===0,'Sem conexão externa');
    await context.close();await queue;await db.close();db=null;

@@ -1,4 +1,3 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { createInventoryUI } from './inventory.js';
 import { createFridgesUI } from './fridges.js';
 import { createReportsUI } from './reports.js';
@@ -593,6 +592,10 @@ async function allRows(table, columns) {
 // ============================================================
 
 async function bootstrap() {
+  if (!navigator.onLine) {
+    setOfflineDashboardState();
+    return;
+  }
 
   if (
     !/^https:\/\/[a-z0-9-]+\.supabase\.co$/i
@@ -613,6 +616,8 @@ async function bootstrap() {
   }
 
 
+  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+  if (client) return;
   client = createClient(
     cfg.url,
     cfg.publishableKey,
@@ -3302,7 +3307,11 @@ window.addEventListener(
 
     try {
 
-      await refresh();
+      if (!client) {
+        await bootstrap();
+      } else {
+        await refresh();
+      }
 
     }
     catch (error) {

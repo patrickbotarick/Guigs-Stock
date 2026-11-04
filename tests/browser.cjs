@@ -150,6 +150,7 @@ if (require.main === module) (async () => {
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', message => {if (message.type()==='error') errors.push(message.text());});
     await page.goto(`${base}/auth-preview.html`);
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller);
     await page.fill('#email','owner@test.invalid'); await page.fill('#password','test-only');
     await page.click('#enter');
     await page.waitForURL('**/index.html');
@@ -263,9 +264,8 @@ if (require.main === module) (async () => {
     check(await page.isVisible('#cancelFefo') && await page.isVisible('#continueFefo'), 'Ações FEFO acessíveis mobile');
     if (artifacts) await page.screenshot({path:path.join(artifacts,'fefo-mobile.png')});
     await page.click('#cancelFefo'); await page.click('[data-close="transferDialog"]');
-    await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v11')), 'Novo cache PWA instalado');
+    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v12')), 'Novo cache PWA instalado');
     await context.setOffline(true);
     await page.waitForFunction(() => document.getElementById('receiveStock').disabled);
     check((await page.textContent('#status')).includes('sem conexão'), 'Offline informa indisponibilidade e desabilita operações');

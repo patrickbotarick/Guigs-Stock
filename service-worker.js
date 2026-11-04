@@ -1,4 +1,4 @@
-const CACHE_NAME = "guigs-stock-shell-v11";
+const CACHE_NAME = "guigs-stock-shell-v12";
 const CACHE_PREFIX = "guigs-stock-shell-v";
 
 const APP_SHELL = [
@@ -24,15 +24,40 @@ const shell = new Map(APP_SHELL.map(entry => {
   const url = new URL(entry, self.registration.scope);
   return [url.pathname, url.href];
 }));
-for (const alias of ["index", "auth-preview", "reset-password"]) {
-  const path = new URL(alias, self.registration.scope);
-  shell.set(path.pathname, new URL(alias + ".html", self.registration.scope).href);
+const canonicalPages = new Map([
+  ["index.html", "./"],
+  ["auth-preview.html", "auth-preview"],
+  ["reset-password.html", "reset-password"],
+].map(([file, route]) => [
+  new URL(file, self.registration.scope).href,
+  new URL(route, self.registration.scope),
+]));
+for (const [asset, route] of canonicalPages) {
+  if (!shell.has(route.pathname)) shell.set(route.pathname, asset);
+}
+
+shell.set(new URL("index", self.registration.scope).pathname, new URL("index.html", self.registration.scope).href);
+
+function isShellResponse(response) {
+  return response?.ok && !response.redirected;
+}
+
+async function fetchShellAsset(asset) {
+  let response = await fetch(asset, { cache: "reload", redirect: "manual" });
+  const canonical = canonicalPages.get(asset);
+  // Pages redireciona os arquivos HTML para suas rotas públicas.
+  if (response.type === "opaqueredirect" && canonical) {
+    response = await fetch(canonical, { cache: "reload", redirect: "error" });
+  }
+  if (!isShellResponse(response)) throw new Error("Resposta inválida para o app shell");
+  return response;
 }
 
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    await cache.addAll(APP_SHELL);
+    const assets = new Set(shell.values());
+    await Promise.all([...assets].map(async (asset) => cache.put(asset, await fetchShellAsset(asset))));
     await self.skipWaiting();
   })());
 });
@@ -69,12 +94,13 @@ self.addEventListener("fetch", (event) => {
     const cache = await caches.open(CACHE_NAME);
     try {
       const response = await fetch(request);
-      if (response.ok && !url.search) {
+      if (isShellResponse(response) && !url.search) {
         try { await cache.put(asset, response.clone()); } catch { /* falha de cache não derruba rede */ }
       }
       return response;
     } catch {
-      return await cache.match(asset) || Response.error();
+      const cached = await cache.match(asset);
+      return isShellResponse(cached) ? cached : Response.error();
     }
   })());
 });
