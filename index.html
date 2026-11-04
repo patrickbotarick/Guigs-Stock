@@ -1515,7 +1515,7 @@
             <div id="inventoryMessage" class="notice hidden" role="status" aria-live="polite"></div>
             <div class="panel">
               <div class="panelhead"><div><h2>Inventários físicos</h2><p class="muted">Contar não altera estoque. Somente o proprietário pode fechar e aplicar divergências após revisão.</p></div>
-                <div class="inventory-actions"><button type="button" id="newInventory" class="btn green hidden" data-inventory-write>Novo inventário</button><button type="button" id="inventoryReload" class="btn">Atualizar inventários</button></div>
+                <div class="inventory-actions"><button type="button" id="newSpatialInventory" class="btn green hidden" data-inventory-write>Inventário por posição</button><button type="button" id="newInventory" class="btn hidden" data-inventory-write>Novo inventário sem posições</button><button type="button" id="inventoryReload" class="btn">Atualizar inventários</button></div>
               </div>
               <p id="inventoryOpenSummary"></p><p id="inventoryLastCompleted" class="muted"></p>
               <h3>Histórico de inventários</h3><div id="inventoryList"></div>
@@ -1538,6 +1538,7 @@
                 <div class="field"><label for="inventoryItemSelect">Pesquisar produto / lote</label><select id="inventoryItemSelect"><option value="">Todos os produtos / lotes</option></select></div>
                 <div class="field"><label for="inventoryLocation">Localização</label><select id="inventoryLocation"><option value="">Ambas</option><option value="stock">Estoque seco</option><option value="fridge">Geladeira</option></select></div>
                 <div class="field"><label for="inventoryFilter">Conferência</label><select id="inventoryFilter"><option value="all">Todos</option><option value="divergent">Divergentes</option><option value="pending">Não contados</option><option value="counted">Conferidos</option></select></div>
+                <div id="inventoryPositionField" class="field hidden"><label for="inventoryPosition">Posição física</label><select id="inventoryPosition"></select></div>
                 <button type="button" id="inventoryNextItem" class="btn">Próxima contagem pendente</button>
               </div>
               <div id="inventoryItems" class="inventory-items"></div>

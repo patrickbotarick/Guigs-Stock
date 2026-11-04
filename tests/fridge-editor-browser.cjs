@@ -21,7 +21,12 @@ async function dispatch({role,table,name,args}){
       [args?.p_shop_id,args?.p_request_id,args?.p_slot_id,args?.p_quantity,JSON.stringify(args?.p_plan??null)]],
     guigs_get_fridge_operation:['select public.guigs_get_fridge_operation($1,$2) as data',[args?.p_shop_id,JSON.stringify(args?.p_spec)]],
     guigs_apply_fridge_operation:['select public.guigs_apply_fridge_operation($1,$2,$3,$4,$5) as data',
-      [args?.p_shop_id,args?.p_request_id,JSON.stringify(args?.p_spec),JSON.stringify(args?.p_expected),args?.p_note]]
+      [args?.p_shop_id,args?.p_request_id,JSON.stringify(args?.p_spec),JSON.stringify(args?.p_expected),args?.p_note]],
+    guigs_list_inventories:['select public.guigs_list_inventories($1,$2,$3) as data',[args?.p_shop_id,args?.p_limit,args?.p_offset]],
+    guigs_create_spatial_inventory:['select public.guigs_create_spatial_inventory($1,$2) as data',[args?.p_shop_id,args?.p_observation]],
+    guigs_get_spatial_inventory:['select public.guigs_get_spatial_inventory($1,$2) as data',[args?.p_shop_id,args?.p_inventory_id]],
+    guigs_count_spatial_inventory_item:['select public.guigs_count_spatial_inventory_item($1,$2,$3,$4,$5) as data',
+      [args?.p_shop_id,args?.p_inventory_id,args?.p_item_id,args?.p_quantity,args?.p_version]]
   };
   return asUser(db,role,async tx=>{
     if(tables[table])return (await tx.query('select * from '+tables[table]+' where shop_id=$1 order by id',[shop])).rows;
@@ -49,7 +54,7 @@ const server=http.createServer(async(req,res)=>{
 function bridge({role,shop}){
   const c=window.__mockClient, original=c.rpc.bind(c), originalFrom=c.from.bind(c);
   const send=data=>fetch('/fixture',{method:'POST',body:JSON.stringify({role,...data})}).then(r=>r.json());
-  c.rpc=(name,args)=>/^(guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation)$/.test(name)?send({name,args}):original(name,args);
+  c.rpc=(name,args)=>/^(guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item)$/.test(name)?send({name,args}):original(name,args);
   c.from=table=>{
     if(table==='guigs_memberships')return {select(){return this},eq(){return this},then(a,b){return Promise.resolve({data:[{shop_id:shop,role,active:true}],error:null}).then(a,b)}};
     if(!['guigs_products','guigs_lots','guigs_suppliers'].includes(table))return originalFrom(table);
@@ -64,6 +69,7 @@ function bridge({role,shop}){
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104124433_spatial_fridge_allocation.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104124855_spatial_fridge_replenishment.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104125329_spatial_fridge_operations.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104125833_spatial_fridge_inventory.sql'),'utf8'));
     const ledger=()=>db.query('select id,delta,slot_id from public.guigs_movements order by id').then(r=>r.rows);
     const before=await ledger();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -215,7 +221,25 @@ function bridge({role,shop}){
     check((await db.query("select count(distinct event_id)::int as n from public.guigs_movements where movement_type='sale' and spatial")).rows[0].n===1,'Split tem um único evento');
     check(worker.errors.length===0,'Saída sem erro JavaScript');
     await worker.context.close();
-    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+replenishChecks+checks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${replenishChecks} reposição, ${checks} saída); navegador e PGlite artificiais.`);
+    const operationChecks=checks;checks=0;
+    const countBefore=await ledger();
+    const inventory=await open('owner',{width:390,height:844});
+    await inventory.page.click('#navInventory');
+    await inventory.page.click('#newSpatialInventory');
+    await inventory.page.click('#inventoryCreateSubmit');
+    await inventory.page.waitForSelector('#inventoryDetail:not(.hidden) .inventory-item');
+    check((await inventory.page.textContent('#inventoryDetailInfo')).includes('Por posição'),'Novo inventário espacial identificado');
+    check(await inventory.page.isVisible('#inventoryPosition'),'Filtro de posição exposto');
+    await inventory.page.selectOption('#inventoryPosition',x);
+    check(await inventory.page.locator('.inventory-item').count()===1,'Filtro deixa apenas o lote da posição');
+    check((await inventory.page.locator('.inventory-item').textContent()).includes('Contagem cega'),'Esperado não exibido antes da contagem');
+    await inventory.page.locator('.inventory-count-input').fill('6');
+    await inventory.page.locator('.inventory-count-form button[type=submit]').click();
+    await inventory.page.waitForFunction(()=>document.querySelector('#inventoryTotals').textContent.includes('Conferidos: 1'));
+    assert.deepEqual(await ledger(),countBefore);checks++;
+    check(inventory.errors.length===0,'Inventário espacial sem erro JavaScript');
+    await inventory.context.close();
+    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+replenishChecks+operationChecks+checks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${replenishChecks} reposição, ${operationChecks} saída, ${checks} inventário); navegador e PGlite artificiais.`);
   }finally{
     if(browser)await browser.close();
     if(server.listening)await new Promise(resolve=>server.close(resolve));

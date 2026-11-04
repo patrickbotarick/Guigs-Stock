@@ -3,6 +3,7 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
   const el = id => document.getElementById(id);
   const statusLabel = {open:'Aberto',review:'Em revisão',completed:'Concluído',cancelled:'Cancelado'};
   const localLabel = value => value === 'stock' ? 'Estoque seco' : 'Geladeira';
+  const itemLabel = item => item.slot_label || (data?.inventory.spatial&&item.location==='fridge'?'Geladeira — não alocado':localLabel(item.location));
   const date = value => value ? new Date(value).toLocaleString('pt-BR') : '—';
   const actor = (value,label) => label || (value ? `Usuário ${value.slice(0,8)}` : '—');
   let data = null;
@@ -13,6 +14,16 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
   let total = 0;
   let loaded = false;
   let reviewApproved = false;
+  let createSpatial=false;
+  const spatialIds=new Set(),closeKeys=new Map();
+  const spatialRPC={
+    guigs_get_inventory:'guigs_get_spatial_inventory',
+    guigs_count_inventory_item:'guigs_count_spatial_inventory_item',
+    guigs_recount_inventory_item:'guigs_recount_spatial_inventory_item',
+    guigs_refresh_inventory_scope:'guigs_refresh_spatial_inventory_scope',
+    guigs_set_inventory_status:'guigs_set_spatial_inventory_status',
+    guigs_complete_inventory:'guigs_complete_spatial_inventory'
+  };
   const drafts = new Map(); // Somente memória da página; não salva contagem automaticamente.
   enhanceSelect('inventoryItemSelect');
   function message(text, error = false) {
@@ -23,7 +34,8 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     const {client, shop} = getContext();
     if (!navigator.onLine) throw Error('Sem internet: inventário somente para consulta dos dados já exibidos.');
     if (!client || !shop) throw Error('Aguarde a autenticação.');
-    const result = await client.rpc(name, {p_shop_id:shop.shop_id,...args});
+    const endpoint=spatialIds.has(args.p_inventory_id)?spatialRPC[name]||name:name;
+    const result = await client.rpc(endpoint, {p_shop_id:shop.shop_id,...args});
     if (result.error) {
       if (result.error.code === 'PGRST202' || /does not exist|schema cache/i.test(result.error.message || '')) {
         throw Error('Inventário indisponível neste ambiente. A migration 007 precisa ser homologada e aplicada pelo responsável; não execute em produção nesta fase.');
@@ -38,6 +50,7 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     const current = data?.inventory;
     const active = current && ['open','review'].includes(current.status);
     el('newInventory').classList.toggle('hidden', !owner);
+    el('newSpatialInventory').classList.toggle('hidden', !owner);
     for (const id of ['inventoryReview','inventoryReopen','inventoryCancel','inventoryComplete','inventoryScope']) {
       el(id).classList.toggle('hidden', !owner || !active);
     }
@@ -77,6 +90,7 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
       const open = document.createElement('button');
       open.type = 'button'; open.className = 'btn'; open.textContent = 'Abrir inventário';
       open.dataset.inventoryOpen='true';
+      if(inv.spatial){spatialIds.add(inv.id);info.textContent+=' · Por posição';}
       open.addEventListener('click', () => void readInventory(inv.id));
       entry.append(info,open); list.append(entry);
     }
@@ -108,7 +122,7 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     const items = data.items;
     el('inventoryDetail').classList.remove('hidden');
     el('inventoryDetailTitle').textContent = `Inventário #${current.id.slice(0,8)} · ${statusLabel[current.status]}`;
-    el('inventoryDetailInfo').textContent = `Iniciado ${date(current.started_at)} · ${actor(current.started_by,current.started_by_label)} · ${current.observation || 'Sem observação'}`;
+    el('inventoryDetailInfo').textContent = `${current.spatial?'Por posição · ':''}Iniciado ${date(current.started_at)} · ${actor(current.started_by,current.started_by_label)} · ${current.observation || 'Sem observação'}`;
     const counted = items.filter(item => item.counted_quantity !== null).length;
     const different = items.filter(item => ['positive','negative'].includes(stateOf(item))).length;
     el('inventoryTotals').textContent = `Itens: ${items.length} · Conferidos: ${counted} · Pendentes: ${items.length-counted} · Sem divergência: ${counted-different} · Divergentes: ${different}`;
@@ -119,8 +133,13 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     el('inventoryMovementWarning').textContent = `${data.movements_after_start} movimentação(ões) após o início. Itens ainda exigindo recontagem: ${conflicts}. Lotes novos fora do escopo: ${data.new_lots}. ${conflicts ? 'Reconte os locais afetados.' : 'Os itens já reconferidos não estão bloqueados por esses movimentos.'} O fechamento verifica novamente no servidor.`;
     const selected = el('inventoryItemSelect').value;
     el('inventoryItemSelect').replaceChildren(new Option('Todos os produtos / lotes',''));
-    for (const item of items) el('inventoryItemSelect').add(new Option(`${item.product_name} · ${item.lot_code} · ${localLabel(item.location)}`,item.id));
+    for (const item of items) el('inventoryItemSelect').add(new Option(`${item.product_name} · ${item.lot_code} · ${itemLabel(item)}`,item.id));
     el('inventoryItemSelect').value = items.some(item=>item.id===selected) ? selected : '';
+    const position=el('inventoryPosition'),previousPosition=position.value;
+    const positions=new Map(items.filter(i=>i.location==='fridge').map(i=>[i.slot_id||'unallocated',itemLabel(i)]));
+    position.replaceChildren(new Option('Todas as posições',''),...[...positions].map(([id,label])=>new Option(label,id)));
+    position.value=positions.has(previousPosition)?previousPosition:'';
+    el('inventoryPositionField').classList.toggle('hidden',!current.spatial);
     el('inventoryReviewCheck').checked = reviewApproved;
     el('inventoryReviewGate').classList.toggle('hidden', current.status !== 'review' || getContext().shop?.role !== 'owner');
     const differences = el('inventoryDifferences');
@@ -128,7 +147,7 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     if (current.status !== 'open') {
       for (const item of items.filter(item=>['positive','negative'].includes(stateOf(item)))) {
         const row=document.createElement('p');
-        row.textContent=`${item.product_name} · ${item.lot_code} · ${localLabel(item.location)}: base ${item.basis_quantity} → contado ${item.counted_quantity} (${Number(item.counted_quantity)-Number(item.basis_quantity)>0?'+':''}${Number(item.counted_quantity)-Number(item.basis_quantity)})${item.conflict && active?' · MOVIMENTADO: RECONTAR':''}`;
+        row.textContent=`${item.product_name} · ${item.lot_code} · ${itemLabel(item)}: base ${item.basis_quantity} → contado ${item.counted_quantity} (${Number(item.counted_quantity)-Number(item.basis_quantity)>0?'+':''}${Number(item.counted_quantity)-Number(item.basis_quantity)})${item.conflict && active?' · MOVIMENTADO: RECONTAR':''}`;
         differences.append(row);
       }
       if (!differences.children.length) differences.textContent = 'Nenhuma divergência registrada.';
@@ -139,7 +158,7 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
       const row=document.createElement('p');
       const names={created:'Criação',counted:'Contagem',recount:'Recontagem preparada',scope_refreshed:'Escopo atualizado',review:'Revisão',reopened:'Reabertura',completed:'Fechamento',cancelled:'Cancelamento'};
       const item=items.find(item=>item.id===entry.item_id);
-      row.textContent=`${date(entry.created_at)} · ${actor(entry.actor_id,entry.actor_label)} · ${names[entry.action] || entry.action}${item?` · ${item.product_name} / ${item.lot_code} / ${localLabel(item.location)}`:''}${entry.counted_quantity!==null?` · Contado: ${entry.counted_quantity}`:''}${entry.previous_quantity!==null?` · Contagem anterior: ${entry.previous_quantity}`:''}${entry.note?` · ${entry.note}`:''}`;
+      row.textContent=`${date(entry.created_at)} · ${actor(entry.actor_id,entry.actor_label)} · ${names[entry.action] || entry.action}${item?` · ${item.product_name} / ${item.lot_code} / ${itemLabel(item)}`:''}${entry.counted_quantity!==null?` · Contado: ${entry.counted_quantity}`:''}${entry.previous_quantity!==null?` · Contagem anterior: ${entry.previous_quantity}`:''}${entry.note?` · ${entry.note}`:''}`;
       audit.append(row);
     }
     renderItems(); sync();
@@ -151,9 +170,11 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     const location=el('inventoryLocation').value;
     const selected=el('inventoryItemSelect').value;
     const current=data.inventory;
+    const position=current.spatial?el('inventoryPosition').value:'';
     const items=data.items.filter(item=>{
       const state=stateOf(item);
       return (!selected || item.id===selected) && (!location || item.location===location) &&
+        (!position || (item.location==='fridge' && (item.slot_id||'unallocated')===position)) &&
         (filter==='all' || (filter==='divergent' && ['positive','negative'].includes(state)) || (filter==='pending' && state==='pending') || (filter==='counted' && state!=='pending'));
     });
     for (const item of items) {
@@ -161,7 +182,7 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
       const state=stateOf(item);
       card.className=`inventory-item inventory-${state}`; card.dataset.itemId=item.id;
       const title=document.createElement('h3');title.textContent=`${item.product_name} · ${item.lot_code}`;
-      const meta=document.createElement('p');meta.className='muted';meta.textContent=`${localLabel(item.location)} · Validade: ${item.expiry.split('-').reverse().join('/')} · Fornecedor: ${item.supplier_name || 'Não informado'}`;
+      const meta=document.createElement('p');meta.className='muted';meta.textContent=`${itemLabel(item)} · Validade: ${item.expiry.split('-').reverse().join('/')} · Fornecedor: ${item.supplier_name || 'Não informado'}`;
       const info=document.createElement('p');
       const reveal=current.status!=='open' || item.counted_quantity!==null;
       info.textContent=reveal ? `Esperado inicial: ${item.expected_initial} · Base de conferência: ${item.basis_quantity} · Contado: ${item.counted_quantity ?? 'Não contado'} · Diferença: ${item.counted_quantity===null?'—':Number(item.counted_quantity)-Number(item.basis_quantity)}` : 'Contagem cega: saldo esperado oculto até registrar a quantidade.';
@@ -194,7 +215,7 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
         }
         const recount=document.createElement('button');recount.type='button';recount.className='btn';recount.textContent='Recontar';recount.dataset.inventoryWrite='true';
         recount.addEventListener('click',()=>void action(recount,async()=>{
-          if (!await confirmAction('Preparar recontagem',`Reconte fisicamente ${item.product_name} / ${item.lot_code} / ${localLabel(item.location)}. A evidência anterior será preservada e a base será atualizada.`)) return;
+          if (!await confirmAction('Preparar recontagem',`Reconte fisicamente ${item.product_name} / ${item.lot_code} / ${itemLabel(item)}. A evidência anterior será preservada e a base será atualizada.`)) return;
           await rpc('guigs_recount_inventory_item',{p_inventory_id:current.id,p_item_id:item.id,p_version:item.version});
           drafts.delete(item.id);
           return 'Recontagem preparada. Conte novamente; estoque não alterado.';
@@ -211,6 +232,7 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     const next=data.items.find(item=>item.counted_quantity===null && item.id!==previousId);
     if (!next) {el('inventoryTotals').focus();return;}
     el('inventoryItemSelect').value='';el('inventoryFilter').value='pending';el('inventoryLocation').value='';
+    el('inventoryPosition').value='';
     el('inventoryItemSelect').dispatchEvent(new Event('change',{bubbles:true}));
     const input=el(`count-${next.id}`);input?.scrollIntoView({block:'center'});input?.focus();
   }
@@ -240,18 +262,24 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
   el('inventoryItemSelect').addEventListener('change',renderItems);
   el('inventoryFilter').addEventListener('change',renderItems);
   el('inventoryLocation').addEventListener('change',renderItems);
+  el('inventoryPosition').addEventListener('change',renderItems);
   el('inventoryReviewCheck').addEventListener('change',()=>{reviewApproved=el('inventoryReviewCheck').checked;sync();});
   el('inventoryNextItem').addEventListener('click',()=>{if(data)focusNext('');});
-  el('newInventory').addEventListener('click',()=>{
+  const openCreate=spatial=>{
+    createSpatial=spatial;
+    el('inventoryCreateTitle').textContent=spatial?'Novo inventário por posição':'Novo inventário físico';
     el('inventoryCreateMessage').textContent='';el('inventoryCreateDialog').showModal();
-  });
+  };
+  el('newInventory').addEventListener('click',()=>openCreate(false));
+  el('newSpatialInventory').addEventListener('click',()=>openCreate(true));
   el('inventoryCreateDialog').addEventListener('cancel',event=>{if(pending)event.preventDefault();});
   el('inventoryCreateForm').addEventListener('submit',event=>{
     event.preventDefault();if (!event.currentTarget.reportValidity() || getContext().shop?.role!=='owner') return;
     const observation=el('inventoryObservation').value.trim();
     let createdId;
     void action(el('inventoryCreateSubmit'),async()=>{
-      createdId=await rpc('guigs_create_inventory',{p_observation:observation});
+      createdId=await rpc(createSpatial?'guigs_create_spatial_inventory':'guigs_create_inventory',{p_observation:observation});
+      if(createSpatial)spatialIds.add(createdId);
       el('inventoryCreateDialog').close();page=0;
       return 'Inventário criado com snapshot. Nenhum saldo foi alterado.';
     },null,()=>readInventory(createdId,true));
@@ -284,7 +312,13 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     const differences=data.items.filter(item=>['positive','negative'].includes(stateOf(item)));
     void action(el('inventoryComplete'),async()=>{
       if (!await confirmAction('Fechar inventário e aplicar ajustes',`Inventário #${current.id.slice(0,8)} · ${data.items.length} itens · ${differences.length} ajuste(s). A lista completa de divergências está na revisão. Os ajustes serão registrados no histórico; este fechamento é definitivo.`)) return;
-      const result=await rpc('guigs_complete_inventory',{p_inventory_id:current.id,p_version:current.version,p_confirm:true});
+      const args={p_inventory_id:current.id,p_version:current.version,p_confirm:true};
+      if(current.spatial){
+        const key=current.id+':'+current.version;
+        if(!closeKeys.has(key))closeKeys.set(key,crypto.randomUUID());
+        args.p_request_id=closeKeys.get(key);
+      }
+      const result=await rpc('guigs_complete_inventory',args);
       return `Inventário concluído: ${result.adjustments} ajuste(s) registrados no histórico.`;
     },current.id,refreshStock);
   });
