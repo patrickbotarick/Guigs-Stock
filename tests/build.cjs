@@ -19,7 +19,7 @@ try {
  fs.writeFileSync(path.join(result.directory,'unwanted.txt'),'ARTEFATO ANTIGO');build({sourceRoot:root,env});
  check(!fs.existsSync(path.join(result.directory,'unwanted.txt')),'Build limpo remove sobra de artefato anterior');
  const sw=fs.readFileSync(path.join(result.directory,'service-worker.js'),'utf8');
- check(sw.includes('guigs-stock-shell-v10'),'PWA final v10');
+ check(sw.includes('guigs-stock-shell-v11'),'PWA final v11');
  for(const entry of sw.match(/const APP_SHELL = \[([\s\S]*?)\];/)[1].matchAll(/"\.\/([^"]*)"/g))check(!entry[1]||fs.existsSync(path.join(result.directory,entry[1].split('?')[0])),`Shell existe no artefato: ${entry[1]}`);
  for(const page of ['index.html','auth-preview.html','reset-password.html']){
   const html=fs.readFileSync(path.join(result.directory,page),'utf8');
@@ -30,6 +30,8 @@ try {
  }
  const manifest=JSON.parse(fs.readFileSync(path.join(result.directory,'manifest.webmanifest'),'utf8'));
  for(const icon of manifest.icons)check(fs.existsSync(path.join(result.directory,icon.src)),'Ícone instalável disponível');
+ fs.writeFileSync(path.join(root,'service-worker.js'),sw.replace('  "./fridges.js",',''));
+ assert.throws(()=>build({sourceRoot:root,env}),/Shell PWA não inclui: fridges\.js/);checks++;
  console.log(`Build: ${checks} verificações passaram; configuração artificial e nenhum deploy.`);
 } finally {
  // Raiz mkdtemp conhecida e verificada dentro do TEMP, nunca workspace/backup real.

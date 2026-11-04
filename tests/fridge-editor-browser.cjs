@@ -185,6 +185,16 @@ function bridge({role,shop}){
     check((await owner.page.locator('[data-slot-id="'+x+'"]').textContent()).includes('5 / 18 un.'),'Mapa atualizado depois da distribuição');
     check((await db.query("select sum(delta)::int as n from public.guigs_movements where location='fridge'")).rows[0].n===8,'Saldo global preservado pelo fluxo UI');
     check(owner.errors.length===0,'Fluxo de distribuição sem erro JavaScript');
+    let offlineChecks=0;
+    const offline=(value,label)=>{assert.ok(value,label);offlineChecks++;};
+    await owner.context.setOffline(true);
+    await owner.page.waitForFunction(()=>!document.querySelector('#fridgeOffline').classList.contains('hidden'));
+    offline((await owner.page.locator('[data-slot-id="'+x+'"]').textContent()).includes('5 / 18 un.'),'Mapa anterior permanece visível offline');
+    for(const selector of ['#fridgeEdit','#fridgeAllocate','#fridgeOperateStock','[data-replenish="'+x+'"]'])
+      offline(await owner.page.isDisabled(selector),'Operação bloqueada offline: '+selector);
+    await owner.context.setOffline(false);
+    await owner.page.waitForFunction(()=>!document.querySelector('#fridgeOperateStock').disabled);
+    offline(await owner.page.isEnabled('#fridgeEdit'),'Reconexão restaura ações');
     await owner.context.close();
     const allocationChecks=checks;checks=0;
     const worker=await open('attendant',{width:390,height:844});await waitMap(worker.page);
@@ -285,8 +295,11 @@ function bridge({role,shop}){
     await inventory.page.waitForFunction(()=>document.querySelector('#inventoryTotals').textContent.includes('Conferidos: 1'));
     assert.deepEqual(await ledger(),countBefore);checks++;
     check(inventory.errors.length===0,'Inventário espacial sem erro JavaScript');
+    await inventory.context.setOffline(true);
+    await inventory.page.waitForFunction(()=>document.querySelector('#newSpatialInventory').disabled);
+    offline(await inventory.page.isDisabled('#inventoryReview'),'Inventário espacial sem mutações offline');
     await inventory.context.close();
-    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+replenishChecks+operationChecks+restockChecks+historyChecks+reportingChecks+checks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${replenishChecks} reposição, ${operationChecks} saída, ${restockChecks} lista, ${historyChecks+reportingChecks} observabilidade, ${checks} inventário); navegador e PGlite artificiais.`);
+    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+replenishChecks+operationChecks+restockChecks+historyChecks+reportingChecks+checks+offlineChecks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${replenishChecks} reposição, ${operationChecks} saída, ${restockChecks} lista, ${historyChecks+reportingChecks} observabilidade, ${checks} inventário, ${offlineChecks} offline); navegador e PGlite artificiais.`);
   }finally{
     if(browser)await browser.close();
     if(server.listening)await new Promise(resolve=>server.close(resolve));

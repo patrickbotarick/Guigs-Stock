@@ -1,5 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const $ = (id) => document.getElementById(id);
 
 const msg = (text) => ($("message").textContent = text);
@@ -7,6 +5,7 @@ const msg = (text) => ($("message").textContent = text);
 const cfg = window.GUIGS_SUPABASE_CONFIG || {};
 
 let client = null;
+let connecting = false;
 
 // ============================================================
 // HELPERS
@@ -38,14 +37,17 @@ function updateConnectionState() {
     return;
   }
 
-  $("enter").disabled = false;
+  $("enter").disabled = !client;
 }
 
 // ============================================================
 // CONFIGURAÇÃO / CLIENTE SUPABASE
 // ============================================================
 
-if (
+async function connectClient() {
+  if (connecting || client) return;
+  if (!navigator.onLine) { updateConnectionState(); return; }
+  if (
   !/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(cfg.url || "") ||
   !/^sb_publishable_[A-Za-z0-9_-]+$/.test(cfg.publishableKey || "")
 ) {
@@ -57,7 +59,11 @@ if (
   );
 
   $("enter").disabled = true;
-} else {
+    return;
+  }
+  connecting = true;
+  try {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
   client = createClient(cfg.url, cfg.publishableKey, {
     auth: {
       persistSession: true,
@@ -65,6 +71,7 @@ if (
       detectSessionInUrl: false,
     },
   });
+  updateConnectionState();
 
   if (!navigator.onLine) {
     setOfflineMessage();
@@ -90,6 +97,12 @@ if (
 
       msg("Não foi possível verificar a sessão.");
     });
+  } catch (error) {
+    if (isNetworkFailure(error)) setOfflineMessage();
+    else msg("Não foi possível carregar o acesso. Recarregue para tentar novamente.");
+  } finally {
+    connecting = false;
+  }
 }
 
 // ============================================================
@@ -343,11 +356,12 @@ window.addEventListener("offline", () => {
 });
 
 window.addEventListener("online", async () => {
-  $("enter").disabled = false;
+  updateConnectionState();
 
   msg("Conexão restaurada. Verificando sua sessão…");
 
   if (!client) {
+    await connectClient();
     return;
   }
 
@@ -369,3 +383,4 @@ window.addEventListener("online", async () => {
 // ============================================================
 
 updateConnectionState();
+void connectClient();
