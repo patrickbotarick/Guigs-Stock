@@ -1172,6 +1172,25 @@
       #fridgeLayoutFields input[type="checkbox"] { inline-size: 1.3rem; block-size: 1.3rem; }
       #fridgeEditor select, #fridgeEditor input { max-inline-size: 100%; }
       #fridgeEditor .field { margin-block: .6rem; }
+      .fridge-cabinets { display:flex; flex-wrap:wrap; gap:.9rem; }
+      .fridge-cabinet { flex:1 1 min(100%,max(19rem,var(--cabinet-width,48%))); min-inline-size:0; border:1px solid var(--line,#394253); border-radius:14px; padding:.8rem; }
+      .fridge-cabinet h3, .fridge-shelf h4 { margin:.25rem 0 .55rem; overflow-wrap:anywhere; }
+      .fridge-shelf { border-block-end:2px solid var(--line,#394253); margin-block:.6rem; padding:.5rem; background:rgba(125,145,165,.08); border-radius:8px; container-type:inline-size; }
+      .fridge-shelf .fridge-rail { display:grid; grid-template-columns:repeat(100,minmax(0,1fr)); row-gap:.55rem; min-block-size:calc(2rem + var(--shelf-size,0) * 5rem); }
+      .fridge-slot { grid-column:var(--slot-column); grid-row:var(--slot-row); min-inline-size:0; border:1px solid var(--line,#394253); border-radius:8px; padding:.55rem; margin-inline-end:3px; overflow-wrap:anywhere; }
+      .fridge-slot h5, .fridge-slot p { margin:.2rem 0; }
+      .fridge-slot meter { inline-size:100%; min-inline-size:0; }
+      .fridge-photo { display:block; inline-size:2.25rem; block-size:2.25rem; object-fit:contain; }
+      .fridge-photo-fallback { display:grid; place-items:center; background:rgba(125,145,165,.18); border-radius:6px; }
+      .fridge-state { display:inline-block; font-size:.8rem; font-weight:700; padding:.12rem .36rem; border-radius:4px; color:#16202b; background:#e5e7eb; }
+      .fridge-state[data-state="OK"] { background:#a6edc0; }
+      .fridge-state[data-state="ATENÇÃO"] { background:#ffe0a0; }
+      .fridge-state[data-state="CRÍTICO"] { background:#ffc4c4; }
+      .fridge-unallocated { margin-block-start:1rem; padding-block-start:.5rem; border-block-start:1px solid var(--line,#394253); }
+      @container (max-width:420px) {
+        .fridge-shelf .fridge-rail { grid-template-columns:minmax(0,1fr); }
+        .fridge-slot { grid-column:1; grid-row:auto; margin-inline-end:0; }
+      }
       #reportsView .panel { margin-bottom: 16px; }
       .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 12px; }
       .report-card { border: 1px solid var(--line, #ddd); border-radius: 12px; padding: 14px; min-width: 0; overflow-wrap: anywhere; }

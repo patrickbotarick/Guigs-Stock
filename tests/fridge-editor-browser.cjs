@@ -108,7 +108,49 @@ function bridge({role,shop}){
     check(mobile.errors.length===0,'Sem erro JavaScript mobile');
     await mobile.context.close();
     assert.deepEqual(await ledger(),before);checks++;
-    console.log(`Editor espacial: ${checks} verificações passaram; navegador e PGlite artificiais.`);
+    const editorChecks=checks;checks=0;
+    const {fridgeSlotState}=await import('../fridges.js');
+    for(const [quantity,expected] of [[0,'VAZIO'],[1,'CRÍTICO'],[2,'ATENÇÃO'],[4,'OK'],[6,'OK']])
+      check(fridgeSlotState({quantity,min_quantity:2,target_quantity:4,capacity_quantity:6})===expected,'Estado no limite '+quantity);
+    const create=async(kind,values)=>(await dispatch({role:'owner',name:'guigs_save_fridge_layout',args:{p_shop_id:shop,p_kind:kind,p_values:values,p_id:null,p_revision:null}}));
+    const critical=await create('slot',{fridge_id:a,shelf_id:h,name:'Crítico',product_id:id(20),min_quantity:2,target_quantity:4,capacity_quantity:6,x_ratio:.15,width_ratio:.2});
+    const ok=await create('slot',{fridge_id:a,shelf_id:h,name:'Pronto',product_id:id(20),min_quantity:1,target_quantity:2,capacity_quantity:6,x_ratio:.75,width_ratio:.25});
+    await create('slot',{fridge_id:a,shelf_id:h,name:'Vazio',x_ratio:0,width_ratio:.15});
+    await db.transaction(async tx=>{
+      const e=(await tx.query('select gen_random_uuid() as id')).rows[0].id;
+      for(const [slot,delta] of [[null,-7],[x,4],[critical.id,1],[ok.id,2]])
+        await tx.query("insert into public.guigs_movements(shop_id,lot_id,event_id,movement_type,location,delta,actor_id,slot_id,spatial) values($1,$2,$3,'adjust','fridge',$4,$5,$6,true)",[shop,id(30),e,delta,id(1),slot]);
+    });
+    const waitMap=p=>p.waitForSelector('.fridge-unallocated');
+    const desktop=await open('attendant',{width:1440,height:950});await waitMap(desktop.page);
+    check(await desktop.page.locator('.fridge-cabinet').count()===2,'Duas geladeiras em desktop');
+    check(await desktop.page.locator('.fridge-cabinet').evaluateAll(ns=>Math.abs(ns[0].getBoundingClientRect().top-ns[1].getBoundingClientRect().top)<2),'Geladeiras lado a lado quando há espaço');
+    for(const state of ['VAZIO','CRÍTICO','ATENÇÃO','OK'])
+      check(await desktop.page.locator('.fridge-state').filter({hasText:state}).count()===1,'Mapa exibe estado '+state);
+    check(await desktop.page.locator('.fridge-photo-fallback').count()===4,'Placeholders sem imagem');
+    check((await desktop.page.locator('.fridge-unallocated').textContent()).includes('1 un. sem posição física'),'Saldo não alocado separado do mapa');
+    const slot=desktop.page.locator('[data-slot-id="'+x+'"]');
+    check(await slot.getByRole('meter',{name:'Ocupação de Coca A1'}).count()===1,'Ocupação com nome acessível');
+    await slot.getByText('Lotes e validade').focus();await desktop.page.keyboard.press('Enter');
+    check(await slot.locator('details[open]').count()===1,'Validade acessível por teclado');
+    check(desktop.errors.length===0,'Mapa sem erro JavaScript');
+    await desktop.context.close();
+    await db.query('update public.guigs_fridges set active=false where id=$1',[b]);
+    const tablet=await open('attendant',{width:820,height:900});await waitMap(tablet.page);
+    check(await tablet.page.locator('.fridge-cabinet').count()===1,'Uma geladeira ativa em tablet');
+    check(await tablet.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Tablet sem rolagem horizontal global');
+    await tablet.context.close();
+    await db.query('update public.guigs_fridges set active=true where id=$1',[b]);
+    for(let i=3;i<=5;i++){
+      const f=await create('fridge',{name:'Geladeira '+i,width_ratio:.35+i*.1,sort_order:i});
+      for(let j=0;j<i-2;j++)await create('shelf',{name:'Prateleira '+j,fridge_id:f.id,y_ratio:j*.2,height_ratio:.2});
+    }
+    const small=await open('attendant',{width:360,height:740});await waitMap(small.page);
+    check(await small.page.locator('.fridge-cabinet').count()===5,'Cinco geladeiras no celular');
+    check(await small.page.locator('.fridge-cabinet').evaluateAll(ns=>ns.every((n,i)=>i===0||n.getBoundingClientRect().top>ns[i-1].getBoundingClientRect().top)),'Geladeiras empilhadas no celular');
+    check(await small.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Celular sem rolagem horizontal global');
+    await small.context.close();
+    console.log(`Editor e mapa espacial: ${editorChecks+checks} verificações passaram (${editorChecks} editor, ${checks} mapa); navegador e PGlite artificiais.`);
   }finally{
     if(browser)await browser.close();
     if(server.listening)await new Promise(resolve=>server.close(resolve));
