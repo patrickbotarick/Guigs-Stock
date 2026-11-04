@@ -125,7 +125,7 @@ function fixture({role, session, searchable = false, readOnly = false, operation
 module.exports = {fixture};
 if (require.main === module) (async () => {
   // Lista explícita; config.js real nunca é lido nem servido.
-  const files = ['index.html','auth-preview.html','reset-password.html','cloud-dashboard.js','inventory.js','reports.js','auth-preview.js','reset-password.js','pwa.js','service-worker.js','manifest.webmanifest','logo-guigs.png'];
+  const files = ['index.html','auth-preview.html','reset-password.html','cloud-dashboard.js','inventory.js','reports.js','fridges.js','auth-preview.js','reset-password.js','pwa.js','service-worker.js','manifest.webmanifest','logo-guigs.png'];
   const server = http.createServer((req,res) => {
     const file = new URL(req.url,'http://localhost').pathname.slice(1) || 'index.html';
     res.setHeader('Cache-Control','no-store');

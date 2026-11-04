@@ -9,7 +9,8 @@ const base='a0079a192597252a283a0e70f4f945db27275793';
 const root=path.resolve(__dirname,'../..');
 async function legacyBrowser(user){
   const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
-  const assets=new Map(files.map(f=>[f,execFileSync('git',['show',base+':'+f],{cwd:root})]));
+  const tracked=new Set(execFileSync('git',['ls-tree','-r','--name-only',base],{cwd:root,encoding:'utf8'}).trim().split(/\r?\n/));
+  const assets=new Map(files.filter(f=>tracked.has(f)).map(f=>[f,execFileSync('git',['show',base+':'+f],{cwd:root})]));
   assets.set('config.js',Buffer.from('window.GUIGS_SUPABASE_CONFIG='+JSON.stringify({url:URL_BASE,publishableKey:PUBLIC_KEY})+';'));
   const server=http.createServer((req,res)=>{
     const f=new URL(req.url,'http://127.0.0.1').pathname.slice(1)||'index.html';

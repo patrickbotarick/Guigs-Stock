@@ -8,6 +8,7 @@ const APP_SHELL = [
   "./cloud-dashboard.js",
   "./inventory.js",
   "./reports.js",
+  "./fridges.js",
   "./pwa.js",
   "./auth-preview.js?v=1.4.1",
   "./reset-password.js",
