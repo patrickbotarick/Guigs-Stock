@@ -220,8 +220,24 @@ function bridge({role,shop}){
     check((await db.query("select count(distinct event_id)::int as events,count(*)::int as lines from public.guigs_movements where movement_type='sale' and spatial")).rows[0].lines===3,'Venda split gravada no ledger');
     check((await db.query("select count(distinct event_id)::int as n from public.guigs_movements where movement_type='sale' and spatial")).rows[0].n===1,'Split tem um único evento');
     check(worker.errors.length===0,'Saída sem erro JavaScript');
-    await worker.context.close();
     const operationChecks=checks;checks=0;
+    await worker.page.click('#fridgeRestockMode');
+    check(await worker.page.locator('#fridgeRestockList [data-restock-slot]').count()===3,'Lista inclui apenas posições abaixo da meta com produto');
+    check((await worker.page.textContent('#fridgeRestockSummary')).includes('Pegar até 7 de 11 un.'),'Resumo não conta o mesmo estoque seco duas vezes');
+    await worker.page.selectOption('#fridgeRestockFilter','shortage');
+    const target=worker.page.locator('[data-restock-slot="'+x+'"]');
+    check(await worker.page.locator('#fridgeRestockList [data-restock-slot]').count()===1,'Filtro mostra falta de estoque');
+    await target.getByRole('button',{name:'Conferir reposição'}).click();
+    await worker.page.waitForFunction(()=>!document.querySelector('#fridgeReplenishConfirm').disabled);
+    check(await worker.page.inputValue('#fridgeReplenishQuantity')==='1','Lista abre plano FEFO limitado à estimativa da posição');
+    await worker.page.click('#fridgeReplenishConfirm');
+    await worker.page.waitForFunction(slot=>document.querySelector('[data-restock-slot="'+slot+'"]').textContent.includes('8 / 18'),x);
+    check((await target.textContent()).includes('Sem estoque seco elegível para esta posição.'),'Lista atualizada após reposição');
+    await worker.page.selectOption('#fridgeRestockFilter','available');
+    check(await target.count()===0,'Filtro com disponibilidade oculta posição sem unidades a pegar');
+    check(await worker.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Reposição mobile sem rolagem horizontal global');
+    await worker.context.close();
+    const restockChecks=checks;checks=0;
     const countBefore=await ledger();
     const inventory=await open('owner',{width:390,height:844});
     await inventory.page.click('#navInventory');
@@ -239,7 +255,7 @@ function bridge({role,shop}){
     assert.deepEqual(await ledger(),countBefore);checks++;
     check(inventory.errors.length===0,'Inventário espacial sem erro JavaScript');
     await inventory.context.close();
-    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+replenishChecks+operationChecks+checks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${replenishChecks} reposição, ${operationChecks} saída, ${checks} inventário); navegador e PGlite artificiais.`);
+    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+replenishChecks+operationChecks+restockChecks+checks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${replenishChecks} reposição, ${operationChecks} saída, ${restockChecks} lista, ${checks} inventário); navegador e PGlite artificiais.`);
   }finally{
     if(browser)await browser.close();
     if(server.listening)await new Promise(resolve=>server.close(resolve));

@@ -7,6 +7,30 @@ export function fridgeSlotState({quantity,min_quantity,target_quantity}){
   return current===0?'VAZIO':current<Number(min_quantity)?'CRÍTICO':current<Number(target_quantity)?'ATENÇÃO':'OK';
 }
 const physicalOrder=(axis)=>(a,b)=>Number(a[axis])-Number(b[axis])||a.sort_order-b.sort_order||a.id.localeCompare(b.id);
+export function fridgeReplenishmentRows(data,today){
+  const f=new Map(data.fridges.filter(x=>x.active).map(x=>[x.id,x]));
+  const h=new Map(data.shelves.filter(x=>x.active&&f.has(x.fridge_id)).map(x=>[x.id,x]));
+  const dry=new Map();
+  for(const lot of data.dry)if(lot.expiry>=today&&lot.product_active&&lot.quantity>0)
+    dry.set(lot.product_id,(dry.get(lot.product_id)||0)+Number(lot.quantity));
+  const rows=data.slots.filter(x=>x.active&&x.product_active&&x.product_id&&f.has(x.fridge_id)&&h.has(x.shelf_id))
+    .map(slot=>({slot,fridge:f.get(slot.fridge_id),shelf:h.get(slot.shelf_id),
+      demand:Math.max(0,Math.min(slot.target_quantity,slot.capacity_quantity)-Number(slot.quantity))}))
+    .filter(x=>x.demand>0)
+    .sort((a,b)=>{
+      const priority={VAZIO:0,'CRÍTICO':1,'ATENÇÃO':2,OK:3};
+      return priority[fridgeSlotState(a.slot)]-priority[fridgeSlotState(b.slot)]||
+        a.fridge.sort_order-b.fridge.sort_order||a.shelf.sort_order-b.shelf.sort_order||
+        a.slot.sort_order-b.slot.sort_order||a.slot.id.localeCompare(b.slot.id);
+    });
+  const remaining=new Map(dry);
+  for(const row of rows){
+    const available=remaining.get(row.slot.product_id)||0;
+    row.estimated=Math.min(row.demand,available);
+    remaining.set(row.slot.product_id,available-row.estimated);
+  }
+  return rows;
+}
 
 export function createFridgesUI({getContext,refreshStock}){
   const el=id=>document.getElementById(id);
@@ -14,7 +38,7 @@ export function createFridgesUI({getContext,refreshStock}){
   const owner=()=>getContext().shop?.role==='owner';
   const view=()=>location.hash==='#geladeiras';
   const msg=text=>{el('fridgeMessage').textContent=text;};
-  let data=null, editing=false, busy=false, generation=0, pendingRefresh=false;
+  let data=null, editing=false, restocking=false, busy=false, generation=0, pendingRefresh=false;
   let photoUrls=new Map();
   let allocationRetry=null;
   let replenishSlot=null, replenishQuote=null, replenishRetry=null;
@@ -30,10 +54,12 @@ export function createFridgesUI({getContext,refreshStock}){
     el('fridgeAllocate').classList.toggle('hidden',!owner());
     el('fridgeAllocate').disabled=locked||!data?.unallocated.some(l=>l.quantity>0);
     el('fridgeOperateStock').disabled=locked||!data;
-    el('fridgeOperate').setAttribute('aria-pressed',String(!editing));
+    el('fridgeOperate').setAttribute('aria-pressed',String(!editing&&!restocking));
+    el('fridgeRestockMode').setAttribute('aria-pressed',String(restocking));
     el('fridgeEdit').setAttribute('aria-pressed',String(editing));
     el('fridgeEditor').classList.toggle('hidden',!editing);
-    el('fridgeMap').classList.toggle('hidden',editing);
+    el('fridgeMap').classList.toggle('hidden',editing||restocking);
+    el('fridgeRestockView').classList.toggle('hidden',!restocking);
     el('fridgeOffline').classList.toggle('hidden',navigator.onLine);
     el('fridgeReload').disabled=locked;
     el('fridgeLayoutFields').disabled=locked;
@@ -47,7 +73,8 @@ export function createFridgesUI({getContext,refreshStock}){
       el('fridgeCancelAllocation').disabled=busy;
       allocationSummary();
     }
-    for(const action of el('fridgeMap').querySelectorAll('[data-replenish]'))action.disabled=locked;
+    for(const root of ['fridgeMap','fridgeRestockList'])
+      for(const action of el(root).querySelectorAll('[data-replenish]'))action.disabled=locked;
     if(el('fridgeReplenishDialog').open)syncReplenish();
     if(el('fridgeStockDialog').open)syncStock();
   }
@@ -198,6 +225,39 @@ export function createFridgesUI({getContext,refreshStock}){
       if(photoUrls.size&&!editing)renderMap();
     }catch{/* Sem foto, conservar o placeholder e os dados de estoque. */}
   }
+  function renderRestock(){
+    const list=el('fridgeRestockList'), summary=el('fridgeRestockSummary');
+    list.replaceChildren();summary.replaceChildren();
+    if(!data)return;
+    const rows=fridgeReplenishmentRows(data,new Date().toISOString().slice(0,10));
+    const filter=el('fridgeRestockFilter').value;
+    const visible=rows.filter(r=>filter==='all'||(filter==='available'?r.estimated>0:r.estimated<r.demand));
+    const groups=new Map();
+    for(const row of rows){
+      const key=row.slot.product_id;
+      const group=groups.get(key)||{name:row.slot.product_name,demand:0,estimated:0};
+      group.demand+=row.demand;group.estimated+=row.estimated;groups.set(key,group);
+    }
+    if(groups.size){
+      const totals=node('ul');
+      for(const g of groups.values())totals.append(node('li',g.name+' · Pegar até '+g.estimated+' de '+g.demand+' un.'));
+      summary.append(node('h3','Resumo por produto'),totals);
+    }
+    if(!visible.length)list.append(node('p',rows.length?'Nenhuma posição neste filtro.':'Todas as posições ativas com produto atingiram a meta.'));
+    for(const row of visible){
+      const {fridge,shelf,slot,estimated,demand}=row;
+      const card=node('article');card.className='panel';card.dataset.restockSlot=slot.id;
+      card.append(node('h3',slot.product_name+' · '+slot.name),node('p',fridge.name+' / '+shelf.name),
+        node('p',slot.quantity+' / '+slot.capacity_quantity+' un. · Repor '+demand+' até a meta.'),
+        node('p',estimated===0?'Sem estoque seco elegível para esta posição.':'Pegar até '+estimated+' un.'+(estimated<demand?' · Seco insuficiente para a meta.':'')));
+      if(estimated>0){
+        const button=node('button','Conferir reposição');button.type='button';button.className='btn';button.dataset.replenish=slot.id;
+        button.addEventListener('click',()=>openReplenish(slot,fridge,shelf,estimated));
+        card.append(button);
+      }
+      list.append(card);
+    }
+  }
   async function load({keepId=el('fridgeEditItem').value,announce=true}={}){
     const {client,shop}=getContext();
     if(!client||!shop||!navigator.onLine)return;
@@ -208,7 +268,7 @@ export function createFridgesUI({getContext,refreshStock}){
       if(stamp!==generation)return;
       if(error)throw error;
       if(!next||Object.values(collections).concat('unallocated','dry').some(k=>!Array.isArray(next[k])))throw Error('Mapa indisponível nesta versão do banco.');
-      data=next;photoUrls=new Map();renderMap();if(editing)renderEditor(keepId);
+      data=next;photoUrls=new Map();renderMap();if(editing)renderEditor(keepId);if(restocking)renderRestock();
       void loadPhotos(next,client,stamp);
       if(announce)msg('');
     }catch(error){if(stamp===generation)msg(safeError(error));}
@@ -335,13 +395,13 @@ export function createFridgesUI({getContext,refreshStock}){
     el('fridgeReplenishCancel').disabled=busy;
     el('fridgeReplenishConfirm').disabled=locked||!replenishQuote?.quantity||Number(quantity.value)!==replenishQuote.quantity;
   }
-  function openReplenish(slot,fridge,shelf){
+  function openReplenish(slot,fridge,shelf,preferred=null){
     if(busy||!navigator.onLine||!getContext().shop)return;
     replenishSlot=slot;replenishQuote=null;
     el('fridgeReplenishPosition').textContent=[fridge.name,shelf.name,slot.name].join(' / ');
     el('fridgeReplenishStats').textContent='';el('fridgeReplenishPlan').replaceChildren();
     el('fridgeReplenishQuantity').value='';
-    el('fridgeReplenishDialog').showModal();void quoteReplenishment(null);
+    el('fridgeReplenishDialog').showModal();void quoteReplenishment(preferred);
   }
   async function quoteReplenishment(quantity){
     if(busy||!navigator.onLine||!replenishSlot)return;
@@ -478,13 +538,15 @@ export function createFridgesUI({getContext,refreshStock}){
   });
   el('fridgeEditKind').addEventListener('change',()=>renderEditor());
   el('fridgeEditItem').addEventListener('change',renderForm);
-  el('fridgeEdit').addEventListener('click',()=>{if(owner()&&navigator.onLine&&data&&!busy){editing=true;renderEditor();sync();}});
-  el('fridgeOperate').addEventListener('click',()=>{editing=false;sync();});
+  el('fridgeEdit').addEventListener('click',()=>{if(owner()&&navigator.onLine&&data&&!busy){editing=true;restocking=false;renderEditor();sync();}});
+  el('fridgeOperate').addEventListener('click',()=>{editing=false;restocking=false;sync();});
+  el('fridgeRestockMode').addEventListener('click',()=>{editing=false;restocking=true;renderRestock();sync();});
+  el('fridgeRestockFilter').addEventListener('change',()=>{renderRestock();sync();});
   el('fridgeReload').addEventListener('click',()=>void load());
   window.addEventListener('offline',sync);
   window.addEventListener('online',()=>{sync();if(view())void load();});
   return {
     activate(){sync();if(view()&&getContext().shop&&navigator.onLine)void load();},
-    reset(){generation++;data=null;photoUrls=new Map();allocationRetry=null;replenishRetry=null;replenishQuote=null;replenishSlot=null;stockQuote=null;stockRetry=null;editing=false;busy=false;pendingRefresh=false;el('fridgeStockDialog').close();el('fridgeReplenishDialog').close();el('fridgeAllocationDialog').close();el('fridgeLayoutFields').replaceChildren();renderMap();msg('');sync();}
+    reset(){generation++;data=null;photoUrls=new Map();allocationRetry=null;replenishRetry=null;replenishQuote=null;replenishSlot=null;stockQuote=null;stockRetry=null;editing=false;restocking=false;busy=false;pendingRefresh=false;el('fridgeStockDialog').close();el('fridgeReplenishDialog').close();el('fridgeAllocationDialog').close();el('fridgeLayoutFields').replaceChildren();renderMap();renderRestock();msg('');sync();}
   };
 }

@@ -1488,6 +1488,7 @@
               <p class="muted">As posições organizam o estoque da geladeira. Editar o layout não movimenta unidades.</p>
               <div class="inventory-actions" aria-label="Modo do mapa">
                 <button id="fridgeOperate" class="btn" type="button" aria-pressed="true">Operação</button>
+                <button id="fridgeRestockMode" class="btn" type="button" aria-pressed="false">Reposição</button>
                 <button id="fridgeEdit" class="btn hidden" type="button" aria-pressed="false">Editar layout</button>
                 <button id="fridgeReload" class="btn" type="button">Atualizar mapa</button>
                 <button id="fridgeAllocate" class="btn hidden" type="button">Distribuir estoque existente</button>
@@ -1497,6 +1498,15 @@
               <p id="fridgeMessage" role="status" aria-live="polite"></p>
             </div>
             <div id="fridgeMap" class="panel"></div>
+            <section id="fridgeRestockView" class="panel hidden" aria-labelledby="fridgeRestockTitle">
+              <h2 id="fridgeRestockTitle">Lista de reposição</h2>
+              <p>Estimativa da leitura atual, sem reserva de estoque. O plano de lotes é confirmado pelo servidor ao abrir cada posição.</p>
+              <div class="field"><label for="fridgeRestockFilter">Mostrar</label><select id="fridgeRestockFilter">
+                <option value="all">Todas as posições abaixo da meta</option><option value="available">Com unidades a pegar</option><option value="shortage">Com falta de estoque seco</option>
+              </select></div>
+              <div id="fridgeRestockSummary"></div>
+              <div id="fridgeRestockList"></div>
+            </section>
             <section id="fridgeEditor" class="panel hidden" aria-labelledby="fridgeEditorTitle">
               <h2 id="fridgeEditorTitle">Configurar geladeiras</h2>
               <p>Posições e tamanhos usam porcentagens. Para desativar uma posição ocupada, realoque o saldo antes.</p>
