@@ -1433,6 +1433,14 @@
                   <option value="sale">Venda</option>
                   <option value="loss">Perda</option>
                   <option value="adjust">Ajuste</option>
+                  <option value="relocate">Distribuição física</option>
+                </select>
+
+                <select id="historyPartition" aria-label="Filtrar localização">
+                  <option value="">Todas as localizações</option>
+                  <option value="stock">Estoque seco</option>
+                  <option value="unallocated">Geladeira — não alocado</option>
+                  <option value="slot">Posições físicas</option>
                 </select>
 
                 <input
@@ -1456,7 +1464,7 @@
                 <input
                   id="search"
                   type="search"
-                  placeholder="Buscar produto, lote ou observação…"
+                  placeholder="Buscar produto, lote, posição ou observação…"
                 />
 
                 <button id="clearHistoryFilters" class="btn" type="button">
@@ -1574,6 +1582,7 @@
             <section class="panel"><h2>Recebimentos por fornecedor</h2><p class="muted">Nome registrado no recebimento. Registros antigos sem fornecedor: Não informado. Nomes iguais são agrupados; renomeações preservam o nome histórico.</p><div id="reportsSuppliers" class="report-grid" data-report-content></div></section>
             <section class="panel"><h2>Atividade por responsável</h2><p class="muted">Contagem de operações para rastreabilidade. Ordem alfabética; sem pontuação de produtividade.</p><div id="reportsActivity" class="report-grid" data-report-content></div></section>
             <section class="panel"><h2>Inventários</h2><h3>Último iniciado, independente do período</h3><div id="reportsLatestInventory" data-report-content></div><h3>Concluídos / cancelados no período</h3><p class="muted">Filtro pela data de encerramento. Responsável é quem iniciou. Divergências comparam a última contagem com a base de conferência.</p><div id="reportsInventories" class="report-grid" data-report-content></div><div class="inventory-actions"><button id="reportsInventoryPrevious" class="btn" type="button">Anterior</button><span id="reportsInventoryPage" data-report-content></span><button id="reportsInventoryNext" class="btn" type="button">Próxima</button></div></section>
+            <section class="panel"><h2>Operações por geladeira</h2><p class="muted">Somente posições físicas identificadas. Distribuição interna não conta como reposição.</p><div id="reportsFridgeSummary" class="report-grid" data-report-content></div></section>
             <section class="panel"><h2>Estoque atual · fora do filtro de período</h2><p id="reportsStockDate" class="muted" data-report-content></p><h3>Validades</h3><div id="reportsExpiry" class="report-grid" data-report-content></div><p id="reportsExpiryNote" class="muted" data-report-content></p><h3>Mínimos e reposição da geladeira</h3><div id="reportsRestock" class="report-grid" data-report-content></div></section>
           </section>
           <div class="foot" id="updated"></div>

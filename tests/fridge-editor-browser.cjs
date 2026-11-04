@@ -26,7 +26,11 @@ async function dispatch({role,table,name,args}){
     guigs_create_spatial_inventory:['select public.guigs_create_spatial_inventory($1,$2) as data',[args?.p_shop_id,args?.p_observation]],
     guigs_get_spatial_inventory:['select public.guigs_get_spatial_inventory($1,$2) as data',[args?.p_shop_id,args?.p_inventory_id]],
     guigs_count_spatial_inventory_item:['select public.guigs_count_spatial_inventory_item($1,$2,$3,$4,$5) as data',
-      [args?.p_shop_id,args?.p_inventory_id,args?.p_item_id,args?.p_quantity,args?.p_version]]
+      [args?.p_shop_id,args?.p_inventory_id,args?.p_item_id,args?.p_quantity,args?.p_version]],
+    guigs_get_spatial_history:['select public.guigs_get_spatial_history($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) as data',
+      [args?.p_shop,args?.p_limit,args?.p_offset,args?.p_product,args?.p_type,args?.p_actor,args?.p_date_from,args?.p_date_to,args?.p_search,args?.p_partition]],
+    guigs_get_reports:['select public.guigs_get_reports($1,$2,$3,$4,$5,$6) as data',
+      [args?.p_shop_id,args?.p_from,args?.p_to,args?.p_limit,args?.p_loss_offset,args?.p_inventory_offset]]
   };
   return asUser(db,role,async tx=>{
     if(tables[table])return (await tx.query('select * from '+tables[table]+' where shop_id=$1 order by id',[shop])).rows;
@@ -54,7 +58,7 @@ const server=http.createServer(async(req,res)=>{
 function bridge({role,shop}){
   const c=window.__mockClient, original=c.rpc.bind(c), originalFrom=c.from.bind(c);
   const send=data=>fetch('/fixture',{method:'POST',body:JSON.stringify({role,...data})}).then(r=>r.json());
-  c.rpc=(name,args)=>/^(guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item)$/.test(name)?send({name,args}):original(name,args);
+  c.rpc=(name,args)=>/^(guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item|guigs_get_spatial_history|guigs_get_reports)$/.test(name)?send({name,args}):original(name,args);
   c.from=table=>{
     if(table==='guigs_memberships')return {select(){return this},eq(){return this},then(a,b){return Promise.resolve({data:[{shop_id:shop,role,active:true}],error:null}).then(a,b)}};
     if(!['guigs_products','guigs_lots','guigs_suppliers'].includes(table))return originalFrom(table);
@@ -70,6 +74,7 @@ function bridge({role,shop}){
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104124855_spatial_fridge_replenishment.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104125329_spatial_fridge_operations.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104125833_spatial_fridge_inventory.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104130828_spatial_fridge_observability.sql'),'utf8'));
     const ledger=()=>db.query('select id,delta,slot_id from public.guigs_movements order by id').then(r=>r.rows);
     const before=await ledger();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -236,10 +241,36 @@ function bridge({role,shop}){
     await worker.page.selectOption('#fridgeRestockFilter','available');
     check(await target.count()===0,'Filtro com disponibilidade oculta posição sem unidades a pegar');
     check(await worker.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Reposição mobile sem rolagem horizontal global');
-    await worker.context.close();
     const restockChecks=checks;checks=0;
+    await worker.page.click('#fridgeOperateStock');
+    await worker.page.selectOption('#fridgeStockKind','loss');
+    await worker.page.selectOption('#fridgeStockOrigin',x);
+    await worker.page.fill('#fridgeStockQuantity','1');
+    await worker.page.fill('#fridgeStockNote','=Fórmula artificial');
+    await worker.page.click('#fridgeStockQuote');
+    await worker.page.waitForFunction(()=>!document.querySelector('#fridgeStockConfirm').disabled);
+    await worker.page.click('#fridgeStockConfirm');
+    await worker.page.waitForFunction(()=>!document.querySelector('#fridgeStockDialog').open&&!document.querySelector('#refresh').disabled);
+    await worker.page.click('#navHistory');
+    await worker.page.selectOption('#historyPartition','slot');
+    await worker.page.waitForFunction(()=>document.querySelector('#history').textContent.includes('Estoque seco → Geladeira A'));
+    check(await worker.page.locator('#history tr').filter({hasText:'Venda'}).count()===1,'Venda split agrupada no histórico');
+    check(await worker.page.locator('#history tr').filter({hasText:'Coca A1'}).count()>1,'Histórico exibe destino/origem física');
+    await worker.page.selectOption('#historyPartition','unallocated');
+    await worker.page.waitForFunction(()=>!document.querySelector('#history').textContent.includes('Fórmula artificial'));
+    check((await worker.page.textContent('#history')).includes('Geladeira — não alocado'),'Filtro inclui partição legada sem inventar posição');
+    await worker.context.close();
+    const historyChecks=checks;checks=0;
     const countBefore=await ledger();
     const inventory=await open('owner',{width:390,height:844});
+    await inventory.page.click('#navReports');
+    await inventory.page.waitForFunction(()=>document.querySelector('#reportsMessage').textContent.includes('Período aplicado'));
+    check((await inventory.page.textContent('#reportsFridgeSummary')).includes('Venda: 4 un.'),'Relatório agrega venda por geladeira');
+    const download=inventory.page.waitForEvent('download');
+    await inventory.page.click('#reportsExport');
+    const csv=fs.readFileSync(await (await download).path(),'utf8');
+    check(csv.includes('"Local"')&&csv.includes('Geladeira A / A1 / Coca A1')&&csv.includes("'=Fórmula"),'CSV inclui posição e neutraliza fórmula');
+    const reportingChecks=checks;checks=0;
     await inventory.page.click('#navInventory');
     await inventory.page.click('#newSpatialInventory');
     await inventory.page.click('#inventoryCreateSubmit');
@@ -255,7 +286,7 @@ function bridge({role,shop}){
     assert.deepEqual(await ledger(),countBefore);checks++;
     check(inventory.errors.length===0,'Inventário espacial sem erro JavaScript');
     await inventory.context.close();
-    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+replenishChecks+operationChecks+restockChecks+checks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${replenishChecks} reposição, ${operationChecks} saída, ${restockChecks} lista, ${checks} inventário); navegador e PGlite artificiais.`);
+    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+replenishChecks+operationChecks+restockChecks+historyChecks+reportingChecks+checks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${replenishChecks} reposição, ${operationChecks} saída, ${restockChecks} lista, ${historyChecks+reportingChecks} observabilidade, ${checks} inventário); navegador e PGlite artificiais.`);
   }finally{
     if(browser)await browser.close();
     if(server.listening)await new Promise(resolve=>server.close(resolve));

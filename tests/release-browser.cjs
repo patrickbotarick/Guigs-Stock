@@ -13,6 +13,7 @@ async function dispatch(request){
   return asUser(db,'owner',async tx=>(await tx.query(`select * from public.${request.table} where shop_id=$1 order by id limit 1000 offset $2`,[id(10),request.offset||0])).rows);
  }
  if(request.name==='guigs_get_reports')return report(db,'owner',request.args);
+ if(request.name==='guigs_get_spatial_history')throw Object.assign(Error('RPC ausente no schema legado'),{code:'PGRST202'});
  if(/inventory|inventories/.test(request.name))return callRPC(db,'owner',request.name,request.args);
  const reads={guigs_get_lot_balances:['select * from public.guigs_get_lot_balances($1)',[id(10)]],guigs_get_history_actors:['select * from public.guigs_get_history_actors($1)',[id(10)]],guigs_get_history:['select * from public.guigs_get_history($1,20,0)',[id(10)]]};
  if(reads[request.name])return asUser(db,'owner',async tx=>(await tx.query(...reads[request.name])).rows);

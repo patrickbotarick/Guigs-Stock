@@ -77,7 +77,11 @@ export function createReportsUI({getContext, dayDifference, replenishmentFor}) {
     const ranking = row => card(row.product,[quantity(row.units,'unidade','unidades')]);
     list('reportsSales',data.sales,'Nenhuma saída por venda registrada neste período.',ranking,data.sales_count);
     list('reportsLossRanking',data.loss_ranking,'Nenhuma perda registrada neste período.',ranking,data.loss_ranking_count);
-    list('reportsLosses',data.losses,'Nenhuma perda registrada neste período.',row=>card(`${row.product} · Lote ${row.lot}`,[`${row.units} unidades · ${formatDate(row.date)}`,`Responsável: ${row.actor}`,`Motivo / observação: ${row.note || 'Não informado'}`]));
+    list('reportsLosses',data.losses,'Nenhuma perda registrada neste período.',row=>card(`${row.product} · Lote ${row.lot}`,[`${row.units} unidades · ${formatDate(row.date)}`,`Local: ${row.location_label || 'Não informado'}`,`Responsável: ${row.actor}`,`Motivo / observação: ${row.note || 'Não informado'}`]));
+    list('reportsFridgeSummary',data.spatial_summary||[],'Nenhuma operação em posição física neste período.',row=>card(row.fridge_name,[
+      `Reposições: ${row.replenishment_events} · Unidades repostas: ${row.replenished_units}`,
+      `Venda: ${row.sale_units} un. · Perda: ${row.loss_units} un.`
+    ]));
     el('reportsLossPage').textContent = `Página ${Math.floor(lossOffset/limit)+1} · ${quantity(data.loss_count,'registro','registros')} de perda`;
     list('reportsSuppliers',data.suppliers,'Nenhum recebimento registrado neste período.',row=>card(row.supplier,[`${quantity(row.operations,'recebimento','recebimentos')} · ${quantity(row.units,'unidade','unidades')}`,`Último recebimento no período: ${formatDate(row.latest)}`]),data.supplier_count);
     list('reportsActivity',data.activity,'Nenhuma atividade registrada neste período.',row=>card(row.actor,[`Recebimentos: ${row.receipts} · Movimentações: ${row.transfers}`,`Saídas por venda: ${row.sales} · Perdas: ${row.losses} · Ajustes: ${row.adjustments}`]),data.activity_count);
@@ -153,7 +157,7 @@ export function createReportsUI({getContext, dayDifference, replenishmentFor}) {
       let text=String(value ?? ''); if (/^[\s\u0000-\u001f]*[=+\-@]/.test(text)) text="'"+text;
       return '"'+text.replaceAll('"','""')+'"';
     };
-    const rows=[['Perdas — página exibida',applied.from,applied.to,`Página ${Math.floor(lossOffset/limit)+1}`],['Produto','Lote','Unidades perdidas','Data','Responsável','Motivo / observação'],...data.losses.map(r=>[r.product,r.lot,r.units,formatDate(r.date),r.actor,r.note])];
+    const rows=[['Perdas — página exibida',applied.from,applied.to,`Página ${Math.floor(lossOffset/limit)+1}`],['Produto','Lote','Unidades perdidas','Data','Local','Responsável','Motivo / observação'],...data.losses.map(r=>[r.product,r.lot,r.units,formatDate(r.date),r.location_label,r.actor,r.note])];
     const blob = new Blob(['\ufeff'+rows.map(row=>row.map(cell).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'});
     const url=URL.createObjectURL(blob), link=node('a');link.href=url;link.download=`perdas-${applied.from}-${applied.to}-pagina-${Math.floor(lossOffset/limit)+1}.csv`;
     document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);

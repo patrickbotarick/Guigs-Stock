@@ -188,6 +188,8 @@ let query = '';
 
 let historyProduct = '';
 let historyType = '';
+let historyPartition = '';
+let spatialHistorySupported;
 let historyActor = '';
 let historyDateFrom = '';
 let historyDateTo = '';
@@ -1742,12 +1744,7 @@ async function loadHistory() {
     historyPage * historyPageSize;
 
 
-  const {
-    data,
-    error
-  } = await client.rpc(
-    'guigs_get_history',
-    {
+  const args = {
       p_shop: shop.shop_id,
       p_limit: historyPageSize,
       p_offset: offset,
@@ -1777,8 +1774,19 @@ p_date_to:
         query.trim()
           ? query.trim()
           : null
-    }
-  );
+  };
+  let response;
+  if(spatialHistorySupported!==false){
+    response=await client.rpc('guigs_get_spatial_history',{...args,p_partition:historyPartition||null});
+    if(response.error?.code==='PGRST202'||(!response.error&&response.data==null))spatialHistorySupported=false;
+    else if(!response.error)spatialHistorySupported=true;
+  }
+  if(spatialHistorySupported===false){
+    el('historyPartition').classList.add('hidden');
+    el('historyType').querySelector('[value="relocate"]').disabled=true;
+    response=await client.rpc('guigs_get_history',args);
+  }
+  const {data,error}=response;
 
 
   if (error) {
@@ -1863,7 +1871,8 @@ function renderHistory() {
       return: 'Retorno',
       sale: 'Venda',
       loss: 'Perda',
-      adjust: 'Ajuste'
+      adjust: 'Ajuste',
+      relocate: 'Distribuição física'
     };
 
 
@@ -1906,15 +1915,27 @@ function renderHistory() {
       'location-badge';
 
 
-    locationBadge.textContent =
-      m.location === 'stock'
-        ? 'Estoque'
-        : 'Geladeira';
+    const parts=Array.isArray(m.parts)?m.parts:[];
+    const groupedTransfer=m.spatial&&['transfer','return','relocate'].includes(m.movement_type);
+    const labels=rows=>[...new Set(rows.map(x=>x.label))].join(' + ');
+    locationBadge.textContent=groupedTransfer
+      ? labels(parts.filter(p=>p.delta<0))+' → '+labels(parts.filter(p=>p.delta>0))
+      : parts.length?labels(parts):m.location==='stock'?'Estoque':'Geladeira — não alocado';
 
 
     locationCell.append(
       locationBadge
     );
+    if(m.spatial&&parts.length>1){
+      const detail=document.createElement('details'),summary=document.createElement('summary'),list=document.createElement('ul');
+      summary.textContent='Ver posições e lotes';
+      for(const p of parts){
+        const entry=document.createElement('li');
+        entry.textContent=p.label+' · '+p.lot_code+' · '+(p.delta>0?'+':'')+p.delta;
+        list.append(entry);
+      }
+      detail.append(summary,list);locationCell.append(detail);
+    }
 
 
     r.append(
@@ -1929,9 +1950,9 @@ function renderHistory() {
 
     cell(
       r,
-      (m.delta > 0 ? '+' : '')
+      (m.delta > 0 && !groupedTransfer ? '+' : '')
       + m.delta,
-      m.delta > 0
+      m.delta > 0 && !groupedTransfer
         ? 'num delta-positive'
         : m.delta < 0
           ? 'num delta-negative'
@@ -2864,6 +2885,11 @@ el('historyDateTo')
   );
 
 
+el('historyPartition').addEventListener('change',event=>{
+  historyPartition=event.target.value;
+  void applyHistoryFilters();
+});
+
 el('clearHistoryFilters')
   .addEventListener(
     'click',
@@ -2871,6 +2897,7 @@ el('clearHistoryFilters')
 
       historyProduct = '';
       historyType = '';
+      historyPartition = '';
       historyActor = '';
       historyDateFrom = '';
       historyDateTo = '';
@@ -2880,6 +2907,7 @@ el('clearHistoryFilters')
       el('historyProduct').value = '';
       searchableSelects.get('historyProduct')();
       el('historyType').value = '';
+      el('historyPartition').value = '';
       el('historyActor').value = '';
       el('historyDateFrom').value = '';
       el('historyDateTo').value = '';
