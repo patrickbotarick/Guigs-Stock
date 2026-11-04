@@ -1,0 +1,32 @@
+const {randomUUID}=require('node:crypto');
+const {ids,loginAll,check}=require('./live.cjs');
+(async()=>{
+ const {clients:{ownerA:owner,attendantA:attendant,ownerB:foreign}}=await loginAll();
+ const shop=ids.shopA, suffix=randomUUID().slice(0,8);
+ const rpc=(c,n,args={})=>c.rpc(n,{p_shop_id:shop,...args});
+ const ok=async(c,n,args)=>{const r=await rpc(c,n,args);if(r.error)throw Error('RPC '+n);return r.data;};
+ const product=await ok(owner,'guigs_create_product',{p_name:'Fixture saída '+suffix});
+ const lot=(await ok(owner,'guigs_receive_stock',{p_product_id:product,p_lot_code:'S-'+suffix,
+  p_expiry:new Date(Date.now()+30*86400000).toISOString().slice(0,10),p_quantity:10,p_note:'Fixture artificial',p_supplier_id:null})).lot_id;
+ await ok(owner,'guigs_transfer_stock',{p_lot_id:lot,p_from_location:'stock',p_to_location:'fridge',p_quantity:8,p_note:'Fixture artificial'});
+ const save=(kind,values)=>ok(owner,'guigs_save_fridge_layout',{p_kind:kind,p_values:values});
+ const f=await save('fridge',{name:'Saída artificial '+suffix}),h=await save('shelf',{name:'1',fridge_id:f.id});
+ const a=await save('slot',{name:'A',fridge_id:f.id,shelf_id:h.id,product_id:product,sort_order:1});
+ const b=await save('slot',{name:'B',fridge_id:f.id,shelf_id:h.id,product_id:product,sort_order:2});
+ await ok(owner,'guigs_allocate_fridge_stock',{p_request_id:randomUUID(),p_entries:[[a,5],[b,3]].map(([s,quantity])=>({lot_id:lot,slot_id:s.id,quantity}))});
+ const spec={kind:'sale',origin:'auto',quantity:6,product_id:product};
+ const quote=await ok(attendant,'guigs_get_fridge_operation',{p_spec:spec});
+ check(quote.plan.map(x=>x.delta).join()==='-5,-1','Venda real dividida com ordem física no empate FEFO');
+ const args=()=>({p_request_id:randomUUID(),p_spec:spec,p_expected:quote,p_note:'Fixture artificial'});
+ const requests=[args(),args()],roles=[attendant,owner];
+ check(!!(await rpc(foreign,'guigs_apply_fridge_operation',args())).error,'Venda real cross-shop negada');
+ const results=await Promise.all(roles.map((c,i)=>rpc(c,'guigs_apply_fridge_operation',requests[i])));
+ check(results.filter(r=>!r.error).length===1,'Uma de duas vendas concorrentes confirma');
+ const winner=results.findIndex(r=>!r.error);
+ const replay=await ok(roles[winner],'guigs_apply_fridge_operation',requests[winner]);
+ check(replay.event_id===results[winner].data.event_id,'Retry de venda mantém o evento');
+ const balances=await owner.rpc('guigs_get_lot_balances',{p_shop:shop});
+ check(balances.data?.find(b=>b.lot_id===lot)?.fridge===2,'Saldo global real não foi debitado duas vezes');
+ const map=await ok(attendant,'guigs_get_fridge_map');
+ check(map.slots.find(s=>s.id===a.id).quantity===0&&map.slots.find(s=>s.id===b.id).quantity===2,'Debita apenas as posições do plano');
+})().catch(()=>{console.error('Falha na homologação de saídas espaciais; dados e credenciais omitidos.');process.exitCode=1;});

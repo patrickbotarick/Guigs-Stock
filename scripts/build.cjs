@@ -1,6 +1,6 @@
 // Build estático por allowlist. Nunca lê config.js local nem faz conexão de rede.
 const fs=require('node:fs'),path=require('node:path');
-const files=Object.freeze(['index.html','auth-preview.html','reset-password.html','cloud-dashboard.js','inventory.js','reports.js',
+const files=Object.freeze(['index.html','auth-preview.html','reset-password.html','cloud-dashboard.js','inventory.js','reports.js','fridges.js',
  'auth-preview.js','reset-password.js','pwa.js','service-worker.js','manifest.webmanifest','logo-guigs.png',
  'icons/guigs-stock-192.png','icons/guigs-stock-512.png','icons/guigs-stock-maskable-512.png']);
 function build({sourceRoot=path.resolve(__dirname,'..'),env=process.env}={}) {
@@ -16,6 +16,13 @@ function build({sourceRoot=path.resolve(__dirname,'..'),env=process.env}={}) {
   const source=path.join(root,file),resolved=fs.realpathSync(source);
   if(!resolved.startsWith(root+path.sep)||fs.lstatSync(source).isSymbolicLink()||!fs.statSync(source).isFile())throw Error('Arquivo público ausente ou fora da origem permitida.');
  }
+ const worker=fs.readFileSync(path.join(root,'service-worker.js'),'utf8');
+ const shell=worker.match(/const APP_SHELL = \[([\s\S]*?)\];/)?.[1];
+ if(!shell)throw Error('Allowlist do shell PWA ausente.');
+ const packaged=new Set(['',...files,'config.js']);
+ const precached=new Set([...shell.matchAll(/"\.\/([^"?#]*)"/g)].map(match=>match[1]));
+ for(const entry of precached)if(!packaged.has(entry))throw Error('Shell PWA referencia arquivo fora do build: '+entry);
+ for(const entry of packaged)if(entry!=='service-worker.js'&&!precached.has(entry))throw Error('Shell PWA não inclui: '+entry);
  // Caminho absoluto fixo verificado acima. Remove apenas o artefato descartável dist.
  if(fs.existsSync(target))fs.rmSync(target,{recursive:true});
  fs.mkdirSync(target);

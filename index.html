@@ -1167,6 +1167,31 @@
         }
       }
       #reportsView { min-width: 0; }
+      #fridgesView, #fridgeLayoutFields { min-inline-size: 0; }
+      #fridgeLayoutFields { border: 0; padding: 0; margin: 0; }
+      #fridgeLayoutFields input[type="checkbox"] { inline-size: 1.3rem; block-size: 1.3rem; }
+      #fridgeEditor select, #fridgeEditor input { max-inline-size: 100%; }
+      #fridgeEditor .field { margin-block: .6rem; }
+      .fridge-cabinets { display:flex; flex-wrap:wrap; gap:.9rem; }
+      .fridge-cabinet { flex:1 1 min(100%,max(19rem,var(--cabinet-width,48%))); min-inline-size:0; border:1px solid var(--line,#394253); border-radius:14px; padding:.8rem; }
+      .fridge-cabinet h3, .fridge-shelf h4 { margin:.25rem 0 .55rem; overflow-wrap:anywhere; }
+      .fridge-shelf { border-block-end:2px solid var(--line,#394253); margin-block:.6rem; padding:.5rem; background:rgba(125,145,165,.08); border-radius:8px; container-type:inline-size; }
+      .fridge-shelf .fridge-rail { display:grid; grid-template-columns:repeat(100,minmax(0,1fr)); row-gap:.55rem; min-block-size:calc(2rem + var(--shelf-size,0) * 5rem); }
+      .fridge-slot { grid-column:var(--slot-column); grid-row:var(--slot-row); min-inline-size:0; border:1px solid var(--line,#394253); border-radius:8px; padding:.55rem; margin-inline-end:3px; overflow-wrap:anywhere; }
+      .fridge-slot h5, .fridge-slot p { margin:.2rem 0; }
+      .fridge-slot meter { inline-size:100%; min-inline-size:0; }
+      .fridge-slot .btn { margin-block:.35rem; max-inline-size:100%; white-space:normal; }
+      .fridge-photo { display:block; inline-size:2.25rem; block-size:2.25rem; object-fit:contain; }
+      .fridge-photo-fallback { display:grid; place-items:center; background:rgba(125,145,165,.18); border-radius:6px; }
+      .fridge-state { display:inline-block; font-size:.8rem; font-weight:700; padding:.12rem .36rem; border-radius:4px; color:#16202b; background:#e5e7eb; }
+      .fridge-state[data-state="OK"] { background:#a6edc0; }
+      .fridge-state[data-state="ATENÇÃO"] { background:#ffe0a0; }
+      .fridge-state[data-state="CRÍTICO"] { background:#ffc4c4; }
+      .fridge-unallocated { margin-block-start:1rem; padding-block-start:.5rem; border-block-start:1px solid var(--line,#394253); }
+      @container (max-width:420px) {
+        .fridge-shelf .fridge-rail { grid-template-columns:minmax(0,1fr); }
+        .fridge-slot { grid-column:1; grid-row:auto; margin-inline-end:0; }
+      }
       #reportsView .panel { margin-bottom: 16px; }
       .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 12px; }
       .report-card { border: 1px solid var(--line, #ddd); border-radius: 12px; padding: 14px; min-width: 0; overflow-wrap: anywhere; }
@@ -1195,6 +1220,7 @@
           <span class="nav-label">NAVEGAÇÃO</span>
           <a id="navOverview" class="menu" href="#visao-geral" aria-current="page">◫ Visão geral</a>
           <a id="navHistory" class="menu" href="#historico">↻ Histórico</a>
+          <a id="navFridges" class="menu" href="#geladeiras">▥ Geladeiras</a>
           <a id="navInventory" class="menu" href="#inventario">▤ Inventário</a>
           <a id="navReports" class="menu hidden" href="#relatorios">▥ Relatórios</a>
         </nav>
@@ -1407,6 +1433,14 @@
                   <option value="sale">Venda</option>
                   <option value="loss">Perda</option>
                   <option value="adjust">Ajuste</option>
+                  <option value="relocate">Distribuição física</option>
+                </select>
+
+                <select id="historyPartition" aria-label="Filtrar localização">
+                  <option value="">Todas as localizações</option>
+                  <option value="stock">Estoque seco</option>
+                  <option value="unallocated">Geladeira — não alocado</option>
+                  <option value="slot">Posições físicas</option>
                 </select>
 
                 <input
@@ -1430,7 +1464,7 @@
                 <input
                   id="search"
                   type="search"
-                  placeholder="Buscar produto, lote ou observação…"
+                  placeholder="Buscar produto, lote, posição ou observação…"
                 />
 
                 <button id="clearHistoryFilters" class="btn" type="button">
@@ -1456,12 +1490,63 @@
             </div>
           </section>
 
+          <section id="fridgesView" class="hidden" aria-label="Geladeiras físicas">
+            <div class="panel">
+              <h2>Geladeiras físicas</h2>
+              <p class="muted">As posições organizam o estoque da geladeira. Editar o layout não movimenta unidades.</p>
+              <div class="inventory-actions" aria-label="Modo do mapa">
+                <button id="fridgeOperate" class="btn" type="button" aria-pressed="true">Operação</button>
+                <button id="fridgeRestockMode" class="btn" type="button" aria-pressed="false">Reposição</button>
+                <button id="fridgeEdit" class="btn hidden" type="button" aria-pressed="false">Editar layout</button>
+                <button id="fridgeReload" class="btn" type="button">Atualizar mapa</button>
+                <button id="fridgeAllocate" class="btn hidden" type="button">Distribuir estoque existente</button>
+                <button id="fridgeOperateStock" class="btn" type="button">Venda, perda, ajuste ou retorno</button>
+              </div>
+              <p id="fridgeOffline" class="notice hidden">Sem conexão. O mapa exibido pode estar desatualizado; edição bloqueada.</p>
+              <p id="fridgeMessage" role="status" aria-live="polite"></p>
+            </div>
+            <div id="fridgeMap" class="panel"></div>
+            <section id="fridgeRestockView" class="panel hidden" aria-labelledby="fridgeRestockTitle">
+              <h2 id="fridgeRestockTitle">Lista de reposição</h2>
+              <p>Estimativa da leitura atual, sem reserva de estoque. O plano de lotes é confirmado pelo servidor ao abrir cada posição.</p>
+              <div class="field"><label for="fridgeRestockFilter">Mostrar</label><select id="fridgeRestockFilter">
+                <option value="all">Todas as posições abaixo da meta</option><option value="available">Com unidades a pegar</option><option value="shortage">Com falta de estoque seco</option>
+              </select></div>
+              <div id="fridgeRestockSummary"></div>
+              <div id="fridgeRestockList"></div>
+            </section>
+            <section id="fridgeEditor" class="panel hidden" aria-labelledby="fridgeEditorTitle">
+              <h2 id="fridgeEditorTitle">Configurar geladeiras</h2>
+              <p>Posições e tamanhos usam porcentagens. Para desativar uma posição ocupada, realoque o saldo antes.</p>
+              <div class="field"><label for="fridgeEditKind">Editar</label><select id="fridgeEditKind">
+                <option value="fridge">Geladeira</option><option value="shelf">Prateleira</option><option value="slot">Posição</option>
+              </select></div>
+              <div class="field"><label for="fridgeEditItem">Item do layout</label><select id="fridgeEditItem"></select></div>
+              <form id="fridgeLayoutForm" class="modalform">
+                <fieldset id="fridgeLayoutFields"></fieldset>
+                <button id="fridgeSaveLayout" class="btn green" type="submit">Salvar layout</button>
+              </form>
+              <section aria-labelledby="fridgeImageTitle">
+                <h3 id="fridgeImageTitle">Foto de produto</h3>
+                <p>PNG, JPEG ou WebP de até 2 MiB. A foto fica disponível para membros da loja. Remover desvincula a foto do mapa.</p>
+                <form id="fridgeImageForm" class="modalform">
+                  <div class="field"><label for="fridgeImageProduct">Produto em uma posição</label><select id="fridgeImageProduct" required></select></div>
+                  <div class="field"><label for="fridgeImageFile">Arquivo de imagem</label><input id="fridgeImageFile" type="file" accept="image/png,image/jpeg,image/webp" required></div>
+                  <div class="inventory-actions">
+                    <button id="fridgeImageUpload" class="btn" type="submit">Salvar foto</button>
+                    <button id="fridgeImageRemove" class="btn" type="button">Remover foto do mapa</button>
+                  </div>
+                  <p id="fridgeImageMessage" role="status" aria-live="polite"></p>
+                </form>
+              </section>
+            </section>
+          </section>
           <section id="inventoryView" class="hidden" aria-label="Inventário físico">
             <div id="inventoryOffline" class="notice danger hidden" role="status">Sem internet: criação, contagem e fechamento bloqueados. Os dados exibidos podem estar desatualizados.</div>
             <div id="inventoryMessage" class="notice hidden" role="status" aria-live="polite"></div>
             <div class="panel">
               <div class="panelhead"><div><h2>Inventários físicos</h2><p class="muted">Contar não altera estoque. Somente o proprietário pode fechar e aplicar divergências após revisão.</p></div>
-                <div class="inventory-actions"><button type="button" id="newInventory" class="btn green hidden" data-inventory-write>Novo inventário</button><button type="button" id="inventoryReload" class="btn">Atualizar inventários</button></div>
+                <div class="inventory-actions"><button type="button" id="newSpatialInventory" class="btn green hidden" data-inventory-write>Inventário por posição</button><button type="button" id="newInventory" class="btn hidden" data-inventory-write>Novo inventário sem posições</button><button type="button" id="inventoryReload" class="btn">Atualizar inventários</button></div>
               </div>
               <p id="inventoryOpenSummary"></p><p id="inventoryLastCompleted" class="muted"></p>
               <h3>Histórico de inventários</h3><div id="inventoryList"></div>
@@ -1484,6 +1569,7 @@
                 <div class="field"><label for="inventoryItemSelect">Pesquisar produto / lote</label><select id="inventoryItemSelect"><option value="">Todos os produtos / lotes</option></select></div>
                 <div class="field"><label for="inventoryLocation">Localização</label><select id="inventoryLocation"><option value="">Ambas</option><option value="stock">Estoque seco</option><option value="fridge">Geladeira</option></select></div>
                 <div class="field"><label for="inventoryFilter">Conferência</label><select id="inventoryFilter"><option value="all">Todos</option><option value="divergent">Divergentes</option><option value="pending">Não contados</option><option value="counted">Conferidos</option></select></div>
+                <div id="inventoryPositionField" class="field hidden"><label for="inventoryPosition">Posição física</label><select id="inventoryPosition"></select></div>
                 <button type="button" id="inventoryNextItem" class="btn">Próxima contagem pendente</button>
               </div>
               <div id="inventoryItems" class="inventory-items"></div>
@@ -1509,6 +1595,7 @@
             <section class="panel"><h2>Recebimentos por fornecedor</h2><p class="muted">Nome registrado no recebimento. Registros antigos sem fornecedor: Não informado. Nomes iguais são agrupados; renomeações preservam o nome histórico.</p><div id="reportsSuppliers" class="report-grid" data-report-content></div></section>
             <section class="panel"><h2>Atividade por responsável</h2><p class="muted">Contagem de operações para rastreabilidade. Ordem alfabética; sem pontuação de produtividade.</p><div id="reportsActivity" class="report-grid" data-report-content></div></section>
             <section class="panel"><h2>Inventários</h2><h3>Último iniciado, independente do período</h3><div id="reportsLatestInventory" data-report-content></div><h3>Concluídos / cancelados no período</h3><p class="muted">Filtro pela data de encerramento. Responsável é quem iniciou. Divergências comparam a última contagem com a base de conferência.</p><div id="reportsInventories" class="report-grid" data-report-content></div><div class="inventory-actions"><button id="reportsInventoryPrevious" class="btn" type="button">Anterior</button><span id="reportsInventoryPage" data-report-content></span><button id="reportsInventoryNext" class="btn" type="button">Próxima</button></div></section>
+            <section class="panel"><h2>Operações por geladeira</h2><p class="muted">Somente posições físicas identificadas. Distribuição interna não conta como reposição.</p><div id="reportsFridgeSummary" class="report-grid" data-report-content></div></section>
             <section class="panel"><h2>Estoque atual · fora do filtro de período</h2><p id="reportsStockDate" class="muted" data-report-content></p><h3>Validades</h3><div id="reportsExpiry" class="report-grid" data-report-content></div><p id="reportsExpiryNote" class="muted" data-report-content></p><h3>Mínimos e reposição da geladeira</h3><div id="reportsRestock" class="report-grid" data-report-content></div></section>
           </section>
           <div class="foot" id="updated"></div>
@@ -1516,6 +1603,62 @@
       </main>
     </div>
 
+    <dialog id="fridgeStockDialog" aria-labelledby="fridgeStockTitle">
+      <div class="modal">
+        <h2 id="fridgeStockTitle">Movimentar saldo da geladeira</h2>
+        <form id="fridgeStockForm" class="modalform">
+          <fieldset id="fridgeStockFields" style="border:0;padding:0;margin:0;min-inline-size:0">
+            <div class="field"><label for="fridgeStockKind">Operação</label><select id="fridgeStockKind"></select></div>
+            <div class="field"><label for="fridgeStockProduct">Produto</label><select id="fridgeStockProduct" required></select></div>
+            <div class="field"><label for="fridgeStockOrigin">Origem</label><select id="fridgeStockOrigin" required></select></div>
+            <div id="fridgeStockLotField" class="field"><label for="fridgeStockLot">Lote</label><select id="fridgeStockLot"></select></div>
+            <div class="field"><label id="fridgeStockQuantityLabel" for="fridgeStockQuantity">Quantidade</label><input id="fridgeStockQuantity" type="number" min="1" max="1000000" step="1" required></div>
+            <div class="field"><label for="fridgeStockNote">Motivo / observação</label><textarea id="fridgeStockNote" maxlength="1000"></textarea></div>
+          </fieldset>
+          <p id="fridgeStockRule"></p>
+          <button id="fridgeStockQuote" class="btn" type="button">Conferir impacto</button>
+          <ol id="fridgeStockPlan" aria-label="Origens e deltas previstos"></ol>
+          <p id="fridgeStockMessage" role="status" aria-live="polite"></p>
+          <div class="modalactions">
+            <button id="fridgeStockCancel" class="btn" type="button">Cancelar</button>
+            <button id="fridgeStockConfirm" class="btn green" type="submit">Confirmar movimentação</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+    <dialog id="fridgeReplenishDialog" aria-labelledby="fridgeReplenishTitle">
+      <div class="modal">
+        <h2 id="fridgeReplenishTitle">Repor posição</h2>
+        <p id="fridgeReplenishPosition"></p>
+        <p id="fridgeReplenishStats"></p>
+        <form id="fridgeReplenishForm" class="modalform">
+          <div class="field"><label for="fridgeReplenishQuantity">Quantidade a repor</label><input id="fridgeReplenishQuantity" type="number" min="1" max="1000000" step="1" required></div>
+          <button id="fridgeReplenishQuote" class="btn" type="button">Calcular sugestão FEFO</button>
+          <ol id="fridgeReplenishPlan" aria-label="Lotes sugeridos em ordem FEFO"></ol>
+          <p id="fridgeReplenishMessage" role="status" aria-live="polite"></p>
+          <div class="modalactions">
+            <button id="fridgeReplenishCancel" class="btn" type="button">Cancelar</button>
+            <button id="fridgeReplenishConfirm" class="btn green" type="submit">Confirmar reposição</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+    <dialog id="fridgeAllocationDialog" aria-labelledby="fridgeAllocationTitle">
+      <div class="modal">
+        <h2 id="fridgeAllocationTitle">Distribuir estoque existente</h2>
+        <p>Mova unidades de um lote não alocado para as posições onde ele está fisicamente. O total da geladeira permanece igual.</p>
+        <form id="fridgeAllocationForm" class="modalform">
+          <div class="field"><label for="fridgeAllocationLot">Lote não alocado</label><select id="fridgeAllocationLot" required></select></div>
+          <div id="fridgeAllocationDestinations"></div>
+          <p id="fridgeAllocationSummary" aria-live="polite"></p>
+          <p id="fridgeAllocationMessage" role="status"></p>
+          <div class="modalactions">
+            <button id="fridgeCancelAllocation" class="btn" type="button">Cancelar</button>
+            <button id="fridgeConfirmAllocation" class="btn green" type="submit">Confirmar distribuição</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
     <dialog id="inventoryCreateDialog" aria-labelledby="inventoryCreateTitle">
       <div class="modal"><h2 id="inventoryCreateTitle">Novo inventário físico</h2><p>Capturar os lotes e os saldos dos dois locais. Nenhum saldo será alterado.</p>
         <form id="inventoryCreateForm" class="modalform">

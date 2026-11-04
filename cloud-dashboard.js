@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { createInventoryUI } from './inventory.js';
+import { createFridgesUI } from './fridges.js';
 import { createReportsUI } from './reports.js';
 
 const el = id => document.getElementById(id);
@@ -187,6 +188,8 @@ let query = '';
 
 let historyProduct = '';
 let historyType = '';
+let historyPartition = '';
+let spatialHistorySupported;
 let historyActor = '';
 let historyDateFrom = '';
 let historyDateTo = '';
@@ -722,6 +725,7 @@ async function bootstrap() {
           .add('hidden');
 
         reportsUI.reset();
+        fridgesUI.reset();
 
         location.replace(
           'auth-preview.html'
@@ -838,6 +842,7 @@ await loadHistory();
       .classList
       .remove('hidden');
     if (location.hash === '#inventario') inventoryUI.activate();
+    if (location.hash === '#geladeiras') fridgesUI.activate();
     el('navReports').classList.toggle('hidden', shop?.role !== 'owner');
     reportsUI.sync();
     if (location.hash === '#relatorios') reportsUI.activate();
@@ -1739,12 +1744,7 @@ async function loadHistory() {
     historyPage * historyPageSize;
 
 
-  const {
-    data,
-    error
-  } = await client.rpc(
-    'guigs_get_history',
-    {
+  const args = {
       p_shop: shop.shop_id,
       p_limit: historyPageSize,
       p_offset: offset,
@@ -1774,8 +1774,19 @@ p_date_to:
         query.trim()
           ? query.trim()
           : null
-    }
-  );
+  };
+  let response;
+  if(spatialHistorySupported!==false){
+    response=await client.rpc('guigs_get_spatial_history',{...args,p_partition:historyPartition||null});
+    if(response.error?.code==='PGRST202'||(!response.error&&response.data==null))spatialHistorySupported=false;
+    else if(!response.error)spatialHistorySupported=true;
+  }
+  if(spatialHistorySupported===false){
+    el('historyPartition').classList.add('hidden');
+    el('historyType').querySelector('[value="relocate"]').disabled=true;
+    response=await client.rpc('guigs_get_history',args);
+  }
+  const {data,error}=response;
 
 
   if (error) {
@@ -1860,7 +1871,8 @@ function renderHistory() {
       return: 'Retorno',
       sale: 'Venda',
       loss: 'Perda',
-      adjust: 'Ajuste'
+      adjust: 'Ajuste',
+      relocate: 'Distribuição física'
     };
 
 
@@ -1903,15 +1915,27 @@ function renderHistory() {
       'location-badge';
 
 
-    locationBadge.textContent =
-      m.location === 'stock'
-        ? 'Estoque'
-        : 'Geladeira';
+    const parts=Array.isArray(m.parts)?m.parts:[];
+    const groupedTransfer=m.spatial&&['transfer','return','relocate'].includes(m.movement_type);
+    const labels=rows=>[...new Set(rows.map(x=>x.label))].join(' + ');
+    locationBadge.textContent=groupedTransfer
+      ? labels(parts.filter(p=>p.delta<0))+' → '+labels(parts.filter(p=>p.delta>0))
+      : parts.length?labels(parts):m.location==='stock'?'Estoque':'Geladeira — não alocado';
 
 
     locationCell.append(
       locationBadge
     );
+    if(m.spatial&&parts.length>1){
+      const detail=document.createElement('details'),summary=document.createElement('summary'),list=document.createElement('ul');
+      summary.textContent='Ver posições e lotes';
+      for(const p of parts){
+        const entry=document.createElement('li');
+        entry.textContent=p.label+' · '+p.lot_code+' · '+(p.delta>0?'+':'')+p.delta;
+        list.append(entry);
+      }
+      detail.append(summary,list);locationCell.append(detail);
+    }
 
 
     r.append(
@@ -1926,9 +1950,9 @@ function renderHistory() {
 
     cell(
       r,
-      (m.delta > 0 ? '+' : '')
+      (m.delta > 0 && !groupedTransfer ? '+' : '')
       + m.delta,
-      m.delta > 0
+      m.delta > 0 && !groupedTransfer
         ? 'num delta-positive'
         : m.delta < 0
           ? 'num delta-negative'
@@ -2699,23 +2723,28 @@ function applyView() {
   const history = location.hash === '#historico';
   const inventory = location.hash === '#inventario';
   const reports = location.hash === '#relatorios';
-  el('overviewView').classList.toggle('hidden', history || inventory || reports);
+  const fridges = location.hash === '#geladeiras';
+  el('overviewView').classList.toggle('hidden', history || inventory || reports || fridges);
   el('historyView').classList.toggle('hidden', !history);
   el('inventoryView').classList.toggle('hidden', !inventory);
   el('reportsView').classList.toggle('hidden', !reports);
-  document.querySelector('.main').classList.toggle('history-view', history || inventory || reports);
-  el('viewTitle').textContent = reports ? 'Relatórios operacionais' : inventory ? 'Inventário físico' : history ? 'Histórico de movimentações' : 'Painel do estoque';
-  for (const [id, active] of [['navOverview', !history && !inventory && !reports], ['navHistory', history], ['navInventory',inventory], ['navReports',reports]]) {
+  el('fridgesView').classList.toggle('hidden', !fridges);
+  document.querySelector('.main').classList.toggle('history-view', history || inventory || reports || fridges);
+  el('viewTitle').textContent = fridges ? 'Mapa de Geladeiras' : reports ? 'Relatórios operacionais' : inventory ? 'Inventário físico' : history ? 'Histórico de movimentações' : 'Painel do estoque';
+  for (const [id, active] of [['navOverview', !history && !inventory && !reports && !fridges], ['navHistory', history], ['navInventory',inventory], ['navReports',reports], ['navFridges',fridges]]) {
     if (active) el(id).setAttribute('aria-current', 'page');
     else el(id).removeAttribute('aria-current');
   }
   if (inventory) inventoryUI.activate();
   if (reports) reportsUI.activate();
+  if (fridges) fridgesUI.activate();
 }
 
 const inventoryUI = createInventoryUI({getContext:()=>({client,shop}),enhanceSelect:enhanceSearchableSelect,
   confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[]),refreshStock:refresh});
 const reportsUI = createReportsUI({getContext:()=>({client,shop}),dayDifference,replenishmentFor});
+const fridgesUI = createFridgesUI({getContext:()=>({client,shop,products,lots}),refreshStock:refresh,
+  confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[])});
 window.addEventListener('hashchange', applyView);
 applyView();
 
@@ -2745,6 +2774,7 @@ el('signout')
         .classList
         .add('hidden');
       reportsUI.reset();
+      fridgesUI.reset();
 
 
       const {
@@ -2856,6 +2886,11 @@ el('historyDateTo')
   );
 
 
+el('historyPartition').addEventListener('change',event=>{
+  historyPartition=event.target.value;
+  void applyHistoryFilters();
+});
+
 el('clearHistoryFilters')
   .addEventListener(
     'click',
@@ -2863,6 +2898,7 @@ el('clearHistoryFilters')
 
       historyProduct = '';
       historyType = '';
+      historyPartition = '';
       historyActor = '';
       historyDateFrom = '';
       historyDateTo = '';
@@ -2872,6 +2908,7 @@ el('clearHistoryFilters')
       el('historyProduct').value = '';
       searchableSelects.get('historyProduct')();
       el('historyType').value = '';
+      el('historyPartition').value = '';
       el('historyActor').value = '';
       el('historyDateFrom').value = '';
       el('historyDateTo').value = '';
