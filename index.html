@@ -1180,6 +1180,7 @@
       .fridge-slot { grid-column:var(--slot-column); grid-row:var(--slot-row); min-inline-size:0; border:1px solid var(--line,#394253); border-radius:8px; padding:.55rem; margin-inline-end:3px; overflow-wrap:anywhere; }
       .fridge-slot h5, .fridge-slot p { margin:.2rem 0; }
       .fridge-slot meter { inline-size:100%; min-inline-size:0; }
+      .fridge-slot .btn { margin-block:.35rem; max-inline-size:100%; white-space:normal; }
       .fridge-photo { display:block; inline-size:2.25rem; block-size:2.25rem; object-fit:contain; }
       .fridge-photo-fallback { display:grid; place-items:center; background:rgba(125,145,165,.18); border-radius:6px; }
       .fridge-state { display:inline-block; font-size:.8rem; font-weight:700; padding:.12rem .36rem; border-radius:4px; color:#16202b; background:#e5e7eb; }
@@ -1568,6 +1569,23 @@
       </main>
     </div>
 
+    <dialog id="fridgeReplenishDialog" aria-labelledby="fridgeReplenishTitle">
+      <div class="modal">
+        <h2 id="fridgeReplenishTitle">Repor posição</h2>
+        <p id="fridgeReplenishPosition"></p>
+        <p id="fridgeReplenishStats"></p>
+        <form id="fridgeReplenishForm" class="modalform">
+          <div class="field"><label for="fridgeReplenishQuantity">Quantidade a repor</label><input id="fridgeReplenishQuantity" type="number" min="1" max="1000000" step="1" required></div>
+          <button id="fridgeReplenishQuote" class="btn" type="button">Calcular sugestão FEFO</button>
+          <ol id="fridgeReplenishPlan" aria-label="Lotes sugeridos em ordem FEFO"></ol>
+          <p id="fridgeReplenishMessage" role="status" aria-live="polite"></p>
+          <div class="modalactions">
+            <button id="fridgeReplenishCancel" class="btn" type="button">Cancelar</button>
+            <button id="fridgeReplenishConfirm" class="btn green" type="submit">Confirmar reposição</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
     <dialog id="fridgeAllocationDialog" aria-labelledby="fridgeAllocationTitle">
       <div class="modal">
         <h2 id="fridgeAllocationTitle">Distribuir estoque existente</h2>

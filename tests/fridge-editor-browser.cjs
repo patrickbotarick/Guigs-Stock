@@ -14,7 +14,11 @@ async function dispatch({role,table,name,args}){
     guigs_save_fridge_layout:['select public.guigs_save_fridge_layout($1,$2,$3,$4,$5) as data',
       [args?.p_shop_id,args?.p_kind,JSON.stringify(args?.p_values??null),args?.p_id,args?.p_revision]],
     guigs_allocate_fridge_stock:['select public.guigs_allocate_fridge_stock($1,$2,$3) as data',
-      [args?.p_shop_id,args?.p_request_id,JSON.stringify(args?.p_entries??null)]]
+      [args?.p_shop_id,args?.p_request_id,JSON.stringify(args?.p_entries??null)]],
+    guigs_get_fridge_replenishment:['select public.guigs_get_fridge_replenishment($1,$2,$3) as data',
+      [args?.p_shop_id,args?.p_slot_id,args?.p_quantity]],
+    guigs_replenish_fridge_slot:['select public.guigs_replenish_fridge_slot($1,$2,$3,$4,$5) as data',
+      [args?.p_shop_id,args?.p_request_id,args?.p_slot_id,args?.p_quantity,JSON.stringify(args?.p_plan??null)]]
   };
   return asUser(db,role,async tx=>{
     if(tables[table])return (await tx.query('select * from '+tables[table]+' where shop_id=$1 order by id',[shop])).rows;
@@ -42,7 +46,7 @@ const server=http.createServer(async(req,res)=>{
 function bridge({role,shop}){
   const c=window.__mockClient, original=c.rpc.bind(c), originalFrom=c.from.bind(c);
   const send=data=>fetch('/fixture',{method:'POST',body:JSON.stringify({role,...data})}).then(r=>r.json());
-  c.rpc=(name,args)=>/^(guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock)$/.test(name)?send({name,args}):original(name,args);
+  c.rpc=(name,args)=>/^(guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot)$/.test(name)?send({name,args}):original(name,args);
   c.from=table=>{
     if(table==='guigs_memberships')return {select(){return this},eq(){return this},then(a,b){return Promise.resolve({data:[{shop_id:shop,role,active:true}],error:null}).then(a,b)}};
     if(!['guigs_products','guigs_lots','guigs_suppliers'].includes(table))return originalFrom(table);
@@ -55,6 +59,7 @@ function bridge({role,shop}){
     db=await createTestDatabase();
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104123035_spatial_fridge_foundation.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104124433_spatial_fridge_allocation.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104124855_spatial_fridge_replenishment.sql'),'utf8'));
     const ledger=()=>db.query('select id,delta,slot_id from public.guigs_movements order by id').then(r=>r.rows);
     const before=await ledger();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -166,7 +171,35 @@ function bridge({role,shop}){
     check((await db.query("select sum(delta)::int as n from public.guigs_movements where location='fridge'")).rows[0].n===8,'Saldo global preservado pelo fluxo UI');
     check(owner.errors.length===0,'Fluxo de distribuição sem erro JavaScript');
     await owner.context.close();
-    console.log(`Editor, mapa e distribuição: ${editorChecks+mapChecks+checks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${checks} distribuição); navegador e PGlite artificiais.`);
+    const allocationChecks=checks;checks=0;
+    const worker=await open('attendant',{width:390,height:844});await waitMap(worker.page);
+    const keys=[];
+    await worker.page.route('**/fixture',async route=>{
+      const request=route.request().postDataJSON();
+      if(request?.name!=='guigs_replenish_fridge_slot')return route.fallback();
+      keys.push(request.args.p_request_id);
+      if(keys.length!==1)return route.fallback();
+      const response=await route.fetch();
+      assert.equal((await response.json()).error,null,'Fixture confirmou no servidor antes da falha de transporte');
+      return route.fulfill({json:{data:null,error:{message:'Conexão interrompida. Tente novamente.'}}});
+    });
+    await worker.page.getByRole('button',{name:'Repor Coca A1'}).click();
+    await worker.page.waitForFunction(()=>!document.querySelector('#fridgeReplenishConfirm').disabled);
+    check(await worker.page.inputValue('#fridgeReplenishQuantity')==='7','Sugestão até a meta no modal');
+    await worker.page.fill('#fridgeReplenishQuantity','3');
+    check(await worker.page.isDisabled('#fridgeReplenishConfirm'),'Mudança de quantidade exige recalcular FEFO');
+    await worker.page.click('#fridgeReplenishQuote');
+    await worker.page.waitForFunction(()=>!document.querySelector('#fridgeReplenishConfirm').disabled);
+    await worker.page.locator('#fridgeReplenishConfirm').evaluate(b=>{b.click();b.click();});
+    await worker.page.waitForFunction(()=>document.querySelector('#fridgeReplenishMessage').textContent.includes('interrompida'));
+    check(keys.length===1,'Duplo clique gera uma requisição');
+    await worker.page.click('#fridgeReplenishConfirm');
+    await worker.page.waitForFunction(slot=>document.querySelector('[data-slot-id="'+slot+'"]').textContent.includes('8 / 18 un.'),x);
+    check(keys.length===2&&keys[0]===keys[1],'Retry após resposta perdida preserva a chave');
+    check((await db.query("select count(*)::int as n from public.guigs_movements where movement_type='transfer' and spatial")).rows[0].n===2,'Retry não duplica o débito/crédito');
+    check(worker.errors.length===0,'Reposição sem erro JavaScript');
+    await worker.context.close();
+    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+checks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${checks} reposição); navegador e PGlite artificiais.`);
   }finally{
     if(browser)await browser.close();
     if(server.listening)await new Promise(resolve=>server.close(resolve));
