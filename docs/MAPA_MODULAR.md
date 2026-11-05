@@ -1,6 +1,6 @@
 # Mapa modular e permissão de layout
 
-Estado consolidado em 05/11/2026: [validação final](VALIDACAO_FINAL_MAPA.md). O núcleo modular passou nos testes, mas o aceite integral solicitado está NO-GO por administração da biblioteca incompleta e referência de foto quebrada em produção. As regras abaixo continuam válidas; blocos pendentes não são, por si só, falha operacional.
+Estado consolidado em 05/11/2026: [validação final](VALIDACAO_FINAL_MAPA.md). A administração da biblioteca foi publicada no código 587931a e a foto de POTY possui vínculo/objeto válidos. O aceite e suas evidências atuais constam na matriz consolidada. As regras abaixo continuam válidas; blocos pendentes não são, por si só, falha operacional.
 
 O mapa é uma configuração operacional contínua, editável antes e depois da primeira alocação. Coordenadas e dimensões são proporções. Geladeiras, níveis e blocos podem ser reordenados, renomeados e desativados pelo editor. Desativar preserva histórico e permite reativação. Um bloco vazio também pode mudar de nível ou geladeira.
 

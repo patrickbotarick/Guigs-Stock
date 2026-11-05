@@ -1,6 +1,6 @@
 # Mapa visual e experiência operacional
 
-Este documento preserva a aprovação histórica do redesign. O estado atual consolidado está em [validação final](VALIDACAO_FINAL_MAPA.md), de 05/11/2026: código a0448a0, shell v14, 19 imagens atuais e aceite integral NO-GO pelas pendências de biblioteca/imagem. Os números e versões das seções históricas abaixo não substituem essa leitura atual.
+Este documento preserva a aprovação histórica do redesign. O estado atual consolidado está em [validação final](VALIDACAO_FINAL_MAPA.md), de 05/11/2026: código executável 587931a, shell v15, 19 imagens e administração da biblioteca publicada. Os números e versões das seções históricas abaixo não substituem essa leitura atual.
 
 ## Gates 0 e 1 — auditoria e inventário
 

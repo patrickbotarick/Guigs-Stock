@@ -1,6 +1,6 @@
 # Validação final consolidada do mapa de geladeiras
 
-Documento consolidado de 05/11/2026, America/Sao_Paulo. A auditoria inicial no código a0448a0 resultou em NO-GO. A seção abaixo registra a correção dos dois bloqueios; as tabelas posteriores preservam a evidência histórica e são substituídas pelo novo aceite quando concluído.
+Documento consolidado de 05/11/2026, America/Sao_Paulo. Resultado final: **MÓDULO VISUAL DE GELADEIRAS APROVADO PARA OPERAÇÃO NA PIZZARIA**. Os dois bloqueios foram resolvidos e o smoke de produção foi concluído. Instalação manual da PWA: **PENDING NÃO BLOQUEANTE**. A auditoria inicial no código a0448a0 resultou em NO-GO; suas tabelas posteriores são histórico, substituídas pelo aceite atual abaixo.
 
 ## Correção dos bloqueios e novo aceite
 
@@ -18,7 +18,9 @@ Regressão atual: 1.206 gerais/14 suítes e 553 espaciais/12 suítes PASS, inclu
 
 Auditoria atual de órfãos: zero catálogo sem objeto, zero objeto sem catálogo, zero vínculo sem catálogo/objeto; zero exclusões pendentes de produção. Baseline segue 184 = 178 + 6, ledger 687 e MD5 0470bca16323e2652e046bfe200d297c, dois movimentos espaciais e Activation Point anterior preservado. Sem escrita de estoque, lotes, histórico, inventário, FEFO, capacidades, layout ou Auth/memberships. A migration e o deploy foram as intervenções de produção autorizadas.
 
-Estado do aceite: controles owner aprovados e aguardando smoke de leitura do atendente de produção, incluindo foto/reload/PWA/logout-login. A matriz final será encerrada após essa etapa.
+Atendente comum real de produção aprovado em 31 controles: membership efetiva, editor/administração restritos, 13 blocos e foto POTY no bloco/modal/biblioteca, reload, shell v15, reload offline, reconexão, logout e segundo login. Zero erros JavaScript e zero tentativas de escrita operacional. O responsável digitou credenciais somente no Edge; o relatório privado não contém tokens, senha ou identificação pessoal. O owner passou na inspeção interativa descrita acima; delegado validado em homologação, sem conceder capabilities reais para teste.
+
+Estado do aceite: **GO**. Nenhum blocker funcional, operacional ou de segurança identificado no escopo testado. O fechamento altera somente documentação; o código executável permanece 587931acb3978e1596a607afb83ab5f9e5a445ef. Nenhuma tag criada. A instalação manual da PWA e os itens de hardening documentados são pendências não bloqueantes.
 
 ### Matriz específica da correção
 
@@ -34,21 +36,21 @@ Estado do aceite: controles owner aprovados e aguardando smoke de leitura do ate
 | Proteção imagem em uso | PASS | RPC nega; POTY publicado mostra 1 vínculo e não oferece confirmar exclusão. |
 | Owner | PASS | UI/API homologação e inspeção interativa publicada. |
 | manage_fridge_layout | PASS | UI/API real de homologação, inclusive delete e falhas intermediárias. |
-| Attendant | PENDING | API negada e UI restrita em homologação; novo smoke de leitura de produção aguardando login. |
+| Attendant | PASS | API administrativa negada em homologação; 31 controles publicados de leitura, restrições e persistência. |
 | Cross-shop | PASS | Cinco RPCs negadas em homologação, tabela privada sem acesso direto. |
 | POTY storage object | PASS | Existe, catálogo válido, hash do original local coincidente; nenhum reenvio necessário. |
-| POTY bloco | PASS | Owner publicado, foto carregada após reload; leitura do atendente ainda pendente. |
-| POTY modal | PASS | Owner publicado, imagem 500×500; leitura do atendente ainda pendente. |
+| POTY bloco | PASS | Owner e atendente publicados; foto carregada após reload/reconexão e novo login. |
+| POTY modal | PASS | Imagem real, owner 500×500 e leitura do atendente aprovada. |
 | Orphan audit | PASS | Zero nas categorias catálogo/objeto/vínculo; fila de produção vazia; sem limpeza. |
-| PWA | PASS | Shell v15, 49 controles reais de homologação; ciclo publicado do atendente pendente. Instalação manual: PENDING NÃO BLOQUEANTE. |
+| PWA | PASS | Shell v15, homologação e ciclo publicado offline/reload/reconexão/login aprovados. Instalação manual: PENDING NÃO BLOQUEANTE. |
 | Testes | PASS | 1.206 gerais + 553 espaciais + 52 admin homolog + 49 mapa/PWA homolog; 13 de alvo. |
-| Produção | PENDING | Migration aplicada, 18/18 arquivos, owner PASS; aguardando leitura do atendente. |
+| Produção | PASS | Migration aplicada, 18/18 arquivos, owner e atendente aprovados, dados preservados. |
 | Saldo fridge | PASS | 184 preservado. |
 | Unallocated | PASS | 178 preservado. |
 | Slot | PASS | 6 preservado. |
 | Ledger | PASS | 687 preservados. |
 | Fingerprint | PASS | Ledger 0470bca16323e2652e046bfe200d297c; demais escopos estáveis no baseline desta rodada. |
-| 30 gates finais | PENDING | Reavaliação abaixo; falta somente smoke real de leitura do atendente para fechar. |
+| 30 gates finais | PASS | Aceite global aprovado; instalação PWA manual é pendência explicitamente não bloqueante. |
 
 ### Reavaliação dos 30 gates
 
@@ -56,12 +58,12 @@ Estado do aceite: controles owner aprovados e aguardando smoke de leitura do ate
 |---|---|---|
 | 1 — Git | PASS | Branch isolada, histórico auditado, main publicado 587931a; nenhum arquivo privado adicionado. |
 | 2 — Produção | PASS | SQL/grants e saúde acessíveis, HTTP/build 18/18; sem alteração de configurações externas. |
-| 3 — Modelo físico | PASS | 2/7/13; reload owner publicado e logout/login nos três papéis de homologação. |
+| 3 — Modelo físico | PASS | 2/7/13; reload owner publicado e logout/login atendente publicado; três papéis em homologação. |
 | 4 — Editor | PASS | 553 espaciais, rascunho/drag/resize/cancelamento/salvamento e ledger preservado. |
 | 5 — Permissões | PASS | Backend/UI owner/delegado/atendente em homologação, grant/RLS conferidos em produção. |
 | 6 — Estados | PASS | Casos e limites repetidos; 12 pendentes e 1 ativo em produção são estado válido. |
 | 7 — Alertas | PASS | Regras existentes preservadas; produção amarelo para 6 entre mínimo 5 e meta 10. |
-| 8 — Imagens | PENDING | Owner e arquivo/hash PASS; foto do atendente publicado aguardando login. |
+| 8 — Imagens | PASS | Arquivo/hash e foto real publicados: owner/atendente, bloco/modal/biblioteca, reload e novo login. |
 | 9 — Biblioteca/admin | PASS | Rename/status/delete, confirmação, proteção de uso e recuperação de falha PASS; UI publicada inspecionada. |
 | 10 — Modal | PASS | Conteúdo e foto owner publicados, fluxo com toque e lotes/FEFO em homologação. |
 | 11 — Reposição | PASS | Suítes locais novamente aprovadas e cotação real homolog; transação remota da auditoria anterior ainda válida. |
@@ -74,7 +76,7 @@ Estado do aceite: controles owner aprovados e aguardando smoke de leitura do ate
 | 18 — Performance | PASS | 100 blocos DOM 40–48 ms; mapa 52 mil movimentos 850 ms; 13 blocos reais homolog 239–331 ms na última amostra. |
 | 19 — Tablet | PASS | 1280×800 / 1024×768, modal/editor/biblioteca e toque nos testes repetidos. |
 | 20 — Mobile | PASS | 390/360px, biblioteca/admin e fluxo completo delegado em homologação a 360px. |
-| 21 — PWA | PENDING | Software v15 PASS em homologação e upgrade v11/v12/v14 repetido; ciclo publicado do atendente pendente. Instalação manual é PENDING NÃO BLOQUEANTE. |
+| 21 — PWA | PENDING | NÃO BLOQUEANTE: falta apenas instalação manual. Software v15, upgrade de caches e ciclo publicado do atendente aprovados. |
 | 22 — Storage | PASS | Privado PNG/JPEG/WebP 2 MiB, 19 objetos/catalogados, zero referências quebradas ou pendências. |
 | 23 — Segurança | PASS | Audit sem achados; 41 security/25 protection; novos endpoints sem anon e sem DML direto. |
 | 24 — Consistência | PASS | Todos os fingerprints desta rodada iguais antes/depois, incluindo produtos já com POTY corrigido. |
@@ -82,8 +84,8 @@ Estado do aceite: controles owner aprovados e aguardando smoke de leitura do ate
 | 26 — Owner | PASS | Administração corrigida sem novo poder de estoque; delegação/revogação anteriores e regressões válidas. |
 | 27 — Erros | PASS | Nome inválido, conflito, em uso, RLS, arquivo ausente e falhas intermediárias com recuperação testados. |
 | 28 — Docs | PASS | Causa, SQL/hash/backup, semântica, testes, intervenção e estado de aceite registrados. |
-| 29 — Pendências | PASS | Dois bloqueios funcionais corrigidos; smoke de atendente pendente; instalação manual não bloqueante. |
-| 30 — GO final | PENDING | Não emitir aprovação integral antes de confirmar o smoke de leitura publicado. |
+| 29 — Pendências | PASS | Dois bloqueios corrigidos, smoke owner/atendente concluído; instalação manual não bloqueante e melhorias futuras separadas. |
+| 30 — GO final | PASS | MÓDULO VISUAL DE GELADEIRAS APROVADO PARA OPERAÇÃO NA PIZZARIA. |
 
 ## Auditoria inicial — histórico no código a0448a0
 
