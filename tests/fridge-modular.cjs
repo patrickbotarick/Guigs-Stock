@@ -5,7 +5,16 @@ let checks=0;
 const eq=(a,b)=>{assert.deepEqual(a,b);checks++;};
 const reject=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
 (async()=>{
- const {fridgeSlotConfiguration}=await import('../fridges.js');
+ const {fridgeSlotConfiguration,fridgeVisualStatus,fridgeDraftGeometry}=await import('../fridges.js');
+ for(const [quantity,tone]of [[0,'critical'],[1,'critical'],[2,'attention'],[5,'healthy']]){
+  const state=fridgeVisualStatus({product_id:id(20),capacity_quantity:10,quantity,min_quantity:2,target_quantity:5});eq(state.tone,tone);eq(typeof state.icon,'string');
+ }
+ eq(fridgeVisualStatus({product_id:null,capacity_quantity:10}).tone,'pending');
+ eq(fridgeVisualStatus({product_id:id(20),capacity_quantity:null}).tone,'pending');
+ eq(fridgeDraftGeometry(-1,.5),{x_ratio:0,width_ratio:.5});
+ eq(fridgeDraftGeometry(.9,.5),{x_ratio:.5,width_ratio:.5});
+ eq(fridgeDraftGeometry(0,3),{x_ratio:0,width_ratio:1});
+ eq(fridgeDraftGeometry(0,0),{x_ratio:0,width_ratio:.05});
  eq(fridgeSlotConfiguration({capacity_quantity:null,product_id:id(20),quantity:0}),'PENDENTE');
  eq(fridgeSlotConfiguration({capacity_quantity:12,product_id:null,quantity:0}),'PENDENTE');
  eq(fridgeSlotConfiguration({capacity_quantity:12,product_id:id(20),quantity:0}),'PRONTO');

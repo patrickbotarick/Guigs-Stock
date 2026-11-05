@@ -1167,30 +1167,110 @@
         }
       }
       #reportsView { min-width: 0; }
-      #fridgesView, #fridgeLayoutFields { min-inline-size: 0; }
-      #fridgeLayoutFields { border: 0; padding: 0; margin: 0; }
-      #fridgeLayoutFields input[type="checkbox"] { inline-size: 1.3rem; block-size: 1.3rem; }
-      #fridgeEditor select, #fridgeEditor input { max-inline-size: 100%; }
-      #fridgeEditor .field { margin-block: .6rem; }
-      .fridge-cabinets { display:flex; flex-wrap:wrap; gap:.9rem; }
-      .fridge-cabinet { flex:1 1 min(100%,max(19rem,var(--cabinet-width,48%))); min-inline-size:0; border:1px solid var(--line,#394253); border-radius:14px; padding:.8rem; }
-      .fridge-cabinet h3, .fridge-shelf h4 { margin:.25rem 0 .55rem; overflow-wrap:anywhere; }
-      .fridge-shelf { border-block-end:2px solid var(--line,#394253); margin-block:.6rem; padding:.5rem; background:rgba(125,145,165,.08); border-radius:8px; container-type:inline-size; }
-      .fridge-shelf .fridge-rail { display:grid; grid-template-columns:repeat(100,minmax(0,1fr)); row-gap:.55rem; min-block-size:calc(2rem + var(--shelf-size,0) * 5rem); }
-      .fridge-slot { grid-column:var(--slot-column); grid-row:var(--slot-row); min-inline-size:0; border:1px solid var(--line,#394253); border-radius:8px; padding:.55rem; margin-inline-end:3px; overflow-wrap:anywhere; }
-      .fridge-slot h5, .fridge-slot p { margin:.2rem 0; }
-      .fridge-slot meter { inline-size:100%; min-inline-size:0; }
-      .fridge-slot .btn { margin-block:.35rem; max-inline-size:100%; white-space:normal; }
-      .fridge-photo { display:block; inline-size:2.25rem; block-size:2.25rem; object-fit:contain; }
-      .fridge-photo-fallback { display:grid; place-items:center; background:rgba(125,145,165,.18); border-radius:6px; }
-      .fridge-state { display:inline-block; font-size:.8rem; font-weight:700; padding:.12rem .36rem; border-radius:4px; color:#16202b; background:#e5e7eb; }
-      .fridge-state[data-state="OK"] { background:#a6edc0; }
-      .fridge-state[data-state="ATENÇÃO"] { background:#ffe0a0; }
-      .fridge-state[data-state="CRÍTICO"] { background:#ffc4c4; }
-      .fridge-unallocated { margin-block-start:1rem; padding-block-start:.5rem; border-block-start:1px solid var(--line,#394253); }
+      #fridgesView, .fridge-detail-dialog {
+        --map-pending:#64717b; --map-healthy:#23754b; --map-attention:#9a650c; --map-critical:#b3323e;
+        --map-shell:#292b30; --map-glass:#eaf1f0; --map-shelf:#a8b8b6; --map-hover:#fff;
+        --map-selected:#ab2933; --map-edit:#f7eee3; --map-ink:#282b32; --map-muted:#5e686d;
+        min-inline-size:0;
+      }
+      #fridgeLayoutFields { border:0; padding:0; margin:0; min-inline-size:0; }
+      #fridgeLayoutFields input[type="checkbox"] { inline-size:1.3rem; block-size:1.3rem; }
+      #fridgeEditor select, #fridgeEditor input { max-inline-size:100%; }
+      #fridgeEditor .field { margin-block:.6rem; }
+      #fridgesView button, .fridge-detail-dialog button { min-block-size:44px; }
+      .fridge-toolbar h2 { margin-block:0 .5rem; }
+      .fridge-toolbar p { margin-block:.4rem .8rem; }
+      #fridgeMoreActions { align-self:center; position:relative; }
+      #fridgeMoreActions summary { min-block-size:44px; display:flex; align-items:center; cursor:pointer; padding:.5rem; }
+      #fridgeMoreActions[open] button { display:block; }
+      .fridge-map-summary { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.5rem; margin:1.3rem 0 1rem; }
+      .fridge-map-summary strong { font-size:1.05rem; }
+      .fridge-map-summary span { font-size:.85rem; color:var(--map-muted); }
+      .fridge-cabinets { display:flex; flex-wrap:wrap; align-items:flex-start; gap:1.4rem; }
+      .fridge-cabinet { flex:1 1 min(100%,max(19rem,var(--cabinet-width,48%))); min-inline-size:0; border:1px solid #474a50; border-radius:22px 22px 15px 15px; padding:7px; background:var(--map-shell); box-shadow:0 12px 24px #22232814, inset 0 0 0 2px #ffffff0b; }
+      .fridge-cabinet-header { display:flex; gap:.8rem; justify-content:space-between; align-items:center; min-block-size:66px; padding:.6rem 1rem; color:#fff; border-block-end:3px solid #ab2933; }
+      .fridge-cabinet h3 { font-size:1rem; margin:0; overflow-wrap:anywhere; letter-spacing:.01em; }
+      .fridge-cabinet-light { color:#b6d8bf; font-size:.6rem; box-shadow:0 0 14px #b6d8bf30; }
+      .fridge-glass { padding:1rem .65rem .4rem; border:1px solid #b5c2c2; border-radius:6px; background:linear-gradient(110deg,#ffffff9e,transparent 38%),var(--map-glass); box-shadow:inset 0 0 18px #4877751a; }
+      .fridge-shelf { border-block-end:6px solid var(--map-shelf); padding:.25rem .1rem .6rem; margin-block:0 1rem; box-shadow:0 3px 0 #b7c6c42e; container-type:inline-size; }
+      .fridge-shelf h4 { margin:0 0 .55rem; color:var(--map-muted); font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; overflow-wrap:anywhere; font-weight:650; }
+      .fridge-rail { display:grid; grid-template-columns:repeat(100,minmax(0,1fr)); gap:.5rem 0; min-block-size:calc(4rem + var(--shelf-size,0) * 4rem); align-items:stretch; }
+      .fridge-rail > p, .fridge-draft-rail > p { grid-column:1 / -1; }
+      .fridge-slot { --slot-accent:var(--map-pending); --slot-surface:#f2f3f3; grid-column:var(--slot-column); grid-row:var(--slot-row); min-inline-size:0; margin-inline:3px; display:flex; }
+      .fridge-slot[data-tone="healthy"] { --slot-accent:var(--map-healthy); --slot-surface:#f3faf6; }
+      .fridge-slot[data-tone="attention"] { --slot-accent:var(--map-attention); --slot-surface:#fffaf0; }
+      .fridge-slot[data-tone="critical"] { --slot-accent:var(--map-critical); --slot-surface:#fff5f5; }
+      .fridge-slot-open { -webkit-tap-highlight-color:transparent; inline-size:100%; min-inline-size:0; min-block-size:150px; border:1px solid color-mix(in srgb,var(--slot-accent),white 45%); border-block-end:3px solid var(--slot-accent); border-radius:12px; background:var(--slot-surface); color:var(--map-ink); display:flex; flex-direction:column; align-items:center; gap:.25rem; padding:.7rem .35rem .5rem; box-shadow:0 3px 7px #213b3510; transition:transform .16s ease,box-shadow .16s ease; }
+      .fridge-slot-open:hover { transform:translateY(-3px); box-shadow:0 6px 12px #213b3524; background:var(--map-hover); }
+      .fridge-slot-open:focus-visible, .fridge-detail-dialog button:focus-visible, #fridgeEditor button:focus-visible { outline:3px solid var(--map-selected); outline-offset:3px; }
+      .fridge-slot-name { font-size:.82rem; font-weight:750; max-inline-size:100%; overflow-wrap:anywhere; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+      .fridge-slot-quantity { font-size:.75rem; color:var(--map-muted); font-variant-numeric:tabular-nums; }
+      .fridge-photo-wrap { display:flex; justify-content:center; align-items:center; inline-size:100%; block-size:64px; margin-block-end:.3rem; }
+      .fridge-photo { display:block; max-inline-size:100%; inline-size:64px; block-size:64px; object-fit:contain; }
+      .fridge-photo-fallback { position:relative; inline-size:25px; block-size:46px; margin-block-start:8px; background:linear-gradient(90deg,#b4c5c3,#d5e0de 45%,#b4c5c3); border:1px solid #99adaa; border-radius:7px 7px 5px 5px; opacity:.65; }
+      .fridge-photo-fallback::before { content:""; position:absolute; inline-size:11px; block-size:10px; inset:-8px auto auto 5px; border:2px solid #99adaa; border-radius:3px 3px 0 0; background:#d5e0de; }
+      .fridge-photo-fallback::after { content:""; position:absolute; inset:13px 3px; background:#f2f5f4; border-radius:2px; }
+      .fridge-state { display:inline-flex; align-items:center; gap:.15rem; font-size:.7rem; font-weight:750; padding:.2rem .4rem; border-radius:20px; color:var(--map-pending); background:#e5e9eb; white-space:normal; }
+      .fridge-state[data-state="OK"] { color:var(--map-healthy); background:#e0f0e5; }
+      .fridge-state[data-state="ATENÇÃO"] { color:var(--map-attention); background:#f9ebcf; }
+      .fridge-state[data-state="CRÍTICO"], .fridge-state[data-state="VAZIO"] { color:var(--map-critical); background:#f9e0e2; }
+      .fridge-cabinet-base { color:#b8bbbf; font-size:.6rem; letter-spacing:.2em; text-align:center; padding:1rem; border-block-start:5px double #4b4d52; }
+      .fridge-unallocated { margin-block:1.25rem; padding:1rem; border:1px solid #d8d8d6; border-radius:12px; background:#f1f0ed; color:var(--map-muted); font-size:.85rem; }
+      .fridge-unallocated summary { cursor:pointer; min-block-size:28px; }
+      .fridge-detail-dialog { inline-size:min(650px,calc(100vw - 24px)); max-block-size:calc(100dvh - 24px); border:1px solid #d5d9d8; border-radius:20px; padding:1.4rem; color:var(--map-ink); background:#fffdfa; overflow:auto; overscroll-behavior:contain; }
+      .fridge-detail-dialog[open] { display:flex; flex-direction:column; }
+      #fridgeDetailBody { min-block-size:0; overflow:auto; overscroll-behavior:contain; padding-inline-end:.3rem; }
+      .fridge-detail-heading, .fridge-detail-actions, .fridge-detail-edit { flex-shrink:0; }
+      .fridge-detail-dialog::backdrop { background:#14171bb3; backdrop-filter:blur(3px); }
+      .fridge-detail-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+      .fridge-detail-heading h2 { margin:0; font-size:1.3rem; overflow-wrap:anywhere; }
+      .fridge-detail-heading p { font-size:.8rem; color:var(--map-muted); line-height:1.5; }
+      .fridge-detail-hero { display:flex; align-items:center; gap:1.3rem; padding:1rem 0; }
+      .fridge-photo-large { inline-size:120px; block-size:120px; flex-shrink:0; border-radius:14px; background:#edf3f1; }
+      .fridge-photo-large img { inline-size:110px; block-size:110px; }
+      .fridge-detail-hero small { overflow-wrap:anywhere; color:var(--map-muted); font-size:.7rem; }
+      .fridge-detail-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.7rem; margin-block:1rem; }
+      .fridge-detail-stats div { border:1px solid #e3e4df; border-radius:10px; padding:.8rem; min-inline-size:0; }
+      .fridge-detail-stats dt { color:var(--map-muted); font-size:.73rem; }
+      .fridge-detail-stats dd { font-weight:750; margin:.35rem 0 0; font-size:.95rem; overflow-wrap:anywhere; }
+      #fridgeDetailBody meter { inline-size:100%; }
+      #fridgeDetailLots { padding:1rem 0; font-size:.9rem; border-block:1px solid #e2e4df; }
+      #fridgeDetailLots summary { min-block-size:40px; cursor:pointer; }
+      .fridge-detail-actions, .fridge-detail-edit { display:flex; flex-wrap:wrap; gap:.5rem; padding-block-start:1rem; }
+      .fridge-detail-actions #fridgeDetailReplenish { flex:1; font-weight:750; }
+      .fridge-detail-edit { border-block-start:1px solid #e2e4df; margin-block-start:1rem; }
+      #fridgeEditor { border:2px solid #d7bb94; background:var(--map-edit); }
+      #fridgeEditorPreview { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:1rem; max-block-size:420px; overflow:auto; padding:.5rem; border:1px solid #cfbea9; border-radius:12px; background:#ebe1d3; }
+      .fridge-preview-cabinet { background:#fcfaf5; border:5px solid #555258; border-radius:12px; padding:.5rem; min-inline-size:0; }
+      .fridge-preview-heading { display:block; background:transparent; border:0; inline-size:100%; text-align:start; color:#514d47; font-size:.8rem; font-weight:700; overflow-wrap:anywhere; }
+      .fridge-preview-shelf { padding:.2rem; margin-block:.5rem; border-block-end:4px solid #bdb4a6; min-block-size:calc(3rem + var(--draft-height,0) * 5rem); }
+      .fridge-draft-rail { display:grid; grid-template-columns:repeat(100,minmax(0,1fr)); gap:.4rem 0; }
+      .fridge-draft-block { min-inline-size:0; border:1px dashed #9a9891; border-radius:8px; background:#e8eeeb; margin:1px; position:relative; }
+      .fridge-draft-block.is-selected { outline:2px solid var(--map-selected); background:#fff; z-index:1; }
+      .fridge-draft-select { inline-size:100%; min-inline-size:0; border:0; background:transparent; padding:.5rem .1rem; overflow-wrap:anywhere; font-size:.75rem; }
+      .fridge-drag-handle { touch-action:none; background:#ab2933; color:white; border:0; border-radius:6px; min-inline-size:44px; margin:2px; cursor:ew-resize; }
+      .fridge-draft-controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:1rem; margin-block:1rem; }
+      .fridge-draft-controls label { display:grid; gap:.4rem; font-size:.85rem; font-weight:700; }
+      .fridge-draft-controls input { inline-size:100%; min-block-size:44px; accent-color:var(--map-selected); }
+      .fridge-draft-controls button { border:1px solid #c7b9a7; background:#fffdfa; color:#4b4038; border-radius:9px; padding:.5rem .7rem; }
+      .fridge-draft-controls small { font-size:.75rem; color:#62564b; }
+      .fridge-advanced { border:1px solid #d9ccba; border-radius:8px; padding:.75rem; margin-block:1rem; }
+      .fridge-advanced summary { cursor:pointer; min-block-size:32px; color:#62564b; font-size:.8rem; }
       @container (max-width:420px) {
-        .fridge-shelf .fridge-rail { grid-template-columns:minmax(0,1fr); }
-        .fridge-slot { grid-column:1; grid-row:auto; margin-inline-end:0; }
+        .fridge-rail { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; }
+        .fridge-slot { grid-column:auto; grid-row:auto; margin-inline:0; }
+        .fridge-slot:only-child { grid-column:1 / -1; }
+      }
+      @media(max-width:700px) {
+        .fridge-cabinets { display:block; }
+        .fridge-cabinet { margin-block-end:1.3rem; inline-size:100%; }
+        .fridge-detail-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .fridge-detail-dialog { padding:1rem; }
+        .fridge-detail-actions .btn { flex:1 1 40%; }
+      }
+      @media(prefers-reduced-motion:reduce) {
+        .fridge-slot-open { transition:none; }
+        .fridge-slot-open:hover { transform:none; }
       }
       #reportsView .panel { margin-bottom: 16px; }
       .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 12px; }
@@ -1491,21 +1571,21 @@
           </section>
 
           <section id="fridgesView" class="hidden" aria-label="Geladeiras físicas">
-            <div class="panel">
-              <h2>Geladeiras físicas</h2>
-              <p class="muted">As posições organizam o estoque da geladeira. Editar o layout não movimenta unidades.</p>
+            <div class="panel fridge-toolbar">
+              <h2>Qual bebida precisa de atenção?</h2>
+              <p class="muted">Toque em uma bebida para conferir os detalhes e repor.</p>
               <div class="inventory-actions" aria-label="Modo do mapa">
                 <button id="fridgeOperate" class="btn" type="button" aria-pressed="true">Operação</button>
                 <button id="fridgeRestockMode" class="btn" type="button" aria-pressed="false">Reposição</button>
                 <button id="fridgeEdit" class="btn hidden" type="button" aria-pressed="false">Editar layout</button>
                 <button id="fridgeReload" class="btn" type="button">Atualizar mapa</button>
-                <button id="fridgeAllocate" class="btn hidden" type="button">Distribuir estoque existente</button>
-                <button id="fridgeOperateStock" class="btn" type="button">Venda, perda, ajuste ou retorno</button>
+                <button id="fridgeOperateStock" class="btn" type="button">Registrar saída</button>
+                <details id="fridgeMoreActions"><summary>Mais ações</summary><button id="fridgeAllocate" class="btn hidden" type="button">Distribuir estoque existente</button></details>
               </div>
               <p id="fridgeOffline" class="notice hidden">Sem conexão. O mapa exibido pode estar desatualizado; edição bloqueada.</p>
               <p id="fridgeMessage" role="status" aria-live="polite"></p>
             </div>
-            <div id="fridgeMap" class="panel"></div>
+            <div id="fridgeMap"></div>
             <section id="fridgeRestockView" class="panel hidden" aria-labelledby="fridgeRestockTitle">
               <h2 id="fridgeRestockTitle">Lista de reposição</h2>
               <p>Estimativa da leitura atual, sem reserva de estoque. O plano de lotes é confirmado pelo servidor ao abrir cada posição.</p>
@@ -1516,8 +1596,10 @@
               <div id="fridgeRestockList"></div>
             </section>
             <section id="fridgeEditor" class="panel hidden" aria-labelledby="fridgeEditorTitle">
-              <h2 id="fridgeEditorTitle">Configurar geladeiras</h2>
-              <p>Posições e tamanhos usam porcentagens. Para desativar uma posição ocupada, realoque o saldo antes.</p>
+              <h2 id="fridgeEditorTitle" tabindex="-1">Editar o layout</h2>
+              <p>Escolha um bloco na prévia. Arraste ou use os controles para preparar a alteração. Nada muda até salvar.</p>
+              <div id="fridgeEditorPreview" aria-label="Prévia do layout"></div>
+              <div id="fridgeDraftControls" class="fridge-draft-controls"></div>
               <div class="field"><label for="fridgeEditKind">Editar</label><select id="fridgeEditKind">
                 <option value="fridge">Geladeira</option><option value="shelf">Prateleira</option><option value="slot">Posição</option>
               </select></div>
@@ -1547,6 +1629,13 @@
               </section>
             </section>
           </section>
+          <dialog id="fridgeDetailDialog" class="fridge-detail-dialog" aria-labelledby="fridgeDetailTitle" aria-describedby="fridgeDetailLocation">
+            <div class="fridge-detail-heading"><div><h2 id="fridgeDetailTitle"></h2><p id="fridgeDetailLocation"></p></div><button id="fridgeDetailClose" class="btn" type="button" autofocus aria-label="Fechar detalhes do bloco">✕</button></div>
+            <p id="fridgeDetailOffline" class="notice hidden">Sem conexão. Dados da última leitura; ações bloqueadas.</p>
+            <div id="fridgeDetailBody"></div>
+            <div class="fridge-detail-actions"><button id="fridgeDetailReplenish" class="btn green" type="button">Repor</button><button id="fridgeDetailShowLots" class="btn" type="button">Ver lotes</button><button id="fridgeDetailStock" class="btn" type="button">Registrar saída</button></div>
+            <div class="fridge-detail-edit"><button id="fridgeDetailEdit" class="btn hidden" type="button">Editar bloco</button><button id="fridgeDetailProduct" class="btn hidden" type="button">Trocar produto</button></div>
+          </dialog>
           <section id="inventoryView" class="hidden" aria-label="Inventário físico">
             <div id="inventoryOffline" class="notice danger hidden" role="status">Sem internet: criação, contagem e fechamento bloqueados. Os dados exibidos podem estar desatualizados.</div>
             <div id="inventoryMessage" class="notice hidden" role="status" aria-live="polite"></div>

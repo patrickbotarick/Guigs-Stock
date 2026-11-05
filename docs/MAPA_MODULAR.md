@@ -33,3 +33,6 @@ A v1.7.0 entrega o mapa modular e pode ser lançada com blocos pendentes e saldo
 A equipe da pizzaria pode completar cada bloco conforme a realidade física. Blocos prontos podem ser usados enquanto os demais permanecem pendentes. Todo saldo ainda sem posição continua não alocado.
 
 O Activation Point é a primeira alocação real de saldo não alocado em qualquer slot físico. Depois desse ponto, um rollback apenas do frontend é insuficiente. A recuperação deve preservar ou reconciliar as partições espaciais e os eventos do ledger.
+## Interface visual
+
+A visão operacional, o modal de detalhes e o editor visual com rascunhos são descritos em [Mapa visual e UX](MAPA_VISUAL_UX.md). A refatoração reaproveita as mesmas RPCs e permissões. Arrastar, redimensionar ou duplicar na prévia exige salvamento explícito, sem movimentar estoque.

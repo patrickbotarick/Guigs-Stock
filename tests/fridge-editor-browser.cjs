@@ -3,9 +3,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const {fixture}=require('./browser.cjs');
 const {createTestDatabase,asUser,id}=require('./inventory-support.cjs');
 const {files}=require('../scripts/build.cjs');
+const {randomUUID}=require('node:crypto');
 const root=path.resolve(__dirname,'..'),allowed=new Set(files),shop=id(10);
 let checks=0,db,pending=Promise.resolve();
 function check(value,msg){assert.ok(value,msg);checks++;}
+async function snapshot(page,name){if(process.env.TEST_ARTIFACTS_DIR){fs.mkdirSync(process.env.TEST_ARTIFACTS_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.TEST_ARTIFACTS_DIR,'map-'+name+'.png')});}}
 async function dispatch({role,table,name,args}){
   if(!['owner','attendant'].includes(role))throw Error('Perfil de fixture inválido');
   const tables={guigs_products:'public.guigs_products',guigs_lots:'public.guigs_lots',guigs_suppliers:'public.guigs_suppliers'};
@@ -66,7 +68,8 @@ const server=http.createServer(async(req,res)=>{
 function bridge({role,shop}){
   const c=window.__mockClient, original=c.rpc.bind(c), originalFrom=c.from.bind(c);
   const send=data=>fetch('/fixture',{method:'POST',body:JSON.stringify({role,...data})}).then(r=>r.json());
-  c.storage={from:()=>({upload:(name,file)=>send({name:'storage_upload',args:{name,type:file.type,size:file.size}}),remove:names=>send({name:'storage_remove',args:{names}}),createSignedUrls:async()=>({data:[]})})};
+  c.supabaseUrl=location.origin;
+  c.storage={from:()=>({upload:(name,file)=>send({name:'storage_upload',args:{name,type:file.type,size:file.size}}),remove:names=>send({name:'storage_remove',args:{names}}),createSignedUrls:async paths=>({data:paths.map(path=>({path,signedUrl:location.origin+'/storage/v1/object/sign/guigs-product-images/'+path}))})})};
   c.rpc=(name,args)=>/^(guigs_set_product_image|guigs_list_fridge_layout_access|guigs_set_fridge_layout_access|guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item|guigs_get_spatial_history|guigs_get_reports)$/.test(name)?send({name,args}):original(name,args);
   c.from=table=>{
     if(table==='guigs_memberships')return {select(){return this},eq(){return this},then(a,b){return Promise.resolve({data:[{shop_id:shop,role,active:true}],error:null}).then(a,b)}};
@@ -95,7 +98,7 @@ function bridge({role,shop}){
     const url='http://127.0.0.1:'+server.address().port+'/#geladeiras';
     browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE||'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'});
     async function open(role,viewport){
-      const context=await browser.newContext({viewport,serviceWorkers:'block'});
+      const context=await browser.newContext({viewport,hasTouch:viewport.width<=1280,serviceWorkers:'block'});
       await context.route('**/*',r=>new URL(r.request().url()).hostname==='127.0.0.1'?r.continue():r.abort());
       await context.addInitScript(fixture,{role,session:true});
       await context.addInitScript(bridge,{role,shop});
@@ -107,7 +110,7 @@ function bridge({role,shop}){
     const {context,page,errors}=await open('owner',{width:1200,height:850});
     await page.click('#fridgeEdit');
     check(await page.isVisible('#fridgeEditor'),'Owner entra no editor');
-    const fill=(name,value)=>page.fill('#fridgeField_'+name,String(value));
+    const fill=async(name,value)=>{const input=page.locator('#fridgeField_'+name),advanced=input.locator('xpath=ancestor::details');if(await advanced.count()&&(await advanced.getAttribute('open'))===null)await advanced.locator('summary').click();await input.fill(String(value));};
     const choose=(name,value)=>page.selectOption('#fridgeField_'+name,value);
     const newKind=async kind=>{await page.selectOption('#fridgeEditKind',kind);await page.selectOption('#fridgeEditItem','');};
     const save=async()=>{
@@ -129,6 +132,13 @@ function bridge({role,shop}){
     const pendingCard=page.locator('[data-slot-id="'+x+'"]');
     check((await pendingCard.textContent()).includes('Configuração pendente'),'Mapa mostra estado pendente');
     check(await pendingCard.locator('meter,[data-replenish]').count()===0,'Pendência não calcula ocupação nem oferece reposição');
+    await pendingCard.locator('button').click();
+    check(await page.locator('#fridgeDetailDialog').isVisible(),'Toque no bloco pendente abre modal');
+    check((await page.textContent('#fridgeDetailBody')).includes('Defina a capacidade'),'Modal explica capacidade pendente');
+    check(await page.locator('#fridgeDetailBody meter').count()===0,'Pendência não mostra ocupação falsa');
+    check(await page.isDisabled('#fridgeDetailReplenish'),'Repor bloqueado sem capacidade');
+    await page.keyboard.press('Escape');
+    check(await pendingCard.locator('button').evaluate(e=>e===document.activeElement),'Escape devolve foco ao bloco');
     await page.click('#fridgeEdit');await page.selectOption('#fridgeEditItem',x);
     check(await page.inputValue('#fridgeField_capacity_quantity')==='','Capacidade pendente foi persistida');
     await fill('capacity_quantity',18);await save();
@@ -146,7 +156,7 @@ function bridge({role,shop}){
     check(errors.length===0,'Sem erro JavaScript desktop');
     await context.close();
     const mobile=await open('attendant',{width:390,height:844});
-    await mobile.page.waitForFunction(()=>document.querySelector('#fridgeMap').textContent.includes('Coca A1'));
+    await mobile.page.waitForSelector('#fridgeMap [data-open-slot]');
     check(!(await mobile.page.isVisible('#fridgeEdit')),'Atendente sem editor');
     check(await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile sem rolagem horizontal global');
     check(mobile.errors.length===0,'Sem erro JavaScript mobile');
@@ -181,10 +191,21 @@ function bridge({role,shop}){
     check((await db.query('select count(*)::int as n from storage.objects')).rows[0].n===0,'Remoção UI exclui objeto desvinculado');
     await authorized.page.selectOption('#fridgeEditKind','slot');
     await authorized.page.selectOption('#fridgeEditItem',x);
+    await authorized.page.locator('.fridge-advanced summary').click();
     await authorized.page.fill('#fridgeField_width_ratio','45');
     await authorized.page.click('#fridgeSaveLayout');
     await authorized.page.waitForFunction(()=>document.querySelector('#fridgeMessage').textContent.startsWith('Layout salvo'));
     check(Number((await db.query('select width_ratio from public.guigs_fridge_slots where id=$1',[x])).rows[0].width_ratio)===.45,'Delegado salva proporção');
+    const handle=authorized.page.getByRole('button',{name:'Redimensionar bloco',exact:true});
+    await handle.scrollIntoViewIfNeeded();const box=await handle.boundingBox();await authorized.page.mouse.move(box.x+box.width/2,box.y+box.height/2);await authorized.page.mouse.down();await authorized.page.mouse.move(box.x+box.width/2+35,box.y+box.height/2,{steps:5});await authorized.page.mouse.up();
+    check(Number(await authorized.page.inputValue('#fridgeField_width_ratio'))>45,'Handle redimensiona rascunho');
+    check(Number((await db.query('select width_ratio from public.guigs_fridge_slots where id=$1',[x])).rows[0].width_ratio)===.45,'Arraste não persiste sem salvar');
+    await snapshot(authorized.page,'editor');
+    const structureCountBefore=(await db.query('select count(*)::int n from public.guigs_fridge_slots')).rows[0].n;
+    await authorized.page.getByRole('button',{name:'Duplicar estrutura'}).click();
+    check(await authorized.page.inputValue('#fridgeField_product_id')==='','Duplicar não associa produto');
+    check(await authorized.page.inputValue('#fridgeField_capacity_quantity')==='','Duplicar não inventa capacidade');
+    check((await db.query('select count(*)::int n from public.guigs_fridge_slots')).rows[0].n===structureCountBefore,'Duplicar prepara rascunho sem escrita');
     await asUser(db,'owner',tx=>tx.query('select public.guigs_set_fridge_layout_access($1,$2,false)',[shop,id(2)]));
     await authorized.page.click('#fridgeReload');
     await authorized.page.waitForFunction(()=>document.querySelector('#fridgeEdit').classList.contains('hidden'));
@@ -208,16 +229,56 @@ function bridge({role,shop}){
     const desktop=await open('attendant',{width:1440,height:950});await waitMap(desktop.page);
     check(await desktop.page.locator('.fridge-cabinet').count()===2,'Duas geladeiras em desktop');
     check(await desktop.page.locator('.fridge-cabinet').evaluateAll(ns=>Math.abs(ns[0].getBoundingClientRect().top-ns[1].getBoundingClientRect().top)<2),'Geladeiras lado a lado quando há espaço');
-    for(const state of ['Pronto para abastecer','CRÍTICO','ATENÇÃO','OK'])
-      check(await desktop.page.locator('.fridge-state').filter({hasText:state}).count()===1,'Mapa exibe estado '+state);
-    check(await desktop.page.locator('.fridge-photo-fallback').count()===4,'Placeholders sem imagem');
+    for(const state of ['Vazio','Crítico','Atenção','Em dia'])
+      check(await desktop.page.locator('#fridgeMap .fridge-state').filter({hasText:state}).count()===1,'Mapa exibe estado '+state);
+    check(await desktop.page.locator('#fridgeMap .fridge-photo-fallback').count()===4,'Placeholders sem imagem');
     check((await desktop.page.locator('.fridge-unallocated').textContent()).includes('1 un. sem posição física'),'Saldo não alocado separado do mapa');
+    check(await desktop.page.locator('#fridgeMap meter,#fridgeMap [data-replenish],#fridgeMap .fridge-slot details').count()===0,'Mapa compacto sem medidores, lotes ou botões técnicos');
+    check(!await desktop.page.locator('#fridgeMap').textContent().then(t=>t.includes('Mínimo')||t.includes('Meta')),'Mínimo e meta fora da tela principal');
+    await snapshot(desktop.page,'desktop');
     const slot=desktop.page.locator('[data-slot-id="'+x+'"]');
-    check(await slot.getByRole('meter',{name:'Ocupação de Coca A1'}).count()===1,'Ocupação com nome acessível');
-    await slot.getByText('Lotes e validade').focus();await desktop.page.keyboard.press('Enter');
-    check(await slot.locator('details[open]').count()===1,'Validade acessível por teclado');
+    await slot.locator('button').click();
+    check(await desktop.page.getByRole('meter',{name:'Ocupação de Coca A1'}).count()===1,'Ocupação com nome acessível no modal');
+    check((await desktop.page.textContent('#fridgeDetailBody')).includes('Bloco ativo'),'Modal mantém configuração ativa derivada do ledger');
+    check(!(await desktop.page.isVisible('#fridgeDetailEdit')),'Atendente comum não vê edição no modal');
+    check(!(await desktop.page.isVisible('#fridgeDetailProduct')),'Atendente comum não troca produto');
+    check(await desktop.page.isEnabled('#fridgeDetailReplenish'),'Atendente pode usar reposição existente');
+    await snapshot(desktop.page,'modal');
+    await desktop.page.locator('#fridgeDetailLots summary').focus();await desktop.page.keyboard.press('Enter');
+    check(await desktop.page.locator('#fridgeDetailLots[open]').count()===1,'Validade acessível por teclado');
+    await desktop.page.keyboard.press('Escape');
+    await desktop.page.emulateMedia({reducedMotion:'reduce'});
+    check(await desktop.page.locator('.fridge-slot-open').first().evaluate(e=>getComputedStyle(e).transitionDuration==='0s'),'Reduced motion elimina transições');
+    const imagePath=shop+'/'+id(20)+'/'+id(404)+'.png';
+    await db.query('update public.guigs_products set image_path=$1 where id=$2',[imagePath,id(20)]);
+    await desktop.page.route('**/storage/v1/object/sign/**',r=>r.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64')}));
+    await desktop.page.reload();await desktop.page.waitForSelector('#fridgeMap img.fridge-photo');
+    await desktop.page.waitForFunction(()=>[...document.querySelectorAll('#fridgeMap img')].every(i=>i.complete&&i.naturalWidth>0));
+    check(await desktop.page.locator('#fridgeMap img.fridge-photo').first().evaluate(e=>getComputedStyle(e).objectFit==='contain'),'Thumbnail carregado e proporcional');
+    await desktop.page.route('**/storage/v1/object/sign/**',r=>r.abort());await desktop.page.reload();
+    await desktop.page.waitForFunction(()=>document.querySelectorAll('#fridgeMap .fridge-photo-fallback').length===4);
+    check(await desktop.page.locator('#fridgeMap img').count()===0,'Arquivo ausente volta ao placeholder');
+    await db.query('update public.guigs_products set image_path=null where id=$1',[id(20)]);
     check(desktop.errors.length===0,'Mapa sem erro JavaScript');
     await desktop.context.close();
+    for(const viewport of [{width:1280,height:800},{width:1024,height:768}]){
+      const touch=await open('attendant',viewport);await waitMap(touch.page);
+      check(await touch.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Tablet '+viewport.width+' sem overflow');
+      await touch.page.locator('[data-open-slot]').first().tap();
+      check(await touch.page.locator('#fridgeDetailDialog').evaluate(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight;}),'Modal cabe no tablet '+viewport.width);
+      await touch.page.keyboard.press('Escape');await touch.page.locator('#fridgeMap').scrollIntoViewIfNeeded();await snapshot(touch.page,'tablet-'+viewport.width);await touch.context.close();
+    }
+    const volume=await open('attendant',{width:1280,height:800});await waitMap(volume.page);
+    await volume.page.route('**/fixture',async route=>{
+      if(route.request().postDataJSON().name!=='guigs_get_fridge_map')return route.fallback();
+      const response=await route.fetch(),payload=await response.json();
+      payload.data.slots=Array.from({length:100},(_,i)=>({...payload.data.slots[0],id:randomUUID(),name:'Bloco artificial '+i,x_ratio:(i%3)/3,width_ratio:1/3,sort_order:i}));
+      return route.fulfill({response,json:payload});
+    });
+    const began=performance.now();await volume.page.click('#fridgeReload');await volume.page.waitForFunction(()=>document.querySelectorAll('#fridgeMap .fridge-slot').length===100);
+    const renderMs=Math.round(performance.now()-began);check(renderMs<3000,'Leitura e render de 100 blocos em menos de 3s');
+    console.log('Mapa DOM 100 blocos artificiais: '+renderMs+' ms.');
+    await volume.page.locator('[data-open-slot]').first().click();check(await volume.page.locator('#fridgeDetailDialog').isVisible(),'Modal funciona com 100 blocos');await volume.context.close();
     await db.query('update public.guigs_fridges set active=false where id=$1',[b]);
     const tablet=await open('attendant',{width:820,height:900});await waitMap(tablet.page);
     check(await tablet.page.locator('.fridge-cabinet').count()===1,'Uma geladeira ativa em tablet');
@@ -232,25 +293,30 @@ function bridge({role,shop}){
     check(await small.page.locator('.fridge-cabinet').count()===5,'Cinco geladeiras no celular');
     check(await small.page.locator('.fridge-cabinet').evaluateAll(ns=>ns.every((n,i)=>i===0||n.getBoundingClientRect().top>ns[i-1].getBoundingClientRect().top)),'Geladeiras empilhadas no celular');
     check(await small.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Celular sem rolagem horizontal global');
+    check(await small.page.locator('#fridgeMap .fridge-slot-open').evaluateAll(rows=>rows.every(e=>{const r=e.getBoundingClientRect();return r.width>=44&&r.height>=44;})),'Alvos do mapa confortáveis no celular');
+    await small.page.locator('[data-open-slot]').first().tap();
+    check(await small.page.locator('#fridgeDetailDialog').evaluate(e=>e.getBoundingClientRect().width<=innerWidth),'Modal cabe em 360px');
+    await snapshot(small.page,'mobile-modal');await small.page.keyboard.press('Escape');
     await small.context.close();
     const mapChecks=checks;checks=0;
     const owner=await open('owner',{width:390,height:844});await waitMap(owner.page);
     const beforeCancel=await ledger();
+    await owner.page.locator('#fridgeMoreActions summary').click();
     await owner.page.click('#fridgeAllocate');await owner.page.fill('#allocate-'+x,'1');await owner.page.click('#fridgeCancelAllocation');
     assert.deepEqual(await ledger(),beforeCancel);checks++;
     await owner.page.click('#fridgeAllocate');await owner.page.fill('#allocate-'+x,'1');
     check((await owner.page.textContent('#fridgeAllocationSummary')).includes('Restam não alocadas: 0'),'Resumo antes da confirmação');
     await owner.page.click('#fridgeConfirmAllocation');
     await owner.page.waitForFunction(()=>document.querySelector('.fridge-unallocated').textContent.includes('0 un. sem posição física'));
-    check((await owner.page.locator('[data-slot-id="'+x+'"]').textContent()).includes('5 / 18 un.'),'Mapa atualizado depois da distribuição');
+    check((await owner.page.locator('[data-slot-id="'+x+'"]').textContent()).includes('5 un.'),'Mapa atualizado depois da distribuição');
     check((await db.query("select sum(delta)::int as n from public.guigs_movements where location='fridge'")).rows[0].n===8,'Saldo global preservado pelo fluxo UI');
     check(owner.errors.length===0,'Fluxo de distribuição sem erro JavaScript');
     let offlineChecks=0;
     const offline=(value,label)=>{assert.ok(value,label);offlineChecks++;};
-    await owner.context.setOffline(true);
+    await owner.page.locator('[data-open-slot="'+x+'"]').click();await owner.context.setOffline(true);
     await owner.page.waitForFunction(()=>!document.querySelector('#fridgeOffline').classList.contains('hidden'));
-    offline((await owner.page.locator('[data-slot-id="'+x+'"]').textContent()).includes('5 / 18 un.'),'Mapa anterior permanece visível offline');
-    for(const selector of ['#fridgeEdit','#fridgeAllocate','#fridgeOperateStock','[data-replenish="'+x+'"]'])
+    offline((await owner.page.locator('[data-slot-id="'+x+'"]').textContent()).includes('5 un.'),'Mapa anterior permanece visível offline');
+    for(const selector of ['#fridgeEdit','#fridgeAllocate','#fridgeOperateStock','#fridgeDetailReplenish'])
       offline(await owner.page.isDisabled(selector),'Operação bloqueada offline: '+selector);
     await owner.context.setOffline(false);
     await owner.page.waitForFunction(()=>document.querySelector('#status').textContent.includes('sincronizado')
@@ -269,7 +335,7 @@ function bridge({role,shop}){
       assert.equal((await response.json()).error,null,'Fixture confirmou no servidor antes da falha de transporte');
       return route.fulfill({json:{data:null,error:{message:'Conexão interrompida. Tente novamente.'}}});
     });
-    await worker.page.getByRole('button',{name:'Repor Coca A1'}).click();
+    await worker.page.locator('[data-open-slot="'+x+'"]').click();await worker.page.click('#fridgeDetailReplenish');
     await worker.page.waitForFunction(()=>!document.querySelector('#fridgeReplenishConfirm').disabled);
     check(await worker.page.inputValue('#fridgeReplenishQuantity')==='7','Sugestão até a meta no modal');
     await worker.page.fill('#fridgeReplenishQuantity','3');
@@ -280,7 +346,7 @@ function bridge({role,shop}){
     await worker.page.waitForFunction(()=>document.querySelector('#fridgeReplenishMessage').textContent.includes('interrompida'));
     check(keys.length===1,'Duplo clique gera uma requisição');
     await worker.page.click('#fridgeReplenishConfirm');
-    await worker.page.waitForFunction(slot=>document.querySelector('[data-slot-id="'+slot+'"]').textContent.includes('8 / 18 un.'),x);
+    await worker.page.waitForFunction(slot=>document.querySelector('[data-slot-id="'+slot+'"]').textContent.includes('8 un.'),x);
     check(keys.length===2&&keys[0]===keys[1],'Retry após resposta perdida preserva a chave');
     check((await db.query("select count(*)::int as n from public.guigs_movements where movement_type='transfer' and spatial")).rows[0].n===2,'Retry não duplica o débito/crédito');
     check(worker.errors.length===0,'Reposição sem erro JavaScript');
@@ -292,7 +358,7 @@ function bridge({role,shop}){
     await worker.page.waitForFunction(()=>!document.querySelector('#fridgeStockConfirm').disabled);
     check(await worker.page.locator('#fridgeStockPlan li').count()===3,'Venda apresenta split antes de confirmar');
     await worker.page.click('#fridgeStockConfirm');
-    await worker.page.waitForFunction(slot=>document.querySelector('[data-slot-id="'+slot+'"]').textContent.includes('7 / 18 un.'),x);
+    await worker.page.waitForFunction(slot=>document.querySelector('[data-slot-id="'+slot+'"]').textContent.includes('7 un.'),x);
     check((await db.query("select count(distinct event_id)::int as events,count(*)::int as lines from public.guigs_movements where movement_type='sale' and spatial")).rows[0].lines===3,'Venda split gravada no ledger');
     check((await db.query("select count(distinct event_id)::int as n from public.guigs_movements where movement_type='sale' and spatial")).rows[0].n===1,'Split tem um único evento');
     check(worker.errors.length===0,'Saída sem erro JavaScript');
