@@ -7,7 +7,9 @@ let checks=0;const eq=(a,b)=>{assert.deepEqual(a,b);checks++;};const reject=asyn
  for(const [bytes,mime]of [[png,'image/png'],[jpg,'image/jpeg'],[webp,'image/webp']]){eq(detectImageMime(bytes),mime);eq((await inspectProductImage(bytes,mime)).sha256.length,64);}
  await reject(()=>inspectProductImage(new Uint8Array(2097153),'image/png'),/2 MiB/);
  await reject(()=>inspectProductImage(jpg,'image/png'),/inválido/);
- const {scanImages}=require('../scripts/import-product-images.cjs');
+ const {scanImages,enrichLegacyCatalog}=require('../scripts/import-product-images.cjs');
+ const legacyClient={from:()=>({select(){return this},eq(){return this},async is(){return {data:[{storage_path:'legado',mime_type:'image/png'}]}}}),storage:{from:()=>({download:async()=>({data:new Blob([jpg])})})},rpc:()=>{throw Error('Não reclassificar legado')}};
+ const legacy=await enrichLegacyCatalog(legacyClient,id(10));eq(legacy.indexed,0);eq(legacy.warnings[0].reason,'legacy_mime_mismatch');
  const blobs={'Água com gás & gelo.png':png,'cópia.png':png,'JPEG foto.jpeg':jpg,'WEBP.webp':webp,'grande.png':new Uint8Array(2097153),'erro.png':new Uint8Array([1]),'nota.txt':new Uint8Array([1])};
  const io={readdirSync:()=>Object.keys(blobs).map(name=>({name,isFile:()=>true})),lstatSync:file=>({size:blobs[path.basename(file)].length,isSymbolicLink:()=>false}),readFileSync:file=>blobs[path.basename(file)]};
  const dry=await scanImages(io);eq(dry.found,7);eq(dry.valid,4);eq(dry.duplicates,1);eq(dry.oversize,1);eq(dry.refused,2);eq(dry.ignored,1);

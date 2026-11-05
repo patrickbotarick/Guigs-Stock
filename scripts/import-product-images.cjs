@@ -32,6 +32,23 @@ async function importImages({client,shopId,manifest,readBytes}){
  }
  return result;
 }
+async function enrichLegacyCatalog(client,shopId){
+ const old=await client.from('guigs_product_images').select('*').eq('shop_id',shopId).is('sha256',null);
+ if(old.error)throw Error('Catálogo indisponível');
+ const {inspectProductImage,detectImageMime}=await import('../image-library.js');const result={indexed:0,warnings:[]};
+ for(const item of old.data){
+  try{
+   const download=await client.storage.from('guigs-product-images').download(item.storage_path);if(download.error)throw Error('legacy_download');
+   const bytes=await download.data.arrayBuffer(),detected=detectImageMime(bytes);
+   // Compatibilidade: metadados históricos podem divergir dos bytes. Não reclassifica nem bloqueia os novos arquivos.
+   if(detected!==item.mime_type){result.warnings.push({reason:'legacy_mime_mismatch',declared:item.mime_type,detected});continue;}
+   const info=await inspectProductImage(bytes,item.mime_type);
+   const r=await client.rpc('guigs_register_product_image',{p_shop_id:shopId,p_path:item.storage_path,p_original_filename:item.original_filename,p_display_name:item.display_name,p_mime_type:info.mime_type,p_bytes:info.bytes,p_sha256:info.sha256});
+   if(r.error)throw Error('legacy_register');result.indexed++;
+  }catch{result.warnings.push({reason:'legacy_hash_not_confirmed'});}
+ }
+ return result;
+}
 async function execute(manifest){
  const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  const {createClient}=require(path.join(process.env.SUPABASE_SDK_DIR||path.join(os.tmpdir(),'guigs-stock-homolog-deps/node_modules'),'@supabase/supabase-js'));
@@ -56,13 +73,9 @@ async function execute(manifest){
   const membership=await client.from('guigs_memberships').select('shop_id,role,active,manage_fridge_layout').eq('shop_id',SHOP).single();
   assert.ok(!membership.error&&membership.data.active&&(membership.data.role==='owner'||membership.data.manage_fridge_layout),'Membership não autorizada');
   console.log('PASS sessão autorizada para importação sob RLS');
-  const bucket=client.storage.from('guigs-product-images');
-  // Enriquecimento de hashes legados sem trocar vínculos ou excluir bytes.
-  const old=await client.from('guigs_product_images').select('*').eq('shop_id',SHOP).is('sha256',null);if(old.error)throw Error('Catálogo indisponível');
-  const {inspectProductImage}=await import('../image-library.js');
-  for(const item of old.data){const download=await bucket.download(item.storage_path);if(download.error)throw Error('Leitura legada recusada');const info=await inspectProductImage(await download.data.arrayBuffer(),item.mime_type);const r=await client.rpc('guigs_register_product_image',{p_shop_id:SHOP,p_path:item.storage_path,p_original_filename:item.original_filename,p_display_name:item.display_name,p_mime_type:info.mime_type,p_bytes:info.bytes,p_sha256:info.sha256});if(r.error)throw Error('Registro legado recusado');}
+  const legacy=await enrichLegacyCatalog(client,SHOP);console.log(JSON.stringify({legacy}));
   const result=await importImages({client,shopId:SHOP,manifest,readBytes:async filename=>fs.readFileSync(path.join(SOURCE,filename))});
-  const output={projectRef:PROJECT,shopId:SHOP,time:new Date().toISOString(),found:manifest.found,...result};
+  const output={projectRef:PROJECT,shopId:SHOP,time:new Date().toISOString(),found:manifest.found,legacy,...result};
   const dir=path.join(os.tmpdir(),'guigs-v16-private');fs.mkdirSync(dir,{recursive:true});const report=path.join(dir,'product-image-import-'+Date.now()+'.json');fs.writeFileSync(report,JSON.stringify(output,null,2),{mode:0o600});
   await page.waitForSelector('#content:not(.hidden)',{timeout:30000});await page.click('#navFridges');await page.waitForSelector('#fridgeMap .fridge-slot');
   await page.click('#fridgeEdit');await page.click('#fridgeImageLibrary');await page.waitForSelector('.image-library-item');
@@ -71,5 +84,5 @@ async function execute(manifest){
   assert.ok(await page.isVisible('#imageLibraryApply'));console.log(JSON.stringify({found:manifest.found,imported:result.imported,duplicates:result.duplicates,refused:result.refused,optimized:0,report,associationsChanged:0,catalogVisible:count,thumbnailsVerified:count}));
  }finally{authorization=undefined;await browser.close();}
 }
-module.exports={SOURCE,scanImages,importImages};
+module.exports={SOURCE,scanImages,importImages,enrichLegacyCatalog};
 if(require.main===module)scanImages().then(async manifest=>{console.log(JSON.stringify(manifest,null,2));if(process.argv.includes('--execute'))await execute(manifest);}).catch(()=>{console.error('Importação interrompida. Credenciais e respostas privadas omitidas.');process.exitCode=1;});
