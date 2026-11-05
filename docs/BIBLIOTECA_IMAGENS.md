@@ -43,3 +43,9 @@ Baseline de produção: 687 movimentos, ledger 0470bca16323e2652e046bfe200d297c,
 Aplicar apenas a nova migration exata após os gates, uma vez, com alvo conferido. Hash do SQL 1FA68893B13630E01ECCAF7880BD1BC4EC9FBC208D1DEACE365B0E951C4E82E1. Não executar db push, reset, restore ou migrations antigas. Frontend anterior continua lendo caminhos antigos e novos e enviando caminhos legados; não reverter CHECK/RPC nem apagar catálogo como rollback. Preferir correção aditiva e preservar todas as imagens e vínculos. Nenhuma tag nova é necessária.
 
 Estado provisório BIBLIOTECA DE IMAGENS NO-GO até concluir produção, importação e fingerprints finais.
+
+## Produção — estado aguardando autenticação
+
+Migration aplicada uma vez com sucesso no projeto wddbhtxkbrhsjewuaekv, preservando os fingerprints de ledger e vínculos de produto. A imagem legada foi catalogada, total de 1 item antes da importação. Código publicado no SHA 865860921dddeca45cc04f70089503def83f5025; os 18 arquivos públicos conferem com o build. Bucket permanece privado.
+
+O comando real de importação foi iniciado e decodificou localmente as 19 imagens, todas válidas. Está aguardando login legítimo de owner na janela isolada do Edge. Até esse login, nenhum arquivo local foi enviado. A sessão usa JWT em memória e RLS; não há chave privilegiada disponível ou necessária. A aprovação final permanece pendente desse passo e da validação posterior. O relatório final será gravado externamente em product-image-import-*.json na pasta privada temporária do administrador.
