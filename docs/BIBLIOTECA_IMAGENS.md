@@ -1,5 +1,7 @@
 # Biblioteca de imagens de produtos
 
+Atualização da auditoria final em 05/11/2026: [matriz consolidada](VALIDACAO_FINAL_MAPA.md). A aprovação da importação abaixo é histórica e restrita ao escopo entregue. O estado atual tem 19 imagens catalogadas e um vínculo de POTY 2L sem objeto. Renomear/desativar/reativar/excluir definitivamente ainda não têm fluxo administrativo na interface. O novo aceite integral solicitado permanece NO-GO; não houve limpeza ou alteração desses dados na auditoria.
+
 ## Auditoria e contrato
 
 Branch codex/product-image-library, base 5f89010cc23b23c6d03029c46ddc5c26aae91ad3. A foto já pertencia a guigs_products.image_path e era reutilizada pelos blocos do produto. O caminho antigo incluía o UUID do produto e o CHECK não permitia reutilização entre produtos. O frontend apagava o arquivo anterior depois de substituir/desvincular. Essas restrições foram auditadas antes de editar.

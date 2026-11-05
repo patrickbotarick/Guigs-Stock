@@ -1,5 +1,7 @@
 # Mapa visual e experiência operacional
 
+Este documento preserva a aprovação histórica do redesign. O estado atual consolidado está em [validação final](VALIDACAO_FINAL_MAPA.md), de 05/11/2026: código a0448a0, shell v14, 19 imagens atuais e aceite integral NO-GO pelas pendências de biblioteca/imagem. Os números e versões das seções históricas abaixo não substituem essa leitura atual.
+
 ## Gates 0 e 1 — auditoria e inventário
 
 Branch codex/fridge-map-visual-redesign, criada da main/origin/main no SHA 417299bf45e6853c71b04e1c826bbaf4a71dbecf. Working tree versionado limpo no início. Arquivos locais privados e auxiliares de backup não versionados foram preservados.

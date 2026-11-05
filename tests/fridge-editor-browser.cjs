@@ -287,6 +287,27 @@ function bridge({role,shop}){
     await db.query('update public.guigs_products set image_path=null where id=$1',[id(20)]);
     check(desktop.errors.length===0,'Mapa sem erro JavaScript');
     await desktop.context.close();
+    const responsiveBefore=await ledger();
+    for(const viewport of [{width:1280,height:800},{width:1024,height:768},{width:390,height:844},{width:360,height:740}]){
+      const responsive=await open('owner',viewport);await waitMap(responsive.page);
+      const contained=e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight;};
+      await responsive.page.locator('[data-open-slot]').first().tap();
+      await responsive.page.click('#fridgeDetailLibrary');await responsive.page.waitForSelector('.image-library-item');
+      check(await responsive.page.locator('#imageLibraryDialog').evaluate(contained),'Biblioteca cabe em '+viewport.width);
+      check(await responsive.page.locator('#imageLibraryDialog').evaluate(e=>e.scrollWidth<=e.clientWidth),'Biblioteca sem overflow horizontal em '+viewport.width);
+      await responsive.page.fill('#imageLibrarySearch','artificial');
+      await responsive.page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent==='1 imagens nesta página.');
+      check(await responsive.page.locator('.image-library-item').count()===1,'Busca por toque em '+viewport.width);
+      await responsive.page.click('#imageLibraryClose');await responsive.page.click('#fridgeEdit');
+      await responsive.page.locator('#fridgeEditorPreview .fridge-draft-block').first().tap();
+      check(await responsive.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Editor sem overflow global em '+viewport.width);
+      check(await responsive.page.isEnabled('#fridgeSaveLayout'),'Editor utilizável por owner em '+viewport.width);
+      await snapshot(responsive.page,'final-editor-'+viewport.width);
+      await responsive.page.click('#fridgeOperate');
+      check(responsive.errors.length===0,'Fluxo responsivo sem erro JavaScript em '+viewport.width);
+      await responsive.context.close();
+    }
+    assert.deepEqual(await ledger(),responsiveBefore);checks++;
     for(const viewport of [{width:1280,height:800},{width:1024,height:768}]){
       const touch=await open('attendant',viewport);await waitMap(touch.page);
       check(await touch.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Tablet '+viewport.width+' sem overflow');

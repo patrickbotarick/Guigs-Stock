@@ -1,5 +1,7 @@
 # Storage de imagens do mapa
 
+Contrato atual: [biblioteca reutilizável](BIBLIOTECA_IMAGENS.md) e [validação final de 05/11/2026](VALIDACAO_FINAL_MAPA.md). As seções abaixo registram a correção histórica do Storage. A UI atual desvincula sem apagar arquivos; objetos catalogados são imutáveis, e a troca usa outro vínculo. DELETE exige catálogo inativo e nenhum produto vinculado. Não interpretar o fluxo antigo de remoção automática abaixo como comportamento atual. A auditoria atual encontrou 19 objetos e uma referência de POTY 2L sem objeto, mantendo o aceite integral NO-GO.
+
 ## Auditoria de 5 de novembro de 2026
 
 O frontend espera o bucket `guigs-product-images`, definido em `fridges.js` na constante `imageBucket`. `imageExtensions` aceita PNG, JPEG e WebP. O limite existente é 2 MiB (2.097.152 bytes), preservado nesta correção.

@@ -66,7 +66,7 @@ const date=days=>new Date(Date.now()+days*86400000).toISOString().slice(0,10);
   res.setHeader('content-type',file.endsWith('.js')?'text/javascript':file.endsWith('.html')?'text/html':file.endsWith('.png')?'image/png':'application/json');res.end(fs.readFileSync(path.join(artifact.directory,file)));
  });
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
- let browser;const errors=[],blocked=[];
+ let browser;const errors=[],blocked=[],timings=[];
  try{
   browser=await chromium.launch({headless:true,executablePath:'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'});
   for(const [role,viewport]of [['owner',{width:1280,height:800}],['attendant',{width:1024,height:768}],['delegate',{width:390,height:844}]]){
@@ -84,15 +84,17 @@ const date=days=>new Date(Date.now()+days*86400000).toISOString().slice(0,10);
    const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(20000);
    stage='UI '+role+' login page';await page.goto(base+'/auth-preview.html');
    stage='UI '+role+' login fields';await page.locator('#email').fill(users[role].email);await page.locator('#password').fill(users[role].password);await page.locator('#enter').click();
-   stage='UI '+role+' dashboard';await page.waitForSelector('#content:not(.hidden)');await page.click('#navFridges');await page.waitForSelector('#fridgeMap .fridge-slot');
+   stage='UI '+role+' dashboard';await page.waitForSelector('#content:not(.hidden)');let began=performance.now();await page.click('#navFridges');await page.waitForSelector('#fridgeMap .fridge-slot');
+   const timing={role,map13Ms:Math.round(performance.now()-began)};timings.push(timing);
    check(await page.locator('#fridgeMap .fridge-slot').count()===13,'Mapa real '+role+' 13 blocos');
    await page.waitForFunction(()=>[...document.querySelectorAll('#fridgeMap img')].some(i=>i.complete&&i.naturalWidth>0));
    check(true,'URL assinada e imagem real de homolog '+role);
    check(await page.isVisible('#fridgeEdit')===(role!=='attendant'),'Permissão do editor '+role);
-   await page.locator('[data-open-slot="'+attentionSlot.id+'"]').tap();
+   began=performance.now();await page.locator('[data-open-slot="'+attentionSlot.id+'"]').tap();timing.modalMs=Math.round(performance.now()-began);
    check(await page.isEnabled('#fridgeDetailReplenish'),'Modal permite reposição '+role);
    check(await page.isVisible('#fridgeDetailEdit')===(role!=='attendant'),'Permissão no modal '+role);
-   await page.click('#fridgeDetailLibrary');await page.waitForSelector('.image-library-item');
+   began=performance.now();await page.click('#fridgeDetailLibrary');await page.waitForSelector('.image-library-item');
+   await page.waitForFunction(()=>[...document.querySelectorAll('.image-library-item img')].every(i=>i.complete&&i.naturalWidth>0));timing.libraryThumbnailsMs=Math.round(performance.now()-began);
    check(await page.locator('.image-library-item').count()>0,'Biblioteca real '+role);
    check(await page.isVisible('#imageLibraryApply')===(role!=='attendant'),'Autorização do seletor '+role);
    if(role!=='attendant'){
@@ -106,7 +108,7 @@ const date=days=>new Date(Date.now()+days*86400000).toISOString().slice(0,10);
    check((await page.textContent('#fridgeReplenishPlan')).includes('UX-1-15'),'Plano FEFO do servidor '+role);
    await page.click('#fridgeReplenishCancel');
    if(role!=='attendant'){
-    await page.click('#fridgeEdit');check(await page.locator('#fridgeEditorPreview .fridge-draft-block').count()===13,'Prévia estrutural '+role);
+    began=performance.now();await page.click('#fridgeEdit');check(await page.locator('#fridgeEditorPreview .fridge-draft-block').count()===13,'Prévia estrutural '+role);timing.editorMs=Math.round(performance.now()-began);
     check(await page.isVisible('#fridgeLayoutAccess')===(role==='owner'),'Delegação administrativa só owner '+role);
     await page.click('#fridgeOperate');
    }
@@ -118,13 +120,17 @@ const date=days=>new Date(Date.now()+days*86400000).toISOString().slice(0,10);
    check(true,'Reload offline '+role);
    await ctx.setOffline(false);await page.reload();await page.waitForSelector('#fridgeMap .fridge-slot');
    check(await page.locator('#fridgeMap .fridge-slot').count()===13,'Reconexão '+role);
+   await page.click('#signout');await page.waitForSelector('#email');
+   await page.fill('#email',users[role].email);await page.fill('#password',users[role].password);await page.click('#enter');
+   await page.waitForSelector('#content:not(.hidden)');await page.click('#navFridges');await page.waitForSelector('#fridgeMap .fridge-slot');
+   check(await page.locator('#fridgeMap .fridge-slot').count()===13,'Logout e novo login preservam mapa '+role);
    await ctx.close();
   }
   const after=await rpc('guigs_get_fridge_map');assert.deepEqual(after,before);check(true,'Mapa integral de homolog preservado pelo smoke');
   const movementsAfter=required(await clients.owner.from('guigs_movements').select('*').eq('shop_id',shop).order('id'),'LEDGER');
   assert.deepEqual(movementsAfter,movementsBefore);check(true,'Ledger de homolog preservado pelo smoke');
   check(errors.length===0&&blocked.length===0,'Sem erros JS ou gravações de estoque no navegador');
-  fs.writeFileSync(path.join(privateDir,'visual-ux-browser-results.json'),JSON.stringify({projectRef:new URL(URL_BASE).hostname.split('.')[0],shop,checks,passed:true,stage:'complete',fixtureOnly:true},null,2));
-  console.log(JSON.stringify({passed:true,checks,project:'homolog',fixtureOnly:true,artifact:folder}));
+  fs.writeFileSync(path.join(privateDir,'visual-ux-browser-results.json'),JSON.stringify({projectRef:new URL(URL_BASE).hostname.split('.')[0],shop,checks,timings,passed:true,stage:'complete',fixtureOnly:true},null,2));
+  console.log(JSON.stringify({passed:true,checks,timings,project:'homolog',fixtureOnly:true,artifact:folder}));
  }finally{if(blocked.length)console.log(JSON.stringify({blockedPaths:blocked}));if(browser)await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error('Homologação visual interrompida em '+stage+' ('+e.name+'). Credenciais e respostas privadas omitidas.');process.exitCode=1;});

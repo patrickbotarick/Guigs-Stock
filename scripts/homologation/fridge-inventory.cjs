@@ -16,7 +16,7 @@ const {ids,loginAll,check}=require('./live.cjs');
  for(const name of ['A','B']){
    const f=await save('fridge',{name:'Inventário artificial '+code+' '+name});
    const h=await save('shelf',{name:'Prateleira 1',fridge_id:f.id});
-   slots.push(await save('slot',{name:'Posição',fridge_id:f.id,shelf_id:h.id,product_id:p}));
+   slots.push(await save('slot',{name:'Posição',fridge_id:f.id,shelf_id:h.id,product_id:p,capacity_quantity:24}));
  }
  await ok(owner,'guigs_allocate_fridge_stock',{p_request_id:randomUUID(),p_entries:slots.map(s=>({lot_id:l,slot_id:s.id,quantity:2}))});
  const inv=await ok(owner,'guigs_create_spatial_inventory',{p_observation:'Fixture artificial'});
