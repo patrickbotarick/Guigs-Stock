@@ -20,13 +20,13 @@ O CDN pode responder conteúdo previamente armazenado por um curto intervalo dep
 
 POTY 2L: o vínculo já estava corrigido no primeiro SELECT desta rodada; não foi regravado nem inferido pelo código. Produto 5c0f46a1-56eb-46f3-9987-43edb4d6f8c1 aponta para o catálogo 48f878ca-69cd-4b98-9dcf-7056f43056ef, caminho `094582e6-29f6-4dda-b631-cdc7b229f5dc/library/cfdf4638184b780f1a8a3d16a2ebacb048ac04424a41c21c680ae366d7e3cc89.png`. Objeto existente, original local Poty 2L.png preservado com o mesmo SHA-256, e inspeção visual confirma guaraná Poty 2L. O modelo usa image_path no produto; não existe coluna image_id vinculada. O id acima é obtido por correspondência do path no catálogo.
 
-Auditoria de órfãos somente leitura: zero registros sem objeto, zero objetos sem catálogo, zero vínculos sem catálogo/objeto e zero imagens inativas em uso no baseline atual. Uma imagem inativa em uso é permitida por este contrato e não seria classificada como órfã. Os 19 arquivos sem vínculo individual são a biblioteca reutilizável, não lixo. Nenhuma limpeza executada.
+Auditoria de órfãos somente leitura: zero registros sem objeto, zero objetos sem catálogo, zero vínculos sem catálogo/objeto e zero imagens inativas em uso no baseline atual. Uma imagem inativa em uso é permitida por este contrato e não seria classificada como órfã. Os arquivos ainda sem vínculo individual são a biblioteca reutilizável, não lixo. Nenhuma limpeza executada.
 
 Validação: 1.206 controles gerais; 553 espaciais em 12 suítes, incluindo 50 de administração SQL/RLS e 168 de navegador/editor. Homologação administrativa real: 52 controles, owner e delegado, UI de rename/reload, desativação vinculada, reativação, confirmação/cancelamento/delete e duas falhas intermediárias injetadas. Atendente e cross-shop negados nas cinco RPCs. As exclusões usaram somente arquivos artificiais. PWA e três papéis conferidos pelo smoke real de homologação; instalação manual permanece PENDING NÃO BLOQUEANTE.
 
 Backup manual novo: pre-image-admin-2026-11-05_18-33-48-4b0c7d91, recovery.dump 404.691 bytes, SHA-256 `69A948CE9B5003A9BD37246D9BB7F3F7E6C089FB1202D4D69C60A0F6486CE1AE`. Manifesto e baseline do mesmo snapshot conferidos. Pacote privado externo ao Git; não contém bytes dos objetos de Storage. Os originais permanecem na pasta do responsável.
 
-Estado desta preparação: homologação aprovada; aplicação da migration, publicação e smoke de produção ainda precisam ser conferidos antes do GO final. Nenhuma tag nova prevista.
+Produção recebeu a migration exata via psql local com TLS verify-full após expirações do conector, sem reparo automático do histórico de migrations. Fila vazia, cinco RPCs e grants confirmados. Código 587931acb3978e1596a607afb83ab5f9e5a445ef publicado, 18/18 arquivos conferidos; owner real inspecionou controles e foto de POTY no bloco/modal, abrindo e cancelando confirmações sem alterar imagem real. Baseline preservado. O encerramento do aceite aguarda o smoke de leitura do atendente descrito na matriz consolidada. Nenhuma tag nova criada.
 
 ## Auditoria e contrato
 

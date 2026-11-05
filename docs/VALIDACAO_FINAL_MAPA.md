@@ -1,6 +1,91 @@
 # Validação final consolidada do mapa de geladeiras
 
-Auditoria de 05/11/2026, America/Sao_Paulo. Resultado: **MÓDULO VISUAL DE GELADEIRAS NO-GO PARA OPERAÇÃO** no escopo integral solicitado. Os fluxos de estoque testados passaram; a certificação completa fica bloqueada pelas lacunas descritas abaixo. Este resultado não afirma corrupção de saldo nem determina desligamento automático da aplicação já publicada.
+Documento consolidado de 05/11/2026, America/Sao_Paulo. A auditoria inicial no código a0448a0 resultou em NO-GO. A seção abaixo registra a correção dos dois bloqueios; as tabelas posteriores preservam a evidência histórica e são substituídas pelo novo aceite quando concluído.
+
+## Correção dos bloqueios e novo aceite
+
+Branch codex/image-library-admin, baseada em 45caa6d (auditoria) e main a0448a0. Código novo publicado: `587931acb3978e1596a607afb83ab5f9e5a445ef`; 18/18 arquivos Pages conferidos, shell v15. A causa da administração ausente era implementação de UI inexistente, não CSS/permissão/build. Agora Gerenciar imagens reúne rename, estado, filtros, confirmação de exclusão e recuperação de falhas. Ver [contrato completo](BIBLIOTECA_IMAGENS.md).
+
+A migration 20261105182536_image_library_administration.sql passou no PGlite e no Supabase de homologação antes de produção. O conector apply_migration expirou três confirmações sem executar em produção; a execução autorizada usou psql local, alvo fixo e PGPASSFILE privado existente, TLS verify-full, conferência de identidade/ausência da fila, hash exato 675D7DABE13DBD3F61242DC3C7A3EF19201EFAC1481EE60004E0EC6A131E27F7 e ON_ERROR_STOP. Não houve db push, reexecução de migrations históricas ou reparo automático de supabase_migrations. Esta aplicação deve ser identificada pelo arquivo/hash e por este registro, sem tentar reaplicá-la para preencher histórico. Cinco RPCs e fila vazia confirmadas por SELECT após a execução; anon sem EXECUTE e clientes sem SELECT/DML direto na fila.
+
+Backup manual do administrador pre-image-admin-2026-11-05_18-33-48-4b0c7d91: archive 404.691 bytes, SHA-256 69A948CE9B5003A9BD37246D9BB7F3F7E6C089FB1202D4D69C60A0F6486CE1AE, manifesto e baseline do mesmo snapshot conferidos. Não foi feito restore nem exportação automática pelo agente.
+
+O vínculo de POTY já estava corrigido na primeira leitura desta nova rodada: objeto/catálogo válidos e SHA-256 igual ao original local Poty 2L.png. Não foi regravado por conveniência. O fingerprint de produtos atual é 99e6fcefc4cf10a8531165823df0b1f1; a mudança diante da auditoria anterior corresponde ao vínculo corrigido antes desta rodada. Todos os demais fingerprints da tabela histórica, inclusive lotes/layout/Auth/memberships/catálogo/objetos/ledger, são iguais, e o fingerprint de produtos atual também ficou estável durante esta correção.
+
+Owner autenticado de produção: reload com 13 blocos e estoque sincronizado, foto POTY no bloco e modal (500×500), biblioteca/thumbnail, entrada Gerenciar imagens, filtros e campo Renomear acessíveis. Exclusão de POTY mostra 1 produto e bloqueia o botão destrutivo; oferece Desativar. A confirmação de desativação informa preservação dos vínculos. Uma imagem sem uso mostra o alerta de irreversibilidade e Excluir permanentemente. Todas as confirmações foram canceladas: nenhuma imagem real foi apagada ou desativada. A inspeção interativa registrou os estados da interface e carregamento real; captura CDP de imagem do modal ficou indisponível por timeout, sem afetar o fluxo verificado. Não se afirma existir screenshot dessa sessão.
+
+Regressão atual: 1.206 gerais/14 suítes e 553 espaciais/12 suítes PASS, incluindo 50 controles administrativos backend e 168 de navegador. Homologação real: 52 controles administrativos PASS (UI/API owner/delegado, negativas para atendente e cross-shop, arquivo em uso e falhas antes/depois da remoção); 49 controles de mapa/PWA/logout-login em três papéis PASS. Shell v15, limpeza dos caches v11/v12/v14, offline/reload e imagens fora do cache testados. Instalação manual: **PENDING NÃO BLOQUEANTE**.
+
+Auditoria atual de órfãos: zero catálogo sem objeto, zero objeto sem catálogo, zero vínculo sem catálogo/objeto; zero exclusões pendentes de produção. Baseline segue 184 = 178 + 6, ledger 687 e MD5 0470bca16323e2652e046bfe200d297c, dois movimentos espaciais e Activation Point anterior preservado. Sem escrita de estoque, lotes, histórico, inventário, FEFO, capacidades, layout ou Auth/memberships. A migration e o deploy foram as intervenções de produção autorizadas.
+
+Estado do aceite: controles owner aprovados e aguardando smoke de leitura do atendente de produção, incluindo foto/reload/PWA/logout-login. A matriz final será encerrada após essa etapa.
+
+### Matriz específica da correção
+
+| Item | Resultado | Evidência |
+|---|---|---|
+| Causa biblioteca ausente | PASS | UI não implementada em a0448a0; backend apenas parcial. |
+| Interface administrativa | PASS | Gerenciar imagens e filtros acessíveis ao owner publicado; delegado em homologação. |
+| Rename | PASS | UI/reload reais de homologação; somente display_name mudou; campo publicado acessível. |
+| Deactivate | PASS | Confirmação; vínculo e leitura preservados em homologação; modal publicado aberto/cancelado. |
+| Reactivate | PASS | Volta ao seletor em homologação, objeto existente exigido; código publicado idêntico ao validado. |
+| Delete | PASS | Dois arquivos artificiais removidos pela API em homologação, registro/fila encerrados; nenhuma exclusão real de produção. |
+| Confirmação | PASS | Thumbnail, nome, alerta, Cancelar e ação destrutiva no build publicado; cancelamento sem escrita. |
+| Proteção imagem em uso | PASS | RPC nega; POTY publicado mostra 1 vínculo e não oferece confirmar exclusão. |
+| Owner | PASS | UI/API homologação e inspeção interativa publicada. |
+| manage_fridge_layout | PASS | UI/API real de homologação, inclusive delete e falhas intermediárias. |
+| Attendant | PENDING | API negada e UI restrita em homologação; novo smoke de leitura de produção aguardando login. |
+| Cross-shop | PASS | Cinco RPCs negadas em homologação, tabela privada sem acesso direto. |
+| POTY storage object | PASS | Existe, catálogo válido, hash do original local coincidente; nenhum reenvio necessário. |
+| POTY bloco | PASS | Owner publicado, foto carregada após reload; leitura do atendente ainda pendente. |
+| POTY modal | PASS | Owner publicado, imagem 500×500; leitura do atendente ainda pendente. |
+| Orphan audit | PASS | Zero nas categorias catálogo/objeto/vínculo; fila de produção vazia; sem limpeza. |
+| PWA | PASS | Shell v15, 49 controles reais de homologação; ciclo publicado do atendente pendente. Instalação manual: PENDING NÃO BLOQUEANTE. |
+| Testes | PASS | 1.206 gerais + 553 espaciais + 52 admin homolog + 49 mapa/PWA homolog; 13 de alvo. |
+| Produção | PENDING | Migration aplicada, 18/18 arquivos, owner PASS; aguardando leitura do atendente. |
+| Saldo fridge | PASS | 184 preservado. |
+| Unallocated | PASS | 178 preservado. |
+| Slot | PASS | 6 preservado. |
+| Ledger | PASS | 687 preservados. |
+| Fingerprint | PASS | Ledger 0470bca16323e2652e046bfe200d297c; demais escopos estáveis no baseline desta rodada. |
+| 30 gates finais | PENDING | Reavaliação abaixo; falta somente smoke real de leitura do atendente para fechar. |
+
+### Reavaliação dos 30 gates
+
+| Gate | Resultado | Evidência atual / reaproveitada |
+|---|---|---|
+| 1 — Git | PASS | Branch isolada, histórico auditado, main publicado 587931a; nenhum arquivo privado adicionado. |
+| 2 — Produção | PASS | SQL/grants e saúde acessíveis, HTTP/build 18/18; sem alteração de configurações externas. |
+| 3 — Modelo físico | PASS | 2/7/13; reload owner publicado e logout/login nos três papéis de homologação. |
+| 4 — Editor | PASS | 553 espaciais, rascunho/drag/resize/cancelamento/salvamento e ledger preservado. |
+| 5 — Permissões | PASS | Backend/UI owner/delegado/atendente em homologação, grant/RLS conferidos em produção. |
+| 6 — Estados | PASS | Casos e limites repetidos; 12 pendentes e 1 ativo em produção são estado válido. |
+| 7 — Alertas | PASS | Regras existentes preservadas; produção amarelo para 6 entre mínimo 5 e meta 10. |
+| 8 — Imagens | PENDING | Owner e arquivo/hash PASS; foto do atendente publicado aguardando login. |
+| 9 — Biblioteca/admin | PASS | Rename/status/delete, confirmação, proteção de uso e recuperação de falha PASS; UI publicada inspecionada. |
+| 10 — Modal | PASS | Conteúdo e foto owner publicados, fluxo com toque e lotes/FEFO em homologação. |
+| 11 — Reposição | PASS | Suítes locais novamente aprovadas e cotação real homolog; transação remota da auditoria anterior ainda válida. |
+| 12 — Venda/saída | PASS | Suítes locais novamente aprovadas; ensaio concorrente remoto anterior preservado, RPCs não alteradas. |
+| 13 — Unallocated | PASS | Invariante por lote e 184 = 178 + 6 conferidos antes/depois. |
+| 14 — Proteções estruturais | PASS | Regressões repetidas; sem alteração de schema/RPC estrutural. |
+| 15 — Histórico | PASS | 687, atores/lotes/pais e fingerprint preservados. |
+| 16 — Inventário | PASS | Regressões repetidas; fechamento concorrente real artificial da auditoria anterior continua válido. |
+| 17 — FEFO | PASS | Regressões e plano real de homologação repetidos; sem mudança de regra. |
+| 18 — Performance | PASS | 100 blocos DOM 40–48 ms; mapa 52 mil movimentos 850 ms; 13 blocos reais homolog 239–331 ms na última amostra. |
+| 19 — Tablet | PASS | 1280×800 / 1024×768, modal/editor/biblioteca e toque nos testes repetidos. |
+| 20 — Mobile | PASS | 390/360px, biblioteca/admin e fluxo completo delegado em homologação a 360px. |
+| 21 — PWA | PENDING | Software v15 PASS em homologação e upgrade v11/v12/v14 repetido; ciclo publicado do atendente pendente. Instalação manual é PENDING NÃO BLOQUEANTE. |
+| 22 — Storage | PASS | Privado PNG/JPEG/WebP 2 MiB, 19 objetos/catalogados, zero referências quebradas ou pendências. |
+| 23 — Segurança | PASS | Audit sem achados; 41 security/25 protection; novos endpoints sem anon e sem DML direto. |
+| 24 — Consistência | PASS | Todos os fingerprints desta rodada iguais antes/depois, incluindo produtos já com POTY corrigido. |
+| 25 — Operação equipe | PASS | Regressões de reposição/saída atualizam mapa sem telas técnicas extras; nenhuma escrita fake em produção. |
+| 26 — Owner | PASS | Administração corrigida sem novo poder de estoque; delegação/revogação anteriores e regressões válidas. |
+| 27 — Erros | PASS | Nome inválido, conflito, em uso, RLS, arquivo ausente e falhas intermediárias com recuperação testados. |
+| 28 — Docs | PASS | Causa, SQL/hash/backup, semântica, testes, intervenção e estado de aceite registrados. |
+| 29 — Pendências | PASS | Dois bloqueios funcionais corrigidos; smoke de atendente pendente; instalação manual não bloqueante. |
+| 30 — GO final | PENDING | Não emitir aprovação integral antes de confirmar o smoke de leitura publicado. |
+
+## Auditoria inicial — histórico no código a0448a0
 
 ## Alvo, Git e limites
 
