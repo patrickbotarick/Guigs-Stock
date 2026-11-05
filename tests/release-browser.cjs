@@ -133,10 +133,15 @@ function bridge(shopId){
       const responses=await Promise.all((await cache.keys()).map(key=>cache.match(key)));
       return responses.every(r=>r.ok&&!r.redirected)&&!(await cache.match('/redirected.js'));
     }),'Shell só contém respostas OK sem redirecionamento');
-    const login=await context.newPage();
+    const offlineContext=await browser.newContext({serviceWorkers:'allow'});
+    await offlineContext.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
+    await offlineContext.addInitScript(fixture,{role:'owner',session:false});
+    await offlineContext.addInitScript(bridge,id(10));
+    const login=await offlineContext.newPage();
     await login.goto(base+'/auth-preview.html');
+    await login.waitForFunction(()=>!!navigator.serviceWorker.controller);
     check(new URL(login.url()).pathname==='/auth-preview','Rota canônica online');
-    await context.setOffline(true);
+    await offlineContext.setOffline(true);
     await login.reload({waitUntil:'domcontentloaded'});
     await login.waitForFunction(()=>document.querySelector('#enter').disabled);
     check(await login.isVisible('#message'),'Reload offline da tela de acesso');
@@ -148,10 +153,10 @@ function bridge(shopId){
       const api=await fetch('/rest/v1/guigs_products').then(()=>false,()=>true);
       return asset.ok&&!asset.redirected&&api;
     }),'Asset offline funciona e API não recebe fallback HTML');
-    await context.setOffline(false);
+    await offlineContext.setOffline(false);
     await login.waitForFunction(()=>document.querySelector('#status').textContent.includes('sincronizado'));
     check(true,'Painel que abriu offline autentica e sincroniza na reconexão');
-    await login.close();
+    await offlineContext.close();
    }
    check(errors.length===0,'Sem erros JS: '+errors);check(external.length===0,'Sem conexão externa');
    await context.close();await queue;await db.close();db=null;

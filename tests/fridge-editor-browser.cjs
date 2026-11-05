@@ -10,6 +10,8 @@ async function dispatch({role,table,name,args}){
   if(!['owner','attendant'].includes(role))throw Error('Perfil de fixture inválido');
   const tables={guigs_products:'public.guigs_products',guigs_lots:'public.guigs_lots',guigs_suppliers:'public.guigs_suppliers'};
   const calls={
+    guigs_list_fridge_layout_access:['select public.guigs_list_fridge_layout_access($1) as data',[args?.p_shop_id]],
+    guigs_set_fridge_layout_access:['select public.guigs_set_fridge_layout_access($1,$2,$3) as data',[args?.p_shop_id,args?.p_user_id,args?.p_allowed]],
     guigs_get_fridge_map:['select public.guigs_get_fridge_map($1) as data',[args?.p_shop_id]],
     guigs_save_fridge_layout:['select public.guigs_save_fridge_layout($1,$2,$3,$4,$5) as data',
       [args?.p_shop_id,args?.p_kind,JSON.stringify(args?.p_values??null),args?.p_id,args?.p_revision]],
@@ -58,7 +60,7 @@ const server=http.createServer(async(req,res)=>{
 function bridge({role,shop}){
   const c=window.__mockClient, original=c.rpc.bind(c), originalFrom=c.from.bind(c);
   const send=data=>fetch('/fixture',{method:'POST',body:JSON.stringify({role,...data})}).then(r=>r.json());
-  c.rpc=(name,args)=>/^(guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item|guigs_get_spatial_history|guigs_get_reports)$/.test(name)?send({name,args}):original(name,args);
+  c.rpc=(name,args)=>/^(guigs_list_fridge_layout_access|guigs_set_fridge_layout_access|guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item|guigs_get_spatial_history|guigs_get_reports)$/.test(name)?send({name,args}):original(name,args);
   c.from=table=>{
     if(table==='guigs_memberships')return {select(){return this},eq(){return this},then(a,b){return Promise.resolve({data:[{shop_id:shop,role,active:true}],error:null}).then(a,b)}};
     if(!['guigs_products','guigs_lots','guigs_suppliers'].includes(table))return originalFrom(table);
@@ -76,6 +78,7 @@ function bridge({role,shop}){
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104125833_spatial_fridge_inventory.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104130828_spatial_fridge_observability.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104183000_spatial_fridge_pending_capacity.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105120000_modular_fridge_layout_access.sql'),'utf8'));
     const ledger=()=>db.query('select id,delta,slot_id from public.guigs_movements order by id').then(r=>r.rows);
     const before=await ledger();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -114,7 +117,7 @@ function bridge({role,shop}){
     const x=await save();
     await page.click('#fridgeOperate');
     const pendingCard=page.locator('[data-slot-id="'+x+'"]');
-    check((await pendingCard.textContent()).includes('Capacidade pendente'),'Mapa mostra estado pendente');
+    check((await pendingCard.textContent()).includes('Configuração pendente'),'Mapa mostra estado pendente');
     check(await pendingCard.locator('meter,[data-replenish]').count()===0,'Pendência não calcula ocupação nem oferece reposição');
     await page.click('#fridgeEdit');await page.selectOption('#fridgeEditItem',x);
     check(await page.inputValue('#fridgeField_capacity_quantity')==='','Capacidade pendente foi persistida');
@@ -138,6 +141,28 @@ function bridge({role,shop}){
     check(await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile sem rolagem horizontal global');
     check(mobile.errors.length===0,'Sem erro JavaScript mobile');
     await mobile.context.close();
+    const delegator=await open('owner',{width:1200,height:850});
+    await delegator.page.click('#fridgeEdit');
+    await delegator.page.locator('#fridgeLayoutAccessList input').check();
+    await delegator.page.waitForFunction(()=>!document.querySelector('#fridgeLayoutAccessList input').disabled);
+    check((await db.query('select manage_fridge_layout from public.guigs_memberships where user_id=$1',[id(2)])).rows[0].manage_fridge_layout,'Owner delega capacidade pelo editor');
+    await delegator.context.close();
+    const authorized=await open('attendant',{width:820,height:900});
+    await authorized.page.waitForFunction(()=>!document.querySelector('#fridgeEdit').disabled);
+    check(await authorized.page.isVisible('#fridgeEdit'),'Atendente autorizado vê editor');
+    await authorized.page.click('#fridgeEdit');
+    check(!(await authorized.page.isVisible('#fridgeLayoutAccess')),'Delegado não administra permissões');
+    await authorized.page.selectOption('#fridgeEditKind','slot');
+    await authorized.page.selectOption('#fridgeEditItem',x);
+    await authorized.page.fill('#fridgeField_width_ratio','45');
+    await authorized.page.click('#fridgeSaveLayout');
+    await authorized.page.waitForFunction(()=>document.querySelector('#fridgeMessage').textContent.startsWith('Layout salvo'));
+    check(Number((await db.query('select width_ratio from public.guigs_fridge_slots where id=$1',[x])).rows[0].width_ratio)===.45,'Delegado salva proporção');
+    await asUser(db,'owner',tx=>tx.query('select public.guigs_set_fridge_layout_access($1,$2,false)',[shop,id(2)]));
+    await authorized.page.click('#fridgeReload');
+    await authorized.page.waitForFunction(()=>document.querySelector('#fridgeEdit').classList.contains('hidden'));
+    check(!(await authorized.page.isVisible('#fridgeEditor')),'Revogação oculta editor na próxima leitura');
+    await authorized.context.close();
     assert.deepEqual(await ledger(),before);checks++;
     const editorChecks=checks;checks=0;
     const {fridgeSlotState}=await import('../fridges.js');
@@ -146,7 +171,7 @@ function bridge({role,shop}){
     const create=async(kind,values)=>(await dispatch({role:'owner',name:'guigs_save_fridge_layout',args:{p_shop_id:shop,p_kind:kind,p_values:values,p_id:null,p_revision:null}}));
     const critical=await create('slot',{fridge_id:a,shelf_id:h,name:'Crítico',product_id:id(20),min_quantity:2,target_quantity:4,capacity_quantity:6,x_ratio:.15,width_ratio:.2});
     const ok=await create('slot',{fridge_id:a,shelf_id:h,name:'Pronto',product_id:id(20),min_quantity:1,target_quantity:2,capacity_quantity:6,x_ratio:.75,width_ratio:.25});
-    await create('slot',{fridge_id:a,shelf_id:h,name:'Vazio',capacity_quantity:24,x_ratio:0,width_ratio:.15});
+    await create('slot',{fridge_id:a,shelf_id:h,name:'Vazio',product_id:id(20),capacity_quantity:24,x_ratio:0,width_ratio:.15});
     await db.transaction(async tx=>{
       const e=(await tx.query('select gen_random_uuid() as id')).rows[0].id;
       for(const [slot,delta] of [[null,-7],[x,4],[critical.id,1],[ok.id,2]])
@@ -156,7 +181,7 @@ function bridge({role,shop}){
     const desktop=await open('attendant',{width:1440,height:950});await waitMap(desktop.page);
     check(await desktop.page.locator('.fridge-cabinet').count()===2,'Duas geladeiras em desktop');
     check(await desktop.page.locator('.fridge-cabinet').evaluateAll(ns=>Math.abs(ns[0].getBoundingClientRect().top-ns[1].getBoundingClientRect().top)<2),'Geladeiras lado a lado quando há espaço');
-    for(const state of ['VAZIO','CRÍTICO','ATENÇÃO','OK'])
+    for(const state of ['Pronto para abastecer','CRÍTICO','ATENÇÃO','OK'])
       check(await desktop.page.locator('.fridge-state').filter({hasText:state}).count()===1,'Mapa exibe estado '+state);
     check(await desktop.page.locator('.fridge-photo-fallback').count()===4,'Placeholders sem imagem');
     check((await desktop.page.locator('.fridge-unallocated').textContent()).includes('1 un. sem posição física'),'Saldo não alocado separado do mapa');

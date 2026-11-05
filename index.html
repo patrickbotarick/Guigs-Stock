@@ -1525,8 +1525,14 @@
               <form id="fridgeLayoutForm" class="modalform">
                 <fieldset id="fridgeLayoutFields"></fieldset>
                 <button id="fridgeSaveLayout" class="btn green" type="submit">Salvar layout</button>
+                <button id="fridgeRemoveLayout" class="btn" type="button" disabled>Remover do mapa</button>
               </form>
               <section aria-labelledby="fridgeImageTitle">
+                                <section id="fridgeLayoutAccess" class="hidden" aria-labelledby="fridgeLayoutAccessTitle">
+                  <h3 id="fridgeLayoutAccessTitle">Quem pode editar o mapa</h3>
+                  <p>Autorizar edição do layout mantém o funcionário como atendente.</p>
+                  <div id="fridgeLayoutAccessList"></div>
+                </section>
                 <h3 id="fridgeImageTitle">Foto de produto</h3>
                 <p>PNG, JPEG ou WebP de até 2 MiB. A foto fica disponível para membros da loja. Remover desvincula a foto do mapa.</p>
                 <form id="fridgeImageForm" class="modalform">
