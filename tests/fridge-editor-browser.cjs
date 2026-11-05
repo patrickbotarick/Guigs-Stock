@@ -10,6 +10,7 @@ async function dispatch({role,table,name,args}){
   if(!['owner','attendant'].includes(role))throw Error('Perfil de fixture inválido');
   const tables={guigs_products:'public.guigs_products',guigs_lots:'public.guigs_lots',guigs_suppliers:'public.guigs_suppliers'};
   const calls={
+    guigs_set_product_image:['select public.guigs_set_product_image($1,$2,$3,$4) as data',[args?.p_shop_id,args?.p_product_id,args?.p_path,args?.p_expected_path]],
     guigs_list_fridge_layout_access:['select public.guigs_list_fridge_layout_access($1) as data',[args?.p_shop_id]],
     guigs_set_fridge_layout_access:['select public.guigs_set_fridge_layout_access($1,$2,$3) as data',[args?.p_shop_id,args?.p_user_id,args?.p_allowed]],
     guigs_get_fridge_map:['select public.guigs_get_fridge_map($1) as data',[args?.p_shop_id]],
@@ -35,6 +36,11 @@ async function dispatch({role,table,name,args}){
       [args?.p_shop_id,args?.p_from,args?.p_to,args?.p_limit,args?.p_loss_offset,args?.p_inventory_offset]]
   };
   return asUser(db,role,async tx=>{
+    if(name==='storage_upload'){
+      if(!['image/png','image/jpeg','image/webp'].includes(args.type)||args.size>2097152)throw Error('Arquivo inválido');
+      await tx.query('insert into storage.objects values($1,$2)',['guigs-product-images',args.name]);return {path:args.name};
+    }
+    if(name==='storage_remove')return (await tx.query('delete from storage.objects where name=any($1) returning name',[args.names])).rows;
     if(tables[table])return (await tx.query('select * from '+tables[table]+' where shop_id=$1 order by id',[shop])).rows;
     if(calls[name])return (await tx.query(...calls[name])).rows[0].data;
     throw Error('Operação de fixture não permitida');
@@ -60,7 +66,8 @@ const server=http.createServer(async(req,res)=>{
 function bridge({role,shop}){
   const c=window.__mockClient, original=c.rpc.bind(c), originalFrom=c.from.bind(c);
   const send=data=>fetch('/fixture',{method:'POST',body:JSON.stringify({role,...data})}).then(r=>r.json());
-  c.rpc=(name,args)=>/^(guigs_list_fridge_layout_access|guigs_set_fridge_layout_access|guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item|guigs_get_spatial_history|guigs_get_reports)$/.test(name)?send({name,args}):original(name,args);
+  c.storage={from:()=>({upload:(name,file)=>send({name:'storage_upload',args:{name,type:file.type,size:file.size}}),remove:names=>send({name:'storage_remove',args:{names}}),createSignedUrls:async()=>({data:[]})})};
+  c.rpc=(name,args)=>/^(guigs_set_product_image|guigs_list_fridge_layout_access|guigs_set_fridge_layout_access|guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item|guigs_get_spatial_history|guigs_get_reports)$/.test(name)?send({name,args}):original(name,args);
   c.from=table=>{
     if(table==='guigs_memberships')return {select(){return this},eq(){return this},then(a,b){return Promise.resolve({data:[{shop_id:shop,role,active:true}],error:null}).then(a,b)}};
     if(!['guigs_products','guigs_lots','guigs_suppliers'].includes(table))return originalFrom(table);
@@ -71,6 +78,7 @@ function bridge({role,shop}){
   let browser;
   try{
     db=await createTestDatabase();
+    await db.exec("create schema storage;create table storage.objects(bucket_id text,name text,primary key(bucket_id,name));alter table storage.objects enable row level security;grant usage on schema storage to authenticated;grant select,insert,update,delete on storage.objects to authenticated;");
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104123035_spatial_fridge_foundation.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104124433_spatial_fridge_allocation.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104124855_spatial_fridge_replenishment.sql'),'utf8'));
@@ -79,6 +87,8 @@ function bridge({role,shop}){
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104130828_spatial_fridge_observability.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104183000_spatial_fridge_pending_capacity.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105120000_modular_fridge_layout_access.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104132033_spatial_fridge_product_images.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105124008_map_image_storage_access.sql'),'utf8'));
     const ledger=()=>db.query('select id,delta,slot_id from public.guigs_movements order by id').then(r=>r.rows);
     const before=await ledger();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -152,6 +162,23 @@ function bridge({role,shop}){
     check(await authorized.page.isVisible('#fridgeEdit'),'Atendente autorizado vê editor');
     await authorized.page.click('#fridgeEdit');
     check(!(await authorized.page.isVisible('#fridgeLayoutAccess')),'Delegado não administra permissões');
+    check(await authorized.page.isEnabled('#fridgeImageUpload'),'Delegado pode enviar fotos');
+    const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64');
+    const uploadPhoto=async()=>{
+      await authorized.page.setInputFiles('#fridgeImageFile',{name:'artificial.png',mimeType:'image/png',buffer:png});
+      await authorized.page.click('#fridgeImageUpload');
+      await authorized.page.waitForFunction(()=>document.querySelector('#fridgeImageMessage').textContent==='Foto salva.'&&!document.querySelector('#fridgeImageUpload').disabled);
+    };
+    await uploadPhoto();
+    const first=(await db.query('select image_path from public.guigs_products where id=$1',[id(20)])).rows[0].image_path;
+    check(!!first,'Upload UI vincula imagem');
+    await uploadPhoto();
+    check((await db.query('select count(*)::int as n from storage.objects')).rows[0].n===1,'Substituição UI limpa objeto anterior');
+    await authorized.page.reload();await authorized.page.click('#fridgeEdit');
+    check(await authorized.page.isEnabled('#fridgeImageRemove'),'Reload mantém imagem vinculada');
+    await authorized.page.click('#fridgeImageRemove');await authorized.page.click('#confirmOperation');
+    await authorized.page.waitForFunction(()=>document.querySelector('#fridgeImageMessage').textContent==='Foto removida do mapa.');
+    check((await db.query('select count(*)::int as n from storage.objects')).rows[0].n===0,'Remoção UI exclui objeto desvinculado');
     await authorized.page.selectOption('#fridgeEditKind','slot');
     await authorized.page.selectOption('#fridgeEditItem',x);
     await authorized.page.fill('#fridgeField_width_ratio','45');

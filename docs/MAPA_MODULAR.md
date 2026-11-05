@@ -20,7 +20,7 @@ Remover do mapa significa desativar. Dividir a organização exige cadastrar blo
 
 A coluna booleana manage_fridge_layout pertence ao vínculo da pessoa com a loja e começa falsa. O papel continua owner ou attendant.
 
-Owner sempre edita o layout e pode conceder ou revogar a permissão de um atendente ativo no próprio editor. Atendentes autorizados editam somente estrutura, capacidade e associação de produto. Relatórios restritos, ajuste de saldo, imagens, distribuição de estoque e administração das próprias permissões preservam seus controles existentes.
+Owner sempre edita o layout e pode conceder ou revogar a permissão de um atendente ativo no próprio editor. Atendentes autorizados editam estrutura, capacidade, associação de produto e fotos. Relatórios restritos, ajuste de saldo, distribuição de estoque e administração das próprias permissões preservam seus controles existentes. O contrato de fotos e suas policies estão em [Storage de imagens](MAPA_IMAGENS_STORAGE.md).
 
 O backend valida a capability em cada gravação, sob a mesma exclusão usada pela configuração de estoque. RLS e ausência de DML direto continuam protegendo as tabelas. Revogar a permissão bloqueia a próxima gravação, mesmo quando uma tela antiga mantém o editor aberto.
 

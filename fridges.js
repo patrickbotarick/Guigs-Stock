@@ -76,8 +76,8 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
     el('fridgeEditItem').disabled=locked;
     el('fridgeImageProduct').disabled=locked;
     el('fridgeImageFile').disabled=locked;
-    el('fridgeImageUpload').disabled=locked||!editing||!owner()||!imageProduct();
-    el('fridgeImageRemove').disabled=locked||!editing||!owner()||!imageProduct()?.image_path;
+    el('fridgeImageUpload').disabled=locked||!editing||!canManageLayout()||!imageProduct();
+    el('fridgeImageRemove').disabled=locked||!editing||!canManageLayout()||!imageProduct()?.image_path;
     const allocating=el('fridgeAllocationDialog').open;
     if(allocating){
       el('fridgeAllocationLot').disabled=locked;
@@ -313,7 +313,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
   }
   const allocationMessage=text=>{el('fridgeAllocationMessage').textContent=text;};
   async function setImage(file){
-    if(busy||!editing||!owner()||!navigator.onLine)return;
+    if(busy||!editing||!canManageLayout()||!navigator.onLine)return;
     const target=imageProduct(),{client,shop}=getContext(),stamp=generation;
     const status=text=>{el('fridgeImageMessage').textContent=text;};
     if(!target||!client||!shop)return;
@@ -335,9 +335,20 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
       const r=await client.rpc('guigs_set_product_image',{p_shop_id:shop.shop_id,p_product_id:target.product_id,
         p_path:imagePath,p_expected_path:target.image_path??null});
       if(r.error)throw r.error;
+      saved=true;
+      // Primeiro troca o vínculo com CAS. A policy só permite excluir objetos desvinculados.
+      let cleanupFailed=false;
+      if(target.image_path&&target.image_path!==imagePath){
+        const removed=await client.storage.from(imageBucket).remove([target.image_path]);
+        cleanupFailed=!!removed.error||!removed.data?.some(row=>row.name===target.image_path);
+      }
       if(stamp!==generation)return;
-      saved=true;el('fridgeImageFile').value='';status(file?'Foto salva.':'Foto desvinculada do mapa.');
-    }catch(error){if(stamp===generation)status(safeError(error));}
+      el('fridgeImageFile').value='';
+      status((file?'Foto salva.':'Foto removida do mapa.')+(cleanupFailed?' O arquivo anterior aguarda limpeza pelo administrador.':''));
+    }catch(error){
+      // Não apaga em erro de rede no RPC: o servidor pode ter confirmado o vínculo.
+      if(stamp===generation)status(safeError(error));
+    }
     finally{if(stamp===generation){busy=false;sync();}}
     if(saved&&stamp===generation)await load({announce:false});
   }
@@ -346,8 +357,8 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
     event.preventDefault();const file=el('fridgeImageFile').files[0];if(file)void setImage(file);
   });
   el('fridgeImageRemove').addEventListener('click',async()=>{
-    if(!owner()||busy||!navigator.onLine||!imageProduct()?.image_path)return;
-    if(confirmAction&&await confirmAction('Remover foto do mapa','A foto será desvinculada. Nenhum saldo será alterado.'))await setImage(null);
+    if(!canManageLayout()||busy||!navigator.onLine||!imageProduct()?.image_path)return;
+    if(confirmAction&&await confirmAction('Remover foto do mapa','A foto será desvinculada e o arquivo será removido. Nenhum saldo será alterado.'))await setImage(null);
   });
   const stockMessage=text=>{el('fridgeStockMessage').textContent=text;};
   const stockKind=()=>el('fridgeStockKind').value;
