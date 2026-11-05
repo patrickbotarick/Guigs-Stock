@@ -25,3 +25,11 @@ Owner sempre edita o layout e pode conceder ou revogar a permissão de um atende
 O backend valida a capability em cada gravação, sob a mesma exclusão usada pela configuração de estoque. RLS e ausência de DML direto continuam protegendo as tabelas. Revogar a permissão bloqueia a próxima gravação, mesmo quando uma tela antiga mantém o editor aberto.
 
 A migration é aditiva. Os vínculos existentes recebem a permissão falsa. Capacidades, produtos, coordenadas, nomes, movimentos e saldos existentes são preservados.
+
+## Release e ativação operacional
+
+A v1.7.0 entrega o mapa modular e pode ser lançada com blocos pendentes e saldo não alocado. Medição, associação de produto e configuração física completa não são pré-requisitos para a release.
+
+A equipe da pizzaria pode completar cada bloco conforme a realidade física. Blocos prontos podem ser usados enquanto os demais permanecem pendentes. Todo saldo ainda sem posição continua não alocado.
+
+O Activation Point é a primeira alocação real de saldo não alocado em qualquer slot físico. Depois desse ponto, um rollback apenas do frontend é insuficiente. A recuperação deve preservar ou reconciliar as partições espaciais e os eventos do ledger.
