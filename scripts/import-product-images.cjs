@@ -91,7 +91,7 @@ async function execute(manifest){
   await page.click('#fridgeEdit');await page.click('#fridgeImageLibrary');await page.waitForSelector('.image-library-item');
   const thumbnails=page.locator('.image-library-item img'),count=await thumbnails.count();assert.ok(count>=result.imported);
   for(let i=0;i<count;i++){await thumbnails.nth(i).scrollIntoViewIfNeeded();await thumbnails.nth(i).waitFor({state:'visible'});await page.waitForFunction(index=>{const i=document.querySelectorAll('.image-library-item img')[index];return i?.complete&&i.naturalWidth>0;},i);}
-  assert.ok(await page.isVisible('#imageLibraryApply'));console.log(JSON.stringify({found:manifest.found,imported:result.imported,duplicates:result.duplicates,refused:result.refused,optimized:0,report,associationsChanged:0,catalogVisible:count,thumbnailsVerified:count}));
+  assert.ok(await page.isVisible('#imageLibraryUploadLabel'));console.log(JSON.stringify({found:manifest.found,imported:result.imported,duplicates:result.duplicates,refused:result.refused,optimized:0,report,associationsChanged:0,catalogVisible:count,thumbnailsVerified:count}));
  }finally{authorization=undefined;await browser.close();}
 }
 module.exports={SOURCE,scanImages,importImages,enrichLegacyCatalog,allowedBrowserRequest};

@@ -166,8 +166,9 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
   }
   function selectEditorItem(type,id){
     if(!canManageLayout()||busy||!navigator.onLine)return;
-    editing=true;restocking=false;el('fridgeEditKind').value=type;renderEditor(id);sync();
+    editing=true;restocking=false;el('fridgeEditKind').value=type;renderEditor(id);imageProductFromSlot();sync();
   }
+  function imageProductFromSlot(){if(kind()==='slot'){const id=selected()?.product_id;el('fridgeImageProduct').value=id||'';}sync();}
   function draftNumber(name,fallback){const input=el('fridgeField_'+name);return input?Number(input.value)/100:fallback;}
   function setDraftGeometry(x,width){
     const next=fridgeDraftGeometry(x,width);
@@ -280,7 +281,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
     const select=el('fridgeImageProduct'),previous=select.value;
     const choices=new Map();
     for(const p of getContext().products||[])if(p.active||p.image_path)choices.set(p.id,p.name);
-    select.replaceChildren(...[...choices].map(([id,name])=>option(id,name)));
+    select.replaceChildren(option('','Selecione um produto'),...[...choices].map(([id,name])=>option(id,name)));
     if(choices.has(previous))select.value=previous;
   }
   function photo(slot,large=false){
@@ -828,7 +829,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
     if(!list.children.length)list.textContent='Nenhum atendente ativo.';
   }
   el('fridgeEditKind').addEventListener('change',()=>renderEditor());
-  el('fridgeEditItem').addEventListener('change',renderForm);
+  el('fridgeEditItem').addEventListener('change',()=>{renderForm();imageProductFromSlot();});
   el('fridgeEdit').addEventListener('click',()=>{if(canManageLayout()&&navigator.onLine&&data&&!busy){editing=true;restocking=false;renderEditor();sync();}});
   el('fridgeOperate').addEventListener('click',()=>{editing=false;restocking=false;renderMap();sync();});
   el('fridgeRestockMode').addEventListener('click',()=>{editing=false;restocking=true;renderRestock();sync();});

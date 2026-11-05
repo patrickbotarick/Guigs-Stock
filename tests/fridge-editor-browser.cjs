@@ -178,7 +178,9 @@ function bridge({role,shop}){
     check(await authorized.page.isVisible('#fridgeEdit'),'Atendente autorizado vê editor');
     await authorized.page.click('#fridgeEdit');
     check(!(await authorized.page.isVisible('#fridgeLayoutAccess')),'Delegado não administra permissões');
-    check(await authorized.page.isEnabled('#fridgeImageUpload'),'Delegado pode enviar fotos');
+    check(await authorized.page.isDisabled('#fridgeImageUpload'),'Sem bloco selecionado, produto exige escolha explícita');
+    await authorized.page.selectOption('#fridgeImageProduct',id(20));
+    check(await authorized.page.isEnabled('#fridgeImageUpload'),'Delegado pode enviar fotos ao produto escolhido');
     const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64');
     const uploadPhoto=async()=>{
       await authorized.page.setInputFiles('#fridgeImageFile',{name:'artificial.png',mimeType:'image/png',buffer:png});
@@ -203,6 +205,7 @@ function bridge({role,shop}){
     check((await db.query('select count(*)::int n from storage.objects')).rows[0].n===1,'Desvincular no seletor preserva arquivo compartilhado');
     await authorized.page.click('#imageLibraryClose');
     await authorized.page.reload();await authorized.page.click('#fridgeEdit');
+    await authorized.page.selectOption('#fridgeImageProduct',id(20));
     check(await authorized.page.isEnabled('#fridgeImageRemove'),'Reload mantém imagem vinculada');
     await authorized.page.click('#fridgeImageRemove');await authorized.page.click('#confirmOperation');
     await authorized.page.waitForFunction(()=>document.querySelector('#fridgeImageMessage').textContent==='Associação removida. O arquivo continua na biblioteca.');

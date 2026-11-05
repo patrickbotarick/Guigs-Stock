@@ -30,8 +30,8 @@ Dry-run real aprovado: 19 arquivos, todos PNG, 19 válidos, 0 duplicados locais,
 
 ## Validação e implantação
 
-- 34 controles locais da biblioteca, com PNG/JPEG/WebP artificiais, tamanho, formato inválido, SHA, duplicata, nomes com espaço/acentos/caracteres especiais, aliases, RLS, compartilhamento, desvinculação, arquivamento e isolamento.
-- Suíte espacial com a biblioteca: 455 controles. Inclui seleção, associação a segundo produto, remoção preservando objeto, reload e atendente sem escrita no modal.
+- 44 controles locais da biblioteca, com PNG/JPEG/WebP artificiais, tamanho, formato inválido, SHA, duplicata, nomes com espaço/acentos/caracteres especiais, aliases, RLS, compartilhamento, desvinculação, arquivamento, isolamento, compatibilidade legada e allowlist do navegador administrativo.
+- Suíte espacial com a biblioteca: 466 controles. Inclui seleção explícita de produto, associação a segundo produto, remoção preservando objeto, reload e atendente sem escrita no modal.
 - API real de homologação valida importação/reexecução, PNG/JPEG/WebP, aliases, conteúdo imutável, reutilização, troca sem upload, owner/delegado/atendente e isolamento, sem movimento de estoque.
 - Navegador com Supabase de homologação: 46 controles, três papéis reais artificiais, biblioteca, seleção/remoção de vínculo, thumbnails, PWA v14, offline/reload/reconexão. Mapa e ledger iguais antes/depois.
 - Regressão geral: 1.206 controles aprovados. Build por allowlist, 18 arquivos públicos, sem imagens locais. Testes de alvo: 13 controles.
@@ -42,10 +42,18 @@ Baseline de produção: 687 movimentos, ledger 0470bca16323e2652e046bfe200d297c,
 
 Aplicar apenas a nova migration exata após os gates, uma vez, com alvo conferido. Hash do SQL 1FA68893B13630E01ECCAF7880BD1BC4EC9FBC208D1DEACE365B0E951C4E82E1. Não executar db push, reset, restore ou migrations antigas. Frontend anterior continua lendo caminhos antigos e novos e enviando caminhos legados; não reverter CHECK/RPC nem apagar catálogo como rollback. Preferir correção aditiva e preservar todas as imagens e vínculos. Nenhuma tag nova é necessária.
 
-Estado provisório BIBLIOTECA DE IMAGENS NO-GO até concluir produção, importação e fingerprints finais.
+Estado final: BIBLIOTECA DE IMAGENS APROVADA.
 
-## Produção — estado aguardando autenticação
+## Produção — importação concluída
 
 Migration aplicada uma vez com sucesso no projeto wddbhtxkbrhsjewuaekv, preservando os fingerprints de ledger e vínculos de produto. A imagem legada foi catalogada, total de 1 item antes da importação. Código publicado no SHA 865860921dddeca45cc04f70089503def83f5025; os 18 arquivos públicos conferem com o build. Bucket permanece privado.
 
-O comando real de importação foi iniciado e decodificou localmente as 19 imagens, todas válidas. Está aguardando login legítimo de owner na janela isolada do Edge. Até esse login, nenhum arquivo local foi enviado. A sessão usa JWT em memória e RLS; não há chave privilegiada disponível ou necessária. A aprovação final permanece pendente desse passo e da validação posterior. O relatório final será gravado externamente em product-image-import-*.json na pasta privada temporária do administrador.
+Login legítimo de owner e importação concluídos: 19 encontrados, 19 importados, 0 duplicados, 0 recusados e 0 otimizados. Catálogo e bucket têm 20 itens: 19 novos e a foto legada preservada. Os 19 hashes locais continuam iguais após a importação. Nenhum vínculo de produto foi criado ou alterado automaticamente.
+
+Relatório privado: C:\Users\patrick.silva\AppData\Local\Temp\guigs-v16-private\product-image-import-1793900649344.json. Sessão com JWT somente em memória e RLS, sem chave privilegiada. O objeto legado contém JPEG com metadata histórica image/png; o importador registra legacy_mime_mismatch e mantém bytes, associação e hash desconhecido, sem bloquear os arquivos novos válidos.
+
+A importação terminou antes de uma falha do smoke isolado: a allowlist do navegador administrativo bloqueava duas consultas de histórico necessárias ao bootstrap, causando TypeError: Failed to fetch. A correção libera somente essas leituras e mantém RPCs de escrita bloqueadas no navegador de validação. O relatório agora registra importCompleted antes do smoke. Não foi necessário reenviar os arquivos. No Chrome normal autenticado, o painel sincronizou, os 20 thumbnails carregaram e a busca por Suco encontrou 5 itens.
+
+O editor exige escolha explícita de produto quando nenhum bloco estiver selecionado; ao selecionar um bloco, usa seu produto real como alvo visual. Abrir o editor ou importar não grava associação. A aplicação mantém arquivos privados fora do cache PWA e fora do build/Git.
+
+Consulta final de produção confirmou todos os fingerprints da baseline: 687 movimentos; global 184 = unallocated 178 + slots 6; layout e vínculos de produto idênticos. Activation Point permanece no estado anterior. Bucket privado, catálogo 20, objetos 20, caminhos library 19 e hashes novos 19. Owner e manage_fridge_layout gerenciam; attendant comum lê; isolamento entre lojas e restrições de escrita passaram em homologação com dados artificiais. Não foram feitos movimentos fictícios em produção.
