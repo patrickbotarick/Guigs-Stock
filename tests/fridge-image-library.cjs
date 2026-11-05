@@ -7,7 +7,14 @@ let checks=0;const eq=(a,b)=>{assert.deepEqual(a,b);checks++;};const reject=asyn
  for(const [bytes,mime]of [[png,'image/png'],[jpg,'image/jpeg'],[webp,'image/webp']]){eq(detectImageMime(bytes),mime);eq((await inspectProductImage(bytes,mime)).sha256.length,64);}
  await reject(()=>inspectProductImage(new Uint8Array(2097153),'image/png'),/2 MiB/);
  await reject(()=>inspectProductImage(jpg,'image/png'),/inválido/);
- const {scanImages,enrichLegacyCatalog}=require('../scripts/import-product-images.cjs');
+ const {scanImages,enrichLegacyCatalog,allowedBrowserRequest}=require('../scripts/import-product-images.cjs');
+ const origin='https://wddbhtxkbrhsjewuaekv.supabase.co';
+ for(const name of ['guigs_get_history','guigs_get_spatial_history'])eq(allowedBrowserRequest(origin+'/rest/v1/rpc/'+name,'POST'),true);
+ for(const name of ['guigs_set_product_image','guigs_apply_fridge_operation'])eq(allowedBrowserRequest(origin+'/rest/v1/rpc/'+name,'POST'),false);
+ eq(allowedBrowserRequest(origin+'/storage/v1/object/guigs-product-images/arquivo','POST'),false);
+ eq(allowedBrowserRequest('http://wddbhtxkbrhsjewuaekv.supabase.co/','GET'),false);
+ eq(allowedBrowserRequest('https://outro.example/','GET'),false);
+ eq(allowedBrowserRequest(origin+'/storage/v1/object/sign/guigs-product-images','POST'),true);
  const legacyClient={from:()=>({select(){return this},eq(){return this},async is(){return {data:[{storage_path:'legado',mime_type:'image/png'}]}}}),storage:{from:()=>({download:async()=>({data:new Blob([jpg])})})},rpc:()=>{throw Error('Não reclassificar legado')}};
  const legacy=await enrichLegacyCatalog(legacyClient,id(10));eq(legacy.indexed,0);eq(legacy.warnings[0].reason,'legacy_mime_mismatch');
  const blobs={'Água com gás & gelo.png':png,'cópia.png':png,'JPEG foto.jpeg':jpg,'WEBP.webp':webp,'grande.png':new Uint8Array(2097153),'erro.png':new Uint8Array([1]),'nota.txt':new Uint8Array([1])};

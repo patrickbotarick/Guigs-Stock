@@ -3,6 +3,15 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),asse
 const SOURCE="C:\\Users\\patrick.silva\\OneDrive\\SALVAR\\GUIG'S\\Bebidas Guigs";
 const PROJECT='wddbhtxkbrhsjewuaekv',SHOP='094582e6-29f6-4dda-b631-cdc7b229f5dc';
 const mime={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp'};
+function allowedBrowserRequest(url,method){
+ const u=new URL(url),project='https://'+PROJECT+'.supabase.co';
+ if(u.protocol!=='https:')return false;
+ if(['GET','HEAD','OPTIONS'].includes(method)&&['guigs-stock.pages.dev','esm.sh',PROJECT+'.supabase.co'].includes(u.hostname))return true;
+ if(u.origin!==project||method!=='POST')return false;
+ if(u.pathname==='/auth/v1/token')return true;
+ if(/^\/rest\/v1\/rpc\/(guigs_get_history_actors|guigs_get_history|guigs_get_spatial_history|guigs_get_lot_balances|guigs_get_fridge_map|guigs_list_fridge_layout_access|guigs_list_product_images)$/.test(u.pathname))return true;
+ const sign='/storage/v1/object/sign/guigs-product-images';return u.pathname===sign||u.pathname.startsWith(sign+'/');
+}
 async function scanImages(io=fs,source=SOURCE){
  const {inspectProductImage}=await import('../image-library.js');
  const entries=[],seen=new Set();let found=0,ignored=0;
@@ -58,7 +67,7 @@ async function execute(manifest){
  let authorization;
  try{
   const ctx=await browser.newContext(),page=await ctx.newPage();
-  await ctx.route('**/*',r=>{const q=r.request(),u=new URL(q.url());const read=['GET','HEAD','OPTIONS'].includes(q.method())&&['guigs-stock.pages.dev','esm.sh',PROJECT+'.supabase.co'].includes(u.hostname);const login=u.origin===config.url&&q.method()==='POST'&&u.pathname==='/auth/v1/token';const rpc=u.origin===config.url&&q.method()==='POST'&&/^\/rest\/v1\/rpc\/(guigs_get_history_actors|guigs_get_lot_balances|guigs_get_fridge_map|guigs_list_fridge_layout_access|guigs_list_product_images)$/.test(u.pathname);const sign=u.origin===config.url&&q.method()==='POST'&&u.pathname.startsWith('/storage/v1/object/sign/guigs-product-images');if(read||login||rpc||sign)return r.continue();return r.abort();});
+  await ctx.route('**/*',r=>allowedBrowserRequest(r.request().url(),r.request().method())?r.continue():r.abort());
   // Decodifica localmente antes de enviar. Os bytes não saem do perfil local nesta etapa.
   for(const entry of manifest.entries.filter(e=>['valid','duplicate'].includes(e.status))){
    const bytes=fs.readFileSync(path.join(SOURCE,entry.filename));
@@ -77,6 +86,7 @@ async function execute(manifest){
   const result=await importImages({client,shopId:SHOP,manifest,readBytes:async filename=>fs.readFileSync(path.join(SOURCE,filename))});
   const output={projectRef:PROJECT,shopId:SHOP,time:new Date().toISOString(),found:manifest.found,legacy,...result};
   const dir=path.join(os.tmpdir(),'guigs-v16-private');fs.mkdirSync(dir,{recursive:true});const report=path.join(dir,'product-image-import-'+Date.now()+'.json');fs.writeFileSync(report,JSON.stringify(output,null,2),{mode:0o600});
+  console.log(JSON.stringify({importCompleted:true,found:manifest.found,imported:result.imported,duplicates:result.duplicates,refused:result.refused,report,associationsChanged:0}));
   await page.waitForSelector('#content:not(.hidden)',{timeout:30000});await page.click('#navFridges');await page.waitForSelector('#fridgeMap .fridge-slot');
   await page.click('#fridgeEdit');await page.click('#fridgeImageLibrary');await page.waitForSelector('.image-library-item');
   const thumbnails=page.locator('.image-library-item img'),count=await thumbnails.count();assert.ok(count>=result.imported);
@@ -84,5 +94,5 @@ async function execute(manifest){
   assert.ok(await page.isVisible('#imageLibraryApply'));console.log(JSON.stringify({found:manifest.found,imported:result.imported,duplicates:result.duplicates,refused:result.refused,optimized:0,report,associationsChanged:0,catalogVisible:count,thumbnailsVerified:count}));
  }finally{authorization=undefined;await browser.close();}
 }
-module.exports={SOURCE,scanImages,importImages,enrichLegacyCatalog};
+module.exports={SOURCE,scanImages,importImages,enrichLegacyCatalog,allowedBrowserRequest};
 if(require.main===module)scanImages().then(async manifest=>{console.log(JSON.stringify(manifest,null,2));if(process.argv.includes('--execute'))await execute(manifest);}).catch(()=>{console.error('Importação interrompida. Credenciais e respostas privadas omitidas.');process.exitCode=1;});
