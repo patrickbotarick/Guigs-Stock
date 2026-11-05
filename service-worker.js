@@ -1,4 +1,4 @@
-const CACHE_NAME = "guigs-stock-shell-v13";
+const CACHE_NAME = "guigs-stock-shell-v14";
 const CACHE_PREFIX = "guigs-stock-shell-v";
 
 const APP_SHELL = [
@@ -10,6 +10,7 @@ const APP_SHELL = [
   "./inventory.js",
   "./reports.js",
   "./fridges.js",
+  "./image-library.js",
   "./pwa.js",
   "./config.js",
   "./auth-preview.js",

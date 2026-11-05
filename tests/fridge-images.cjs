@@ -8,7 +8,7 @@ const reject=async(fn,re)=>{await assert.rejects(fn,re);checks++;};
  const db=await createTestDatabase();
  try{
   // Somente um substituto da tabela de metadados para provar RLS; a API real é testada no homolog.
-  await db.exec("create schema storage;create table storage.objects(bucket_id text,name text,primary key(bucket_id,name));alter table storage.objects enable row level security;grant usage on schema storage to authenticated;grant select,insert,update,delete on storage.objects to authenticated;");
+  await db.exec("create schema storage;create table storage.objects(bucket_id text,name text,metadata jsonb default jsonb_build_object('size','1','mimetype','image/png'),primary key(bucket_id,name));alter table storage.objects enable row level security;grant usage on schema storage to authenticated;grant select,insert,update,delete on storage.objects to authenticated;");
   const folder=path.join(__dirname,'../supabase/migrations');
   for(const f of fs.readdirSync(folder).filter(f=>/^\d{14}_.*\.sql$/.test(f)).sort())await db.exec(fs.readFileSync(path.join(folder,f),'utf8'));
   const before=(await db.query('select * from public.guigs_movements order by id')).rows;

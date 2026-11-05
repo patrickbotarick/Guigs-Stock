@@ -1,0 +1,45 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {createTestDatabase,asUser,id}=require('./inventory-support.cjs');
+let checks=0;const eq=(a,b)=>{assert.deepEqual(a,b);checks++;};const reject=async(fn,re)=>{await assert.rejects(fn,re);checks++;};
+(async()=>{
+ const {inspectProductImage,detectImageMime}=await import('../image-library.js');
+ const png=Uint8Array.from([137,80,78,71,13,10,26,10,1]),jpg=Uint8Array.from([255,216,255,1]),webp=Uint8Array.from([82,73,70,70,0,0,0,0,87,69,66,80,1]);
+ for(const [bytes,mime]of [[png,'image/png'],[jpg,'image/jpeg'],[webp,'image/webp']]){eq(detectImageMime(bytes),mime);eq((await inspectProductImage(bytes,mime)).sha256.length,64);}
+ await reject(()=>inspectProductImage(new Uint8Array(2097153),'image/png'),/2 MiB/);
+ await reject(()=>inspectProductImage(jpg,'image/png'),/inválido/);
+ const {scanImages}=require('../scripts/import-product-images.cjs');
+ const blobs={'Água com gás & gelo.png':png,'cópia.png':png,'JPEG foto.jpeg':jpg,'WEBP.webp':webp,'grande.png':new Uint8Array(2097153),'erro.png':new Uint8Array([1]),'nota.txt':new Uint8Array([1])};
+ const io={readdirSync:()=>Object.keys(blobs).map(name=>({name,isFile:()=>true})),lstatSync:file=>({size:blobs[path.basename(file)].length,isSymbolicLink:()=>false}),readFileSync:file=>blobs[path.basename(file)]};
+ const dry=await scanImages(io);eq(dry.found,7);eq(dry.valid,4);eq(dry.duplicates,1);eq(dry.oversize,1);eq(dry.refused,2);eq(dry.ignored,1);
+ const db=await createTestDatabase();
+ try{
+  await db.exec("create schema storage;create table storage.objects(bucket_id text,name text,metadata jsonb,primary key(bucket_id,name));alter table storage.objects enable row level security;grant usage on schema storage to authenticated;grant select,insert,update,delete on storage.objects to authenticated;");
+  const folder=path.join(__dirname,'../supabase/migrations');for(const f of fs.readdirSync(folder).filter(f=>/^\d{14}_.*\.sql$/.test(f)).sort())await db.exec(fs.readFileSync(path.join(folder,f),'utf8'));
+  const before=(await db.query('select * from public.guigs_movements order by id')).rows;
+  const shop=id(10),hash=(await inspectProductImage(png,'image/png')).sha256,key=shop+'/library/'+hash+'.png';
+  const insert=role=>asUser(db,role,tx=>tx.query('insert into storage.objects values($1,$2,$3)',['guigs-product-images',key,JSON.stringify({mimetype:'image/png',size:png.length})]));
+  const register=(role,name='Água & gelo.png')=>asUser(db,role,async tx=>(await tx.query('select public.guigs_register_product_image($1,$2,$3,$4,$5,$6,$7) data',[shop,key,name,'Água com gás','image/png',png.length,hash])).rows[0].data);
+  const list=(role,search='')=>asUser(db,role,async tx=>(await tx.query('select public.guigs_list_product_images($1,$2,60,0) data',[shop,search])).rows[0].data.items);
+  const bind=(role,product,key,old=null)=>asUser(db,role,tx=>tx.query('select public.guigs_set_product_image($1,$2,$3,$4)',[shop,product,key,old]));
+  await reject(()=>insert('attendant'),/row-level security/);await insert('owner');
+  await reject(()=>register('attendant'),/Sem permissão/);
+  const item=await register('owner');eq(item.sha256,hash);eq(item.storage_path,key);
+  eq((await register('owner','apelido.png')).id,item.id);eq((await list('attendant'))[0].aliases,['apelido.png']);
+  eq((await list('owner','Água')).length,1);
+  await bind('owner',id(20),key);await bind('owner',id(21),key);eq((await list('attendant','SUCO UVA'))[0].id,item.id);
+  const remove=role=>asUser(db,role,tx=>tx.query('delete from storage.objects where name=$1 returning name',[key]));
+  eq((await remove('owner')).rows.length,0);
+  eq((await asUser(db,'owner',tx=>tx.query('update storage.objects set name=name where name=$1 returning name',[key]))).rows.length,0);
+  await reject(()=>asUser(db,'owner',tx=>tx.query('select public.guigs_archive_product_image($1,$2)',[shop,item.id])),/Desvincule/);
+  await db.query('update public.guigs_memberships set manage_fridge_layout=true where user_id=$1',[id(2)]);
+  eq((await register('attendant','delegado.png')).id,item.id);await bind('attendant',id(20),null,key);await bind('attendant',id(21),null,key);
+  eq((await list('attendant')).length,1);eq((await db.query('select count(*)::int n from storage.objects')).rows[0].n,1);
+  await asUser(db,'attendant',tx=>tx.query('select public.guigs_archive_product_image($1,$2)',[shop,item.id]));eq((await list('attendant')).length,0);
+  eq((await remove('attendant')).rows.length,1);
+  await reject(()=>asUser(db,'attendant',tx=>tx.query('update public.guigs_product_images set display_name=$1',['INVÁLIDO'])),/permission denied/);
+  await db.query('insert into public.guigs_shops(id,name) values($1,$2)',[id(11),'Outra loja']);await db.query('update public.guigs_memberships set shop_id=$1 where user_id=$2',[id(11),id(2)]);
+  await reject(()=>list('attendant'),/Acesso negado/);await reject(()=>register('attendant'),/Sem permissão/);
+  eq((await db.query('select * from public.guigs_movements order by id')).rows,before);
+  console.log(`Biblioteca de imagens: ${checks} verificações passaram; PGlite e arquivos artificiais.`);
+ }finally{await db.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

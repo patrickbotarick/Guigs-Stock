@@ -1272,6 +1272,22 @@
         .fridge-slot-open { transition:none; }
         .fridge-slot-open:hover { transform:none; }
       }
+      .image-library-dialog { inline-size:min(820px,calc(100vw - 24px)); max-block-size:calc(100dvh - 24px); border:1px solid #d5d9d8; border-radius:18px; padding:1rem; color:#282b32; background:#fffdfa; overflow:auto; }
+      .image-library-dialog::backdrop { background:#14171bb3; }
+      .image-library-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+      .image-library-heading h2 { margin:0; }
+      .image-library-heading p { color:#5e686d; font-size:.85rem; }
+      #imageLibrarySearch { inline-size:100%; min-block-size:44px; margin-block:.5rem; }
+      .image-library-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,140px),1fr)); gap:.7rem; margin-block:1rem; }
+      .image-library-item { min-inline-size:0; background:#fff; color:#282b32; border:1px solid #d8dfda; border-radius:10px; padding:.7rem; display:flex; flex-direction:column; gap:.4rem; text-align:start; }
+      .image-library-item img { inline-size:100%; block-size:110px; object-fit:contain; }
+      .image-library-item strong, .image-library-item small { overflow-wrap:anywhere; }
+      .image-library-item small { font-size:.7rem; color:#5e686d; }
+      .image-library-item[aria-pressed="true"] { outline:3px solid #ab2933; background:#fff5f5; }
+      .image-library-item:focus-visible { outline:3px solid #ab2933; outline-offset:2px; }
+      .image-library-actions { display:flex; flex-wrap:wrap; gap:.5rem; padding-block-start:1rem; position:sticky; bottom:-1rem; background:#fffdfa; }
+      .image-library-dialog button, #imageLibraryUploadLabel { min-block-size:44px; }
+      #imageLibraryUpload { max-inline-size:170px; display:block; font-size:.7rem; }
       #reportsView .panel { margin-bottom: 16px; }
       .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 12px; }
       .report-card { border: 1px solid var(--line, #ddd); border-radius: 12px; padding: 14px; min-width: 0; overflow-wrap: anywhere; }
@@ -1615,14 +1631,14 @@
                   <p>Autorizar edição do layout mantém o funcionário como atendente.</p>
                   <div id="fridgeLayoutAccessList"></div>
                 </section>
-                <h3 id="fridgeImageTitle">Foto de produto</h3>
-                <p>PNG, JPEG ou WebP de até 2 MiB. A foto fica disponível para membros da loja. Owner ou atendente autorizado a editar o layout pode alterar e remover fotos.</p>
+                <h3 id="fridgeImageTitle">Foto de produto</h3><button id="fridgeImageLibrary" class="btn" type="button">Escolher da biblioteca</button>
+                <p>PNG, JPEG ou WebP de até 2 MiB. A foto fica disponível para membros da loja. Owner ou atendente autorizado pode associar imagens da biblioteca. Remover associação preserva o arquivo.</p>
                 <form id="fridgeImageForm" class="modalform">
-                  <div class="field"><label for="fridgeImageProduct">Produto em uma posição</label><select id="fridgeImageProduct" required></select></div>
+                  <div class="field"><label for="fridgeImageProduct">Produto da loja</label><select id="fridgeImageProduct" required></select></div>
                   <div class="field"><label for="fridgeImageFile">Arquivo de imagem</label><input id="fridgeImageFile" type="file" accept="image/png,image/jpeg,image/webp" required></div>
                   <div class="inventory-actions">
                     <button id="fridgeImageUpload" class="btn" type="submit">Salvar foto</button>
-                    <button id="fridgeImageRemove" class="btn" type="button">Remover foto do mapa</button>
+                    <button id="fridgeImageRemove" class="btn" type="button">Remover associação</button>
                   </div>
                   <p id="fridgeImageMessage" role="status" aria-live="polite"></p>
                 </form>
@@ -1633,8 +1649,16 @@
             <div class="fridge-detail-heading"><div><h2 id="fridgeDetailTitle"></h2><p id="fridgeDetailLocation"></p></div><button id="fridgeDetailClose" class="btn" type="button" autofocus aria-label="Fechar detalhes do bloco">✕</button></div>
             <p id="fridgeDetailOffline" class="notice hidden">Sem conexão. Dados da última leitura; ações bloqueadas.</p>
             <div id="fridgeDetailBody"></div>
-            <div class="fridge-detail-actions"><button id="fridgeDetailReplenish" class="btn green" type="button">Repor</button><button id="fridgeDetailShowLots" class="btn" type="button">Ver lotes</button><button id="fridgeDetailStock" class="btn" type="button">Registrar saída</button></div>
+            <div class="fridge-detail-actions"><button id="fridgeDetailReplenish" class="btn green" type="button">Repor</button><button id="fridgeDetailLibrary" class="btn" type="button">Biblioteca de imagens</button><button id="fridgeDetailShowLots" class="btn" type="button">Ver lotes</button><button id="fridgeDetailStock" class="btn" type="button">Registrar saída</button></div>
             <div class="fridge-detail-edit"><button id="fridgeDetailEdit" class="btn hidden" type="button">Editar bloco</button><button id="fridgeDetailProduct" class="btn hidden" type="button">Trocar produto</button></div>
+          </dialog>
+          <dialog id="imageLibraryDialog" class="image-library-dialog" aria-labelledby="imageLibraryTitle">
+            <div class="image-library-heading"><div><h2 id="imageLibraryTitle">Biblioteca de imagens</h2><p id="imageLibraryTarget"></p></div><button id="imageLibraryClose" class="btn" type="button" autofocus aria-label="Fechar biblioteca">✕</button></div>
+            <label for="imageLibrarySearch">Buscar imagem ou produto</label><input id="imageLibrarySearch" type="search" maxlength="160" placeholder="Nome do arquivo, imagem ou produto">
+            <p id="imageLibraryMessage" role="status" aria-live="polite"></p>
+            <div id="imageLibraryGrid" class="image-library-grid"></div>
+            <div class="inventory-actions"><button id="imageLibraryPrevious" class="btn" type="button">Anterior</button><button id="imageLibraryNext" class="btn" type="button">Próxima</button></div>
+            <div class="image-library-actions"><button id="imageLibraryApply" class="btn green" type="button">Usar imagem neste produto</button><button id="imageLibraryUnlink" class="btn" type="button">Remover associação</button><label id="imageLibraryUploadLabel" class="btn">Enviar nova<input id="imageLibraryUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div>
           </dialog>
           <section id="inventoryView" class="hidden" aria-label="Inventário físico">
             <div id="inventoryOffline" class="notice danger hidden" role="status">Sem internet: criação, contagem e fechamento bloqueados. Os dados exibidos podem estar desatualizados.</div>

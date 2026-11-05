@@ -12,6 +12,8 @@ async function dispatch({role,table,name,args}){
   if(!['owner','attendant'].includes(role))throw Error('Perfil de fixture inválido');
   const tables={guigs_products:'public.guigs_products',guigs_lots:'public.guigs_lots',guigs_suppliers:'public.guigs_suppliers'};
   const calls={
+    guigs_register_product_image:['select public.guigs_register_product_image($1,$2,$3,$4,$5,$6,$7) data',[args?.p_shop_id,args?.p_path,args?.p_original_filename,args?.p_display_name,args?.p_mime_type,args?.p_bytes,args?.p_sha256]],
+    guigs_list_product_images:['select public.guigs_list_product_images($1,$2,$3,$4) data',[args?.p_shop_id,args?.p_search,args?.p_limit,args?.p_offset]],
     guigs_set_product_image:['select public.guigs_set_product_image($1,$2,$3,$4) as data',[args?.p_shop_id,args?.p_product_id,args?.p_path,args?.p_expected_path]],
     guigs_list_fridge_layout_access:['select public.guigs_list_fridge_layout_access($1) as data',[args?.p_shop_id]],
     guigs_set_fridge_layout_access:['select public.guigs_set_fridge_layout_access($1,$2,$3) as data',[args?.p_shop_id,args?.p_user_id,args?.p_allowed]],
@@ -40,9 +42,10 @@ async function dispatch({role,table,name,args}){
   return asUser(db,role,async tx=>{
     if(name==='storage_upload'){
       if(!['image/png','image/jpeg','image/webp'].includes(args.type)||args.size>2097152)throw Error('Arquivo inválido');
-      await tx.query('insert into storage.objects values($1,$2)',['guigs-product-images',args.name]);return {path:args.name};
+      await tx.query('insert into storage.objects(bucket_id,name,metadata) values($1,$2,$3)',['guigs-product-images',args.name,JSON.stringify({mimetype:args.type,size:args.size})]);return {path:args.name};
     }
     if(name==='storage_remove')return (await tx.query('delete from storage.objects where name=any($1) returning name',[args.names])).rows;
+    if(table==='guigs_product_images')return(await tx.query('select * from public.guigs_product_images where shop_id=$1 and sha256=$2',[shop,args.sha])).rows;
     if(tables[table])return (await tx.query('select * from '+tables[table]+' where shop_id=$1 order by id',[shop])).rows;
     if(calls[name])return (await tx.query(...calls[name])).rows[0].data;
     throw Error('Operação de fixture não permitida');
@@ -69,9 +72,11 @@ function bridge({role,shop}){
   const c=window.__mockClient, original=c.rpc.bind(c), originalFrom=c.from.bind(c);
   const send=data=>fetch('/fixture',{method:'POST',body:JSON.stringify({role,...data})}).then(r=>r.json());
   c.supabaseUrl=location.origin;
-  c.storage={from:()=>({upload:(name,file)=>send({name:'storage_upload',args:{name,type:file.type,size:file.size}}),remove:names=>send({name:'storage_remove',args:{names}}),createSignedUrls:async paths=>({data:paths.map(path=>({path,signedUrl:location.origin+'/storage/v1/object/sign/guigs-product-images/'+path}))})})};
-  c.rpc=(name,args)=>/^(guigs_set_product_image|guigs_list_fridge_layout_access|guigs_set_fridge_layout_access|guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item|guigs_get_spatial_history|guigs_get_reports)$/.test(name)?send({name,args}):original(name,args);
+  const fixturePng=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='),c=>c.charCodeAt(0));
+  c.storage={from:()=>({upload:(name,bytes,opts)=>send({name:'storage_upload',args:{name,type:opts.contentType,size:bytes.length}}),download:async()=>({data:new Blob([fixturePng]),error:null}),remove:names=>send({name:'storage_remove',args:{names}}),createSignedUrls:async paths=>({data:paths.map(path=>({path,signedUrl:location.origin+'/storage/v1/object/sign/guigs-product-images/'+path}))})})};
+  c.rpc=(name,args)=>/^(guigs_register_product_image|guigs_list_product_images|guigs_set_product_image|guigs_list_fridge_layout_access|guigs_set_fridge_layout_access|guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item|guigs_get_spatial_history|guigs_get_reports)$/.test(name)?send({name,args}):original(name,args);
   c.from=table=>{
+    if(table==='guigs_product_images')return {select(){return this},eq(k,v){if(k==='sha256')this.sha=v;return this},async maybeSingle(){const r=await send({table,args:{sha:this.sha}});return {data:r.data?.[0]||null,error:r.error}}};
     if(table==='guigs_memberships')return {select(){return this},eq(){return this},then(a,b){return Promise.resolve({data:[{shop_id:shop,role,active:true}],error:null}).then(a,b)}};
     if(!['guigs_products','guigs_lots','guigs_suppliers'].includes(table))return originalFrom(table);
     return {select(){return this},eq(){return this},range(){return this},then(a,b){return send({table}).then(a,b)}};
@@ -81,7 +86,7 @@ function bridge({role,shop}){
   let browser;
   try{
     db=await createTestDatabase();
-    await db.exec("create schema storage;create table storage.objects(bucket_id text,name text,primary key(bucket_id,name));alter table storage.objects enable row level security;grant usage on schema storage to authenticated;grant select,insert,update,delete on storage.objects to authenticated;");
+    await db.exec("create schema storage;create table storage.objects(bucket_id text,name text,metadata jsonb default jsonb_build_object('size','1','mimetype','image/png'),primary key(bucket_id,name));alter table storage.objects enable row level security;grant usage on schema storage to authenticated;grant select,insert,update,delete on storage.objects to authenticated;");
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104123035_spatial_fridge_foundation.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104124433_spatial_fridge_allocation.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104124855_spatial_fridge_replenishment.sql'),'utf8'));
@@ -92,6 +97,7 @@ function bridge({role,shop}){
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105120000_modular_fridge_layout_access.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104132033_spatial_fridge_product_images.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105124008_map_image_storage_access.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105170140_product_image_library.sql'),'utf8'));
     const ledger=()=>db.query('select id,delta,slot_id from public.guigs_movements order by id').then(r=>r.rows);
     const before=await ledger();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -183,12 +189,24 @@ function bridge({role,shop}){
     const first=(await db.query('select image_path from public.guigs_products where id=$1',[id(20)])).rows[0].image_path;
     check(!!first,'Upload UI vincula imagem');
     await uploadPhoto();
-    check((await db.query('select count(*)::int as n from storage.objects')).rows[0].n===1,'Substituição UI limpa objeto anterior');
+    check((await db.query('select count(*)::int as n from storage.objects')).rows[0].n===1,'Duplicata UI reutiliza objeto pelo hash');
+    await authorized.page.selectOption('#fridgeImageProduct',id(21));await authorized.page.click('#fridgeImageLibrary');
+    await authorized.page.waitForSelector('.image-library-item');
+    check(await authorized.page.locator('.image-library-item').count()===1,'Seletor carrega catálogo da loja');
+    await authorized.page.fill('#imageLibrarySearch','COCA');
+    await authorized.page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent==='1 imagens nesta página.');
+    await authorized.page.locator('.image-library-item').first().click();await authorized.page.click('#imageLibraryApply');
+    await authorized.page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent==='Imagem associada ao produto.');
+    const linked=(await db.query('select image_path from public.guigs_products order by id')).rows;
+    check(linked[0].image_path===linked[1].image_path,'Mesmo arquivo reutilizado em dois produtos');
+    await authorized.page.click('#imageLibraryUnlink');try{await authorized.page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent.startsWith('Associação removida'));}catch{throw Error('Desvincular biblioteca: '+await authorized.page.textContent('#imageLibraryMessage'));}
+    check((await db.query('select count(*)::int n from storage.objects')).rows[0].n===1,'Desvincular no seletor preserva arquivo compartilhado');
+    await authorized.page.click('#imageLibraryClose');
     await authorized.page.reload();await authorized.page.click('#fridgeEdit');
     check(await authorized.page.isEnabled('#fridgeImageRemove'),'Reload mantém imagem vinculada');
     await authorized.page.click('#fridgeImageRemove');await authorized.page.click('#confirmOperation');
-    await authorized.page.waitForFunction(()=>document.querySelector('#fridgeImageMessage').textContent==='Foto removida do mapa.');
-    check((await db.query('select count(*)::int as n from storage.objects')).rows[0].n===0,'Remoção UI exclui objeto desvinculado');
+    await authorized.page.waitForFunction(()=>document.querySelector('#fridgeImageMessage').textContent==='Associação removida. O arquivo continua na biblioteca.');
+    check((await db.query('select count(*)::int as n from storage.objects')).rows[0].n===1,'Remoção UI preserva arquivo na biblioteca');
     await authorized.page.selectOption('#fridgeEditKind','slot');
     await authorized.page.selectOption('#fridgeEditItem',x);
     await authorized.page.locator('.fridge-advanced summary').click();
@@ -243,6 +261,11 @@ function bridge({role,shop}){
     check(!(await desktop.page.isVisible('#fridgeDetailEdit')),'Atendente comum não vê edição no modal');
     check(!(await desktop.page.isVisible('#fridgeDetailProduct')),'Atendente comum não troca produto');
     check(await desktop.page.isEnabled('#fridgeDetailReplenish'),'Atendente pode usar reposição existente');
+    await desktop.page.click('#fridgeDetailLibrary');await desktop.page.waitForSelector('.image-library-item');
+    check(!(await desktop.page.isVisible('#imageLibraryApply')),'Atendente comum não associa imagem');
+    check(!(await desktop.page.isVisible('#imageLibraryUploadLabel')),'Atendente comum não recebe upload');
+    check(!(await desktop.page.isVisible('#imageLibraryUnlink')),'Atendente comum não remove associação');
+    await desktop.page.click('#imageLibraryClose');await slot.locator('button').click();
     await snapshot(desktop.page,'modal');
     await desktop.page.locator('#fridgeDetailLots summary').focus();await desktop.page.keyboard.press('Enter');
     check(await desktop.page.locator('#fridgeDetailLots[open]').count()===1,'Validade acessível por teclado');

@@ -76,7 +76,7 @@ const date=days=>new Date(Date.now()+days*86400000).toISOString().slice(0,10);
     const q=r.request(),u=new URL(q.url());
     const auth=u.origin===URL_BASE&&u.pathname.startsWith('/auth/v1/')&&['GET','POST'].includes(q.method());
     const read=['GET','HEAD','OPTIONS'].includes(q.method())&&['127.0.0.1','esm.sh',new URL(URL_BASE).hostname].includes(u.hostname);
-    const call=u.pathname.match(/^\/rest\/v1\/rpc\/(guigs_get_fridge_map|guigs_get_history_actors|guigs_get_history|guigs_get_spatial_history|guigs_get_lot_balances|guigs_list_fridge_layout_access|guigs_get_fridge_replenishment)$/);
+    const call=u.pathname.match(/^\/rest\/v1\/rpc\/(guigs_list_product_images|guigs_set_product_image|guigs_get_fridge_map|guigs_get_history_actors|guigs_get_history|guigs_get_spatial_history|guigs_get_lot_balances|guigs_list_fridge_layout_access|guigs_get_fridge_replenishment)$/);
     const signBase='/storage/v1/object/sign/'+BUCKET;const sign=u.origin===URL_BASE&&(u.pathname===signBase||u.pathname.startsWith(signBase+'/'));
     if(read||auth||u.origin===URL_BASE&&q.method()==='POST'&&(call||sign))return r.continue();
     blocked.push(u.pathname);return r.abort();
@@ -92,6 +92,16 @@ const date=days=>new Date(Date.now()+days*86400000).toISOString().slice(0,10);
    await page.locator('[data-open-slot="'+attentionSlot.id+'"]').tap();
    check(await page.isEnabled('#fridgeDetailReplenish'),'Modal permite reposição '+role);
    check(await page.isVisible('#fridgeDetailEdit')===(role!=='attendant'),'Permissão no modal '+role);
+   await page.click('#fridgeDetailLibrary');await page.waitForSelector('.image-library-item');
+   check(await page.locator('.image-library-item').count()>0,'Biblioteca real '+role);
+   check(await page.isVisible('#imageLibraryApply')===(role!=='attendant'),'Autorização do seletor '+role);
+   if(role!=='attendant'){
+    await page.locator('.image-library-item').first().click();await page.click('#imageLibraryApply');
+    await page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent==='Imagem associada ao produto.');
+    await page.click('#imageLibraryUnlink');await page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent.startsWith('Associação removida'));
+    check(true,'Associar e desvincular no seletor '+role);
+   }
+   await page.click('#imageLibraryClose');await page.locator('[data-open-slot="'+attentionSlot.id+'"]').tap();
    await page.click('#fridgeDetailReplenish');await page.waitForFunction(()=>!document.querySelector('#fridgeReplenishConfirm').disabled);
    check((await page.textContent('#fridgeReplenishPlan')).includes('UX-1-15'),'Plano FEFO do servidor '+role);
    await page.click('#fridgeReplenishCancel');
@@ -101,7 +111,7 @@ const date=days=>new Date(Date.now()+days*86400000).toISOString().slice(0,10);
     await page.click('#fridgeOperate');
    }
    await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
-   const names=await page.evaluate(()=>caches.keys());check(names.includes('guigs-stock-shell-v13'),'PWA v13 '+role);
+   const names=await page.evaluate(()=>caches.keys());check(names.includes('guigs-stock-shell-v14'),'PWA v14 '+role);
    await ctx.setOffline(true);await page.waitForFunction(()=>!document.querySelector('#fridgeOffline').classList.contains('hidden'));
    check(await page.isDisabled('#fridgeOperateStock'),'Operação bloqueada offline '+role);
    await page.reload();await page.waitForFunction(()=>document.querySelector('#status')?.textContent.toLowerCase().includes('sem conexão'));
@@ -113,7 +123,7 @@ const date=days=>new Date(Date.now()+days*86400000).toISOString().slice(0,10);
   const after=await rpc('guigs_get_fridge_map');assert.deepEqual(after,before);check(true,'Mapa integral de homolog preservado pelo smoke');
   const movementsAfter=required(await clients.owner.from('guigs_movements').select('*').eq('shop_id',shop).order('id'),'LEDGER');
   assert.deepEqual(movementsAfter,movementsBefore);check(true,'Ledger de homolog preservado pelo smoke');
-  check(errors.length===0&&blocked.length===0,'Sem erros JS ou tentativas de mutação no navegador');
+  check(errors.length===0&&blocked.length===0,'Sem erros JS ou gravações de estoque no navegador');
   fs.writeFileSync(path.join(privateDir,'visual-ux-browser-results.json'),JSON.stringify({projectRef:new URL(URL_BASE).hostname.split('.')[0],shop,checks,passed:true,stage:'complete',fixtureOnly:true},null,2));
   console.log(JSON.stringify({passed:true,checks,project:'homolog',fixtureOnly:true,artifact:folder}));
  }finally{if(blocked.length)console.log(JSON.stringify({blockedPaths:blocked}));if(browser)await browser.close();await new Promise(r=>server.close(r));}
