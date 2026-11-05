@@ -1,7 +1,7 @@
 // Suítes espaciais exclusivamente locais; nenhuma credencial ou conexão remota.
 const {spawnSync}=require('node:child_process');
 const path=require('node:path');
-const suites=['foundation','allocation','replenishment','operations','inventory','observability','images','image-library','modular','performance','editor-browser'];
+const suites=['foundation','allocation','replenishment','operations','inventory','observability','images','image-library','image-admin','modular','performance','editor-browser'];
 let total=0;
 for(const suite of suites){
   const result=spawnSync(process.execPath,[`tests/fridge-${suite}.cjs`],{

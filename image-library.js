@@ -39,13 +39,35 @@ export async function storeLibraryImage(client,shopId,file){
  if(registered.error)throw registered.error;
  return {image:registered.data,duplicate};
 }
+export async function deleteLibraryImage(client,shopId,image){
+ const prepared=await client.rpc('guigs_begin_image_delete',{p_shop_id:shopId,p_image_id:image.id,p_expected_name:image.display_name,p_expected_active:image.active});
+ if(prepared.error)throw prepared.error;
+ const removed=await client.storage.from(IMAGE_BUCKET).remove([prepared.data.storage_path]);
+ if(removed.error)throw removed.error;
+ const finished=await client.rpc('guigs_finish_image_delete',{p_shop_id:shopId,p_image_id:image.id});
+ if(finished.error)throw finished.error;
+ return finished.data;
+}
 export function createImageLibrary({getContext,canManage,onApplied}){
- const el=id=>document.getElementById(id),dialog=el('imageLibraryDialog');
+ const el=id=>document.getElementById(id),dialog=el('imageLibraryDialog'),confirmation=el('imageDeleteDialog');
  const node=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
- let target=null,selected=null,offset=0,rows=[],request=0,saving=false,searchTimer,lifecycle=0;
+ let target=null,selected=null,offset=0,rows=[],request=0,saving=false,searchTimer,lifecycle=0,admin=false,confirmImage=null,confirmAction=null;
  const status=text=>{el('imageLibraryMessage').textContent=text;};
  function sync(){
-  const write=canManage()&&!!target,locked=saving||!navigator.onLine;
+  const write=canManage()&&!!target&&!admin,locked=saving||!navigator.onLine,manager=canManage(),pending=!!selected?.deletion_pending;
+  el('imageLibraryManage').classList.toggle('hidden',!manager);el('imageLibraryManage').disabled=locked;
+  el('imageLibraryManage').textContent=admin?'Voltar à seleção':'Gerenciar imagens';
+  el('imageAdminPanel').classList.toggle('hidden',!manager||!admin);
+  el('imageAdminFilter').disabled=locked;
+  el('imageAdminName').disabled=locked||!selected||pending;
+  el('imageAdminRename').disabled=locked||!selected||pending;
+  el('imageAdminToggle').disabled=locked||!selected||pending;
+  el('imageAdminToggle').textContent=selected?.active?'Desativar':'Reativar';
+  el('imageAdminDelete').disabled=locked||!selected;
+  el('imageAdminDelete').textContent=pending?'Concluir exclusão':'Excluir';
+  el('imageAdminRestore').classList.toggle('hidden',!pending);el('imageAdminRestore').disabled=locked||!selected?.object_exists;
+  el('imageDeleteCancel').disabled=saving;el('imageDeleteConfirm').disabled=locked||!confirmImage||!!confirmImage.products?.length&&confirmAction==='delete';
+  el('imageDeleteDeactivate').disabled=locked;
   el('imageLibraryApply').classList.toggle('hidden',!write);el('imageLibraryUnlink').classList.toggle('hidden',!write);
   el('imageLibraryUploadLabel').classList.toggle('hidden',!canManage());
   el('imageLibraryApply').disabled=locked||!selected;el('imageLibraryUnlink').disabled=locked||!target?.image_path;
@@ -56,8 +78,8 @@ export function createImageLibrary({getContext,canManage,onApplied}){
  async function load(){
   if(!navigator.onLine){status('Sem conexão. Biblioteca da última leitura; ações bloqueadas.');sync();return;}
   const stamp=++request,{client,shop}=getContext();if(!client||!shop)return;
-  status('Carregando biblioteca…');selected=null;sync();
-  const result=await client.rpc('guigs_list_product_images',{p_shop_id:shop.shop_id,p_search:el('imageLibrarySearch').value.trim(),p_limit:60,p_offset:offset});
+  status('Carregando biblioteca…');selected=null;el('imageAdminSelected').textContent='Nenhuma imagem selecionada.';el('imageAdminName').value='';sync();
+  const result=await client.rpc(admin?'guigs_list_image_admin':'guigs_list_product_images',{p_shop_id:shop.shop_id,p_search:el('imageLibrarySearch').value.trim(),p_limit:60,p_offset:offset,...(admin?{p_status:el('imageAdminFilter').value}:{})});
   if(stamp!==request||!dialog.open)return;
   if(result.error){status(result.error.message||'Biblioteca indisponível.');return;}
   rows=result.data?.items||[];const grid=el('imageLibraryGrid');grid.replaceChildren();
@@ -66,8 +88,9 @@ export function createImageLibrary({getContext,canManage,onApplied}){
    const button=node('button');button.type='button';button.className='image-library-item';button.dataset.libraryId=row.id;button.setAttribute('aria-pressed','false');
    const image=node('img');image.alt='';image.loading='lazy';image.decoding='async';image.addEventListener('error',()=>{image.hidden=true;},{once:true});
    button.append(image,node('strong',row.display_name),node('small',row.original_filename));
+   if(admin)button.append(node('small',row.deletion_pending?'Exclusão pendente':row.active?'Ativa':'Inativa'),node('small',(row.products?.length||0)+' produto(s) vinculado(s)'));
    if(row.products?.length)button.append(node('small',row.products.join(', ')));
-   button.addEventListener('click',()=>{selected=row;for(const item of grid.children)item.setAttribute('aria-pressed',String(item===button));status(canManage()&&target?'Confira o produto e clique em Usar imagem.':'Visualização da imagem.');sync();});grid.append(button);images.push({row,image});
+   button.addEventListener('click',()=>{selected=row;el('imageAdminName').value=row.display_name;el('imageAdminSelected').textContent=row.display_name+' · '+(row.deletion_pending?'Exclusão pendente':row.active?'Ativa':'Inativa')+' · '+(row.products?.length||0)+' produto(s) vinculado(s)';for(const item of grid.children)item.setAttribute('aria-pressed',String(item===button));status(admin?'Escolha uma ação para a imagem selecionada.':canManage()&&target?'Confira o produto e clique em Usar imagem.':'Visualização da imagem.');sync();});grid.append(button);if(row.object_exists!==false)images.push({row,image});else image.hidden=true;
   }
   status(rows.length?rows.length+' imagens nesta página.':'Nenhuma imagem encontrada.');sync();
   if(images.length){
@@ -80,8 +103,55 @@ export function createImageLibrary({getContext,canManage,onApplied}){
    }
   }
  }
+ async function editImage(row,action){
+  const {client,shop}=getContext();
+  const result=await client.rpc('guigs_edit_product_image',{p_shop_id:shop.shop_id,p_image_id:row.id,p_action:action,p_display_name:action==='rename'?el('imageAdminName').value.trim():null,p_expected_name:row.display_name,p_expected_active:row.active});
+  if(result.error)throw result.error;
+ }
+ async function manageAction(action,row=selected){
+  if(saving||!canManage()||!row||!navigator.onLine)return;
+  const stamp=lifecycle;saving=true;sync();clearTimeout(searchTimer);request++;
+  try{
+   const {client,shop}=getContext();
+   if(action==='delete')await deleteLibraryImage(client,shop.shop_id,row);
+   else if(action==='restore'){
+    const r=await client.rpc('guigs_cancel_image_delete',{p_shop_id:shop.shop_id,p_image_id:row.id});if(r.error)throw r.error;
+   }else await editImage(row,action);
+   if(stamp!==lifecycle)return;
+   confirmation.close();await load();status(action==='delete'?'Imagem excluída permanentemente.':action==='rename'?'Nome salvo.':action==='deactivate'?'Imagem desativada. Vínculos preservados.':action==='reactivate'?'Imagem reativada.':'Exclusão cancelada; imagem restaurada.');
+  }catch(e){
+   if(stamp!==lifecycle)return;
+   const message=e.message||'Não foi possível concluir. Atualize a biblioteca.';
+   confirmation.close();await load();status(message+(action==='delete'?' Se houver exclusão pendente, selecione-a para concluir ou cancelar.':''));
+  }finally{if(stamp===lifecycle){saving=false;sync();}}
+ }
+ function confirmManagement(action){
+  if(!selected||saving||!canManage()||!navigator.onLine)return;
+  confirmImage=selected;confirmAction=action;const used=!!selected.products?.length;
+  el('imageDeleteTitle').textContent=action==='delete'?'Excluir imagem permanentemente?':'Desativar esta imagem?';
+  el('imageDeleteName').textContent=selected.display_name;
+  el('imageDeleteWarning').textContent=action==='deactivate'?'Ela deixará de aparecer para novas seleções, mas os vínculos atuais serão preservados.':used?'Esta imagem está sendo utilizada e não pode ser excluída.':'Esta ação removerá a imagem da biblioteca e do armazenamento e não poderá ser desfeita pelo Guig’s Stock.';
+  el('imageDeleteUsage').textContent=used?selected.products.length+' produto(s): '+selected.products.join(', '):'Nenhum produto vinculado.';
+  el('imageDeleteMessage').textContent='';
+  const source=[...el('imageLibraryGrid').children].find(e=>e.dataset.libraryId===selected.id)?.querySelector('img');
+  el('imageDeletePhoto').hidden=!source?.getAttribute('src');if(source?.getAttribute('src'))el('imageDeletePhoto').src=source.src;else el('imageDeletePhoto').removeAttribute('src');
+  el('imageDeleteConfirm').textContent=action==='delete'?'Excluir permanentemente':'Desativar';
+  el('imageDeleteConfirm').classList.toggle('hidden',action==='delete'&&used);
+  el('imageDeleteDeactivate').classList.toggle('hidden',action!=='delete'||!used||!selected.active);
+  sync();confirmation.showModal();
+ }
+ el('imageLibraryManage').addEventListener('click',()=>{if(canManage()&&!saving){admin=!admin;offset=0;void load();}});
+ el('imageAdminFilter').addEventListener('change',()=>{offset=0;void load();});
+ el('imageAdminRename').addEventListener('click',()=>void manageAction('rename'));
+ el('imageAdminToggle').addEventListener('click',()=>{if(selected?.active)confirmManagement('deactivate');else void manageAction('reactivate');});
+ el('imageAdminDelete').addEventListener('click',()=>confirmManagement('delete'));
+ el('imageAdminRestore').addEventListener('click',()=>void manageAction('restore'));
+ el('imageDeleteCancel').addEventListener('click',()=>confirmation.close());
+ el('imageDeleteConfirm').addEventListener('click',()=>void manageAction(confirmAction,confirmImage));
+ el('imageDeleteDeactivate').addEventListener('click',()=>void manageAction('deactivate',confirmImage));
+ confirmation.addEventListener('cancel',e=>{if(saving)e.preventDefault();});
  async function apply(path){
-  if(saving||!canManage()||!target||!navigator.onLine)return;
+  if(saving||admin||!canManage()||!target||!navigator.onLine)return;
   const {client,shop}=getContext(),current=target,stamp=lifecycle;clearTimeout(searchTimer);request++;saving=true;sync();
   try{
    const result=await client.rpc('guigs_set_product_image',{p_shop_id:shop.shop_id,p_product_id:current.product_id,p_path:path,p_expected_path:current.image_path??null});
@@ -102,7 +172,7 @@ export function createImageLibrary({getContext,canManage,onApplied}){
  el('imageLibraryPrevious').addEventListener('click',()=>{offset=Math.max(0,offset-60);void load();});
  el('imageLibraryNext').addEventListener('click',()=>{offset+=60;void load();});
  el('imageLibraryClose').addEventListener('click',()=>dialog.close());
- dialog.addEventListener('cancel',e=>{if(saving)e.preventDefault();});dialog.addEventListener('close',()=>{request++;lifecycle++;clearTimeout(searchTimer);});
+ dialog.addEventListener('cancel',e=>{if(saving)e.preventDefault();});dialog.addEventListener('close',()=>{request++;lifecycle++;clearTimeout(searchTimer);confirmation.close();});
  window.addEventListener('offline',sync);window.addEventListener('online',sync);
- return {open(product=null){lifecycle++;target=product;offset=0;el('imageLibrarySearch').value='';el('imageLibraryTarget').textContent=target?'Produto: '+target.product_name:'Biblioteca da loja · somente visualização';dialog.showModal();void load();},reset(){request++;lifecycle++;target=null;selected=null;rows=[];saving=false;dialog.close();el('imageLibraryGrid').replaceChildren();}};
+ return {open(product=null){lifecycle++;admin=false;target=product;offset=0;el('imageAdminFilter').value='all';el('imageLibrarySearch').value='';el('imageLibraryTarget').textContent=target?'Produto: '+target.product_name:'Biblioteca da loja';dialog.showModal();void load();},reset(){request++;lifecycle++;target=null;selected=null;rows=[];saving=false;admin=false;confirmation.close();dialog.close();el('imageLibraryGrid').replaceChildren();}};
 }

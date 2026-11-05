@@ -1288,6 +1288,12 @@
       .image-library-actions { display:flex; flex-wrap:wrap; gap:.5rem; padding-block-start:1rem; position:sticky; bottom:-1rem; background:#fffdfa; }
       .image-library-dialog button, #imageLibraryUploadLabel { min-block-size:44px; }
       #imageLibraryUpload { max-inline-size:170px; display:block; font-size:.7rem; }
+      .image-admin-controls { border:1px solid #ddd4c9; border-radius:10px; padding:1rem; margin-block:.8rem; }
+      .image-admin-controls input,.image-admin-controls select { max-inline-size:100%; min-block-size:44px; }
+      .image-admin-controls input { inline-size:100%; margin-block:.5rem; }
+      .image-delete-preview { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; overflow-wrap:anywhere; }
+      .image-delete-preview img { inline-size:120px; block-size:120px; object-fit:contain; }
+      #imageDeleteDialog .danger { background:#a52030; color:white; }
       #reportsView .panel { margin-bottom: 16px; }
       .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 12px; }
       .report-card { border: 1px solid var(--line, #ddd); border-radius: 12px; padding: 14px; min-width: 0; overflow-wrap: anywhere; }
@@ -1655,10 +1661,25 @@
           <dialog id="imageLibraryDialog" class="image-library-dialog" aria-labelledby="imageLibraryTitle">
             <div class="image-library-heading"><div><h2 id="imageLibraryTitle">Biblioteca de imagens</h2><p id="imageLibraryTarget"></p></div><button id="imageLibraryClose" class="btn" type="button" autofocus aria-label="Fechar biblioteca">✕</button></div>
             <label for="imageLibrarySearch">Buscar imagem ou produto</label><input id="imageLibrarySearch" type="search" maxlength="160" placeholder="Nome do arquivo, imagem ou produto">
+            <button id="imageLibraryManage" class="btn hidden" type="button">Gerenciar imagens</button>
+            <div id="imageAdminPanel" class="image-admin-controls hidden">
+              <label for="imageAdminFilter">Mostrar imagens</label><select id="imageAdminFilter"><option value="all">Todas</option><option value="active">Ativas</option><option value="inactive">Inativas</option><option value="pending">Exclusões pendentes</option></select>
+              <p>Selecione uma imagem para gerenciar. Desativar preserva os vínculos; excluir remove o arquivo definitivamente.</p>
+              <p id="imageAdminSelected">Nenhuma imagem selecionada.</p>
+              <label for="imageAdminName">Renomear imagem</label><input id="imageAdminName" maxlength="160" autocomplete="off">
+              <div class="image-library-actions"><button id="imageAdminRename" class="btn" type="button">Salvar nome</button><button id="imageAdminToggle" class="btn" type="button">Desativar</button><button id="imageAdminDelete" class="btn" type="button">Excluir</button><button id="imageAdminRestore" class="btn hidden" type="button">Cancelar exclusão pendente</button></div>
+            </div>
             <p id="imageLibraryMessage" role="status" aria-live="polite"></p>
             <div id="imageLibraryGrid" class="image-library-grid"></div>
             <div class="inventory-actions"><button id="imageLibraryPrevious" class="btn" type="button">Anterior</button><button id="imageLibraryNext" class="btn" type="button">Próxima</button></div>
             <div class="image-library-actions"><button id="imageLibraryApply" class="btn green" type="button">Usar imagem neste produto</button><button id="imageLibraryUnlink" class="btn" type="button">Remover associação</button><label id="imageLibraryUploadLabel" class="btn">Enviar nova<input id="imageLibraryUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div>
+          </dialog>
+          <dialog id="imageDeleteDialog" class="image-library-dialog" aria-labelledby="imageDeleteTitle">
+            <h2 id="imageDeleteTitle">Excluir imagem permanentemente?</h2>
+            <div class="image-delete-preview"><img id="imageDeletePhoto" alt="Imagem selecionada"><strong id="imageDeleteName"></strong></div>
+            <p id="imageDeleteWarning"></p><p id="imageDeleteUsage"></p>
+            <p id="imageDeleteMessage" role="status" aria-live="polite"></p>
+            <div class="image-library-actions"><button id="imageDeleteCancel" class="btn" type="button" autofocus>Cancelar</button><button id="imageDeleteDeactivate" class="btn hidden" type="button">Desativar</button><button id="imageDeleteConfirm" class="btn danger" type="button">Excluir permanentemente</button></div>
           </dialog>
           <section id="inventoryView" class="hidden" aria-label="Inventário físico">
             <div id="inventoryOffline" class="notice danger hidden" role="status">Sem internet: criação, contagem e fechamento bloqueados. Os dados exibidos podem estar desatualizados.</div>

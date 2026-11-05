@@ -12,6 +12,11 @@ async function dispatch({role,table,name,args}){
   if(!['owner','attendant'].includes(role))throw Error('Perfil de fixture inválido');
   const tables={guigs_products:'public.guigs_products',guigs_lots:'public.guigs_lots',guigs_suppliers:'public.guigs_suppliers'};
   const calls={
+    guigs_list_image_admin:['select public.guigs_list_image_admin($1,$2,$3,$4,$5) data',[args?.p_shop_id,args?.p_search,args?.p_status,args?.p_limit,args?.p_offset]],
+    guigs_edit_product_image:['select public.guigs_edit_product_image($1,$2,$3,$4,$5,$6) data',[args?.p_shop_id,args?.p_image_id,args?.p_action,args?.p_display_name,args?.p_expected_name,args?.p_expected_active]],
+    guigs_begin_image_delete:['select public.guigs_begin_image_delete($1,$2,$3,$4) data',[args?.p_shop_id,args?.p_image_id,args?.p_expected_name,args?.p_expected_active]],
+    guigs_finish_image_delete:['select public.guigs_finish_image_delete($1,$2) data',[args?.p_shop_id,args?.p_image_id]],
+    guigs_cancel_image_delete:['select public.guigs_cancel_image_delete($1,$2) data',[args?.p_shop_id,args?.p_image_id]],
     guigs_register_product_image:['select public.guigs_register_product_image($1,$2,$3,$4,$5,$6,$7) data',[args?.p_shop_id,args?.p_path,args?.p_original_filename,args?.p_display_name,args?.p_mime_type,args?.p_bytes,args?.p_sha256]],
     guigs_list_product_images:['select public.guigs_list_product_images($1,$2,$3,$4) data',[args?.p_shop_id,args?.p_search,args?.p_limit,args?.p_offset]],
     guigs_set_product_image:['select public.guigs_set_product_image($1,$2,$3,$4) as data',[args?.p_shop_id,args?.p_product_id,args?.p_path,args?.p_expected_path]],
@@ -74,7 +79,7 @@ function bridge({role,shop}){
   c.supabaseUrl=location.origin;
   const fixturePng=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='),c=>c.charCodeAt(0));
   c.storage={from:()=>({upload:(name,bytes,opts)=>send({name:'storage_upload',args:{name,type:opts.contentType,size:bytes.length}}),download:async()=>({data:new Blob([fixturePng]),error:null}),remove:names=>send({name:'storage_remove',args:{names}}),createSignedUrls:async paths=>({data:paths.map(path=>({path,signedUrl:location.origin+'/storage/v1/object/sign/guigs-product-images/'+path}))})})};
-  c.rpc=(name,args)=>/^(guigs_register_product_image|guigs_list_product_images|guigs_set_product_image|guigs_list_fridge_layout_access|guigs_set_fridge_layout_access|guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item|guigs_get_spatial_history|guigs_get_reports)$/.test(name)?send({name,args}):original(name,args);
+  c.rpc=(name,args)=>/^(guigs_list_image_admin|guigs_edit_product_image|guigs_begin_image_delete|guigs_finish_image_delete|guigs_cancel_image_delete|guigs_register_product_image|guigs_list_product_images|guigs_set_product_image|guigs_list_fridge_layout_access|guigs_set_fridge_layout_access|guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item|guigs_get_spatial_history|guigs_get_reports)$/.test(name)?send({name,args}):original(name,args);
   c.from=table=>{
     if(table==='guigs_product_images')return {select(){return this},eq(k,v){if(k==='sha256')this.sha=v;return this},async maybeSingle(){const r=await send({table,args:{sha:this.sha}});return {data:r.data?.[0]||null,error:r.error}}};
     if(table==='guigs_memberships')return {select(){return this},eq(){return this},then(a,b){return Promise.resolve({data:[{shop_id:shop,role,active:true}],error:null}).then(a,b)}};
@@ -98,6 +103,7 @@ function bridge({role,shop}){
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261104132033_spatial_fridge_product_images.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105124008_map_image_storage_access.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105170140_product_image_library.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105182536_image_library_administration.sql'),'utf8'));
     const ledger=()=>db.query('select id,delta,slot_id from public.guigs_movements order by id').then(r=>r.rows);
     const before=await ledger();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -210,6 +216,36 @@ function bridge({role,shop}){
     await authorized.page.click('#fridgeImageRemove');await authorized.page.click('#confirmOperation');
     await authorized.page.waitForFunction(()=>document.querySelector('#fridgeImageMessage').textContent==='Associação removida. O arquivo continua na biblioteca.');
     check((await db.query('select count(*)::int as n from storage.objects')).rows[0].n===1,'Remoção UI preserva arquivo na biblioteca');
+    await authorized.page.click('#fridgeImageLibrary');await authorized.page.waitForSelector('.image-library-item');
+    check(await authorized.page.isVisible('#imageLibraryManage'),'Delegado encontra Gerenciar imagens');
+    await authorized.page.click('#imageLibraryManage');await authorized.page.locator('.image-library-item').first().click();
+    await authorized.page.fill('#imageAdminName','  Foto renomeada  ');await authorized.page.click('#imageAdminRename');
+    await authorized.page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent==='Nome salvo.');
+    check((await db.query('select display_name,storage_path from public.guigs_product_images')).rows[0].storage_path===first,'Rename UI preserva path');
+    await authorized.page.locator('.image-library-item').first().click();await authorized.page.click('#imageAdminToggle');
+    check(await authorized.page.isVisible('#imageDeleteDialog'),'Desativação exige confirmação');
+    await authorized.page.click('#imageDeleteCancel');check((await db.query('select active from public.guigs_product_images')).rows[0].active,'Cancelar desativação preserva estado');
+    await authorized.page.click('#imageAdminToggle');await authorized.page.click('#imageDeleteConfirm');
+    await authorized.page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent.startsWith('Imagem desativada'));
+    await authorized.page.click('#imageLibraryManage');await authorized.page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent==='Nenhuma imagem encontrada.');
+    check(await authorized.page.locator('.image-library-item').count()===0,'Inativa não aparece na seleção');
+    await authorized.page.click('#imageLibraryManage');await authorized.page.selectOption('#imageAdminFilter','inactive');await authorized.page.waitForSelector('.image-library-item');
+    await authorized.page.locator('.image-library-item').first().click();await authorized.page.click('#imageAdminToggle');
+    await authorized.page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent==='Imagem reativada.');
+    await authorized.page.selectOption('#imageAdminFilter','all');await authorized.page.waitForSelector('.image-library-item');
+    const extra=Buffer.concat([png,Buffer.from([1])]);
+    await authorized.page.setInputFiles('#imageLibraryUpload',{name:'Excluir artificial.png',mimeType:'image/png',buffer:extra});
+    await authorized.page.waitForFunction(()=>document.querySelectorAll('.image-library-item').length===2&&!document.querySelector('#imageLibraryUpload').disabled);
+    const deletable=authorized.page.locator('.image-library-item').filter({hasText:'Excluir artificial'});await deletable.click();await authorized.page.click('#imageAdminDelete');
+    check(await authorized.page.isVisible('#imageDeleteConfirm'),'Exclusão tem modal próprio e botão destrutivo');
+    await authorized.page.click('#imageDeleteCancel');check((await db.query('select count(*)::int n from storage.objects')).rows[0].n===2,'Cancelar exclusão não altera Storage');
+    await authorized.page.click('#imageAdminDelete');await authorized.page.click('#imageDeleteConfirm');
+    await authorized.page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent==='Imagem excluída permanentemente.');
+    check((await db.query('select count(*)::int n from storage.objects')).rows[0].n===1,'Delete UI remove somente fixture livre');
+    check((await db.query('select count(*)::int n from guigs_private.product_image_deletions')).rows[0].n===0,'Delete UI finaliza fila privada');
+    await authorized.page.click('#imageLibraryClose');await authorized.page.reload();await authorized.page.click('#fridgeEdit');await authorized.page.click('#fridgeImageLibrary');
+    await authorized.page.waitForSelector('.image-library-item');check((await authorized.page.locator('.image-library-item').textContent()).includes('Foto renomeada'),'Rename persiste após reload');
+    await authorized.page.click('#imageLibraryClose');
     await authorized.page.selectOption('#fridgeEditKind','slot');
     await authorized.page.selectOption('#fridgeEditItem',x);
     await authorized.page.locator('.fridge-advanced summary').click();
@@ -266,6 +302,7 @@ function bridge({role,shop}){
     check(await desktop.page.isEnabled('#fridgeDetailReplenish'),'Atendente pode usar reposição existente');
     await desktop.page.click('#fridgeDetailLibrary');await desktop.page.waitForSelector('.image-library-item');
     check(!(await desktop.page.isVisible('#imageLibraryApply')),'Atendente comum não associa imagem');
+    check(!(await desktop.page.isVisible('#imageLibraryManage')),'Atendente comum não administra biblioteca');
     check(!(await desktop.page.isVisible('#imageLibraryUploadLabel')),'Atendente comum não recebe upload');
     check(!(await desktop.page.isVisible('#imageLibraryUnlink')),'Atendente comum não remove associação');
     await desktop.page.click('#imageLibraryClose');await slot.locator('button').click();

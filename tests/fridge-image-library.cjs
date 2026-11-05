@@ -44,7 +44,10 @@ let checks=0;const eq=(a,b)=>{assert.deepEqual(a,b);checks++;};const reject=asyn
   eq((await register('attendant','delegado.png')).id,item.id);await bind('attendant',id(20),null,key);await bind('attendant',id(21),null,key);
   eq((await list('attendant')).length,1);eq((await db.query('select count(*)::int n from storage.objects')).rows[0].n,1);
   await asUser(db,'attendant',tx=>tx.query('select public.guigs_archive_product_image($1,$2)',[shop,item.id]));eq((await list('attendant')).length,0);
+  eq((await remove('attendant')).rows.length,0);
+  await asUser(db,'attendant',tx=>tx.query('select public.guigs_begin_image_delete($1,$2,$3,false)',[shop,item.id,item.display_name]));
   eq((await remove('attendant')).rows.length,1);
+  await asUser(db,'attendant',tx=>tx.query('select public.guigs_finish_image_delete($1,$2)',[shop,item.id]));
   await reject(()=>asUser(db,'attendant',tx=>tx.query('update public.guigs_product_images set display_name=$1',['INVÁLIDO'])),/permission denied/);
   await db.query('insert into public.guigs_shops(id,name) values($1,$2)',[id(11),'Outra loja']);await db.query('update public.guigs_memberships set shop_id=$1 where user_id=$2',[id(11),id(2)]);
   await reject(()=>list('attendant'),/Acesso negado/);await reject(()=>register('attendant'),/Sem permissão/);
