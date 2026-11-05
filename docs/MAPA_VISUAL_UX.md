@@ -37,7 +37,7 @@ Protótipo funcional no próprio DOM com fixtures artificiais antes de produçã
 
 ## Estado
 
-Gates de implementação e homologação aprovados. GO técnico para publicação controlada. Aprovação final pendente somente do smoke real e da comparação final de produção.
+Gates concluídos. MAPA VISUAL INTERATIVO APROVADO. Publicação e smoke de produção aprovados, com saldos, ledger e estrutura preservados.
 ## Visão operacional, modal e interação
 
 Operação continua como modo padrão. As molduras grafite, vidro claro, níveis horizontais e base identificam as expositoras. O DOM preserva a hierarquia geladeira/nível/bloco. Em espaço estreito, os blocos ganham áreas confortáveis de toque; sua geometria gravada não é alterada. O nome completo e o caminho físico continuam disponíveis no nome acessível e no modal.
@@ -73,4 +73,45 @@ Duas expositoras lado a lado quando há espaço. Mobile empilha uma por linha. T
 
 Backup executado manualmente pelo administrador e verificado. Pacote privado pre-visual-2026-11-05_13-43-38-06128adc, archive recovery.dump de 385.603 bytes. SHA-256 4BE56824679A3E462C042370C90BB72BCD2AF47F1743D83A88DB848C1967361F. Manifesto/snapshot e baseline conferidos. O dump não contém os bytes de Storage; esta rodada não modifica objetos, bucket ou vínculos de fotos. O arquivo original do responsável permanece a fonte do objeto já provisionado.
 
-GO técnico para publicação controlada após auditoria final de diff e segredos. Smoke real de owner e atendente será estritamente de leitura e navegação, com toda gravação de estoque/layout bloqueada no navegador de validação. Comparar os agregados/fingerprints do baseline antes e depois. Não criar tag. Código anterior v1.7 é compatível com o backend atual; eventual compensação limita-se ao frontend v1.7 conhecido e não reverte ledger. A v1.6 não é fallback após Activation Point.
+Auditoria final de diff e segredos aprovada. Smoke real de owner e atendente executado estritamente com leitura e navegação, com toda gravação de estoque/layout bloqueada no navegador de validação. Agregados/fingerprints do baseline comparados e idênticos antes e depois. Nenhuma tag criada. Código anterior v1.7 é compatível com o backend atual; eventual compensação limita-se ao frontend v1.7 conhecido e não reverte ledger. A v1.6 não é fallback após Activation Point.
+
+## Resultado de produção
+
+Código publicado no SHA d4e13095304ddd19e2431fcdaf867768329a940a. Os 17 arquivos públicos conferem com o artefato de produção revisado. Nenhuma migration, RPC, policy ou coluna foi alterada nesta rodada.
+
+Owner real aprovado em 18 controles e atendente comum real em 16, com membership efetiva conferida na resposta autenticada. Duas geladeiras, sete níveis, treze blocos, foto privada, modal por toque, ocupação e lotes no modal, restauração do foco, permissões, reload e PWA v13 confirmados. Owner também abriu a prévia estrutural e o painel administrativo sem salvar. Nenhuma chamada de mutação foi tentada no navegador do smoke. Não houve erro JavaScript. Delegate validado na homologação real, sem conceder ou modificar capabilities em produção.
+
+Baseline final idêntico ao inicial: geladeira global 184, unallocated 178, soma dos slots 6, 687 movimentos, fingerprint do ledger 0470bca16323e2652e046bfe200d297c, duas linhas espaciais, Activation Point já cruzado e preservado. Estrutura com fingerprint 09b4fe20d734029675c1d856fa5c3250 e um objeto de imagem preservados. Não foram feitos movimentos de teste ou alterações de configuração na produção.
+
+Os fingerprints acima são da leitura agregada desta rodada: MD5 da concatenação dos registros JSONB completos do ledger ordenados por id, separados por newline; para estrutura, união dos registros JSONB de geladeiras/níveis/blocos, ordenados pelo texto. O baseline.csv do backup usa a consulta oficial de 13 escopos do pré-release e deve ser comparado usando sua própria definição, sem misturar algoritmos.
+
+| Item | Resultado | Evidência / escopo |
+|---|---|---|
+| Branch | PASS | codex/fridge-map-visual-redesign, base 417299b |
+| Baseline | PASS | atual conferido antes/depois, com Activation Point já cruzado |
+| Novo visual | PASS | protótipo e revisão visual, HTML/CSS/DOM |
+| Geladeira | PASS | moldura, vidro, base, hierarquia preservada |
+| Prateleiras | PASS | níveis visuais e rascunhos de altura/posição |
+| Slots | PASS | botões compactos com alvo de toque |
+| Status | PASS | regras existentes, quatro cores, ícone/texto |
+| Imagens | PASS | contain, lazy load, assinatura privada e fallback |
+| Modal | PASS | informações operacionais, foco e ações visíveis |
+| Repor | PASS | fluxo existente, cotação no servidor e confirmação |
+| FEFO | PASS | testes locais e plano real de homologação |
+| Editor | PASS | separado, prévia, controles simples e campos precisos recolhidos |
+| Drag/resize | PASS | mesma prateleira, rascunho com salvamento explícito |
+| Owner | PASS | homologação e 18 controles reais em produção |
+| Attendant | PASS | homologação e 16 controles reais em produção |
+| manage_fridge_layout | PASS | delegado real artificial de homologação e testes de revogação |
+| Desktop | PASS | visual e navegação por teclado/mouse |
+| Tablet | PASS | 1280x800, 1024x768 e 820px, toque e modal |
+| Mobile | PASS | 390/360px, empilhamento, alvos e modal |
+| PWA | PASS | v13, limpeza v11/v12, offline/reload/reconexão |
+| Performance | PASS | 100 blocos em 47–48 ms na medição local; teste de 52 mil movimentos existente preservado |
+| Testes | PASS | 1.205 gerais + 415 espaciais + 13 de alvo |
+| Homologação | PASS | 38 controles reais com fixture artificial e zero drift do ledger |
+| Produção | PASS | 17 arquivos conferidos e 34 controles reais somente leitura |
+| Saldo preservado | PASS | 184 = 178 + 6, sem diferença |
+| Ledger preservado | PASS | 687 registros e fingerprint idêntico |
+
+Divisão e mesclagem permanecem planejadas conforme a opção permitida no pedido, dependendo de futura operação atômica de estrutura. Nenhum controle incompleto foi publicado. Não há blocker aberto para o escopo aprovado de redesign.
