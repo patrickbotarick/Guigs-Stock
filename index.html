@@ -1206,6 +1206,12 @@
       .fridge-slot-name { font-size:.82rem; font-weight:750; max-inline-size:100%; overflow-wrap:anywhere; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
       .fridge-slot-quantity { font-size:.75rem; color:var(--map-muted); font-variant-numeric:tabular-nums; }
       .fridge-photo-wrap { display:flex; justify-content:center; align-items:center; inline-size:100%; block-size:64px; margin-block-end:.3rem; }
+      #transferPositions { display:grid; gap:.55rem; }
+      #transferPositions.hidden { display:none; }
+      .transfer-position { display:grid; grid-template-columns:auto 3rem minmax(0,1fr); align-items:center; gap:.6rem; padding:.6rem; }
+      .transfer-position:has(input:disabled) { opacity:.65; }
+      .transfer-position .fridge-photo-wrap { block-size:3rem; margin:0; }
+      .transfer-position input { width:auto; }
       .fridge-photo { display:block; max-inline-size:100%; inline-size:64px; block-size:64px; object-fit:contain; }
       .fridge-photo-fallback { position:relative; inline-size:25px; block-size:46px; margin-block-start:8px; background:linear-gradient(90deg,#b4c5c3,#d5e0de 45%,#b4c5c3); border:1px solid #99adaa; border-radius:7px 7px 5px 5px; opacity:.65; }
       .fridge-photo-fallback::before { content:""; position:absolute; inline-size:11px; block-size:10px; inset:-8px auto auto 5px; border:2px solid #99adaa; border-radius:3px 3px 0 0; background:#d5e0de; }
@@ -1655,7 +1661,7 @@
             <div class="fridge-detail-heading"><div><h2 id="fridgeDetailTitle"></h2><p id="fridgeDetailLocation"></p></div><button id="fridgeDetailClose" class="btn" type="button" autofocus aria-label="Fechar detalhes do bloco">✕</button></div>
             <p id="fridgeDetailOffline" class="notice hidden">Sem conexão. Dados da última leitura; ações bloqueadas.</p>
             <div id="fridgeDetailBody"></div>
-            <div class="fridge-detail-actions"><button id="fridgeDetailReplenish" class="btn green" type="button">Repor</button><button id="fridgeDetailLibrary" class="btn" type="button">Biblioteca de imagens</button><button id="fridgeDetailShowLots" class="btn" type="button">Ver lotes</button><button id="fridgeDetailStock" class="btn" type="button">Registrar saída</button></div>
+            <div class="fridge-detail-actions"><button id="fridgeDetailTransfer" class="btn" type="button">Transferir para este bloco</button><button id="fridgeDetailReplenish" class="btn green" type="button">Repor</button><button id="fridgeDetailLibrary" class="btn" type="button">Biblioteca de imagens</button><button id="fridgeDetailShowLots" class="btn" type="button">Ver lotes</button><button id="fridgeDetailStock" class="btn" type="button">Registrar saída</button></div>
             <div class="fridge-detail-edit"><button id="fridgeDetailEdit" class="btn hidden" type="button">Editar bloco</button><button id="fridgeDetailProduct" class="btn hidden" type="button">Trocar produto</button></div>
           </dialog>
           <dialog id="imageLibraryDialog" class="image-library-dialog" aria-labelledby="imageLibraryTitle">
@@ -2148,6 +2154,15 @@
             />
           </div>
 
+          <fieldset id="transferSendMode">
+            <legend>Destino na geladeira</legend>
+            <label><input type="radio" name="transferMode" value="unallocated" checked> Enviar para geladeira</label>
+            <p class="muted">Transferir sem definir posição física.</p>
+            <label><input type="radio" name="transferMode" value="position"> Enviar e posicionar</label>
+            <p class="muted">Transferir e escolher onde as bebidas serão armazenadas.</p>
+            <label><input id="transferAutoFefo" type="checkbox"> Usar primeiro os lotes elegíveis com validade mais próxima para este produto</label>
+          </fieldset>
+          <div id="transferPositions" class="hidden" aria-live="polite"></div>
           <div id="transferBalance" class="balancebox"></div>
 
           <div class="field">

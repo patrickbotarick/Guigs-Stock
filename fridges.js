@@ -52,7 +52,7 @@ export function fridgeReplenishmentRows(data,today){
   return rows;
 }
 
-export function createFridgesUI({getContext,refreshStock,confirmAction}){
+export function createFridgesUI({getContext,refreshStock,confirmAction,openTransfer}){
   const el=id=>document.getElementById(id);
   const node=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
   const owner=()=>getContext().shop?.role==='owner';
@@ -355,6 +355,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
   function detailSlot(){return data?.slots.find(s=>s.id===detailSlotId);}
   function syncDetail(){
     const slot=detailSlot(),locked=busy||!navigator.onLine;
+    el('fridgeDetailTransfer').disabled=locked||!slot?.product_active||slot.capacity_quantity==null||Number(slot.quantity)>=slot.capacity_quantity;
     el('fridgeDetailReplenish').disabled=locked||!slot||fridgeSlotConfiguration(slot)==='PENDENTE'||slot.target_quantity==null||!slot.product_active;
     el('fridgeDetailEdit').classList.toggle('hidden',!canManageLayout());el('fridgeDetailProduct').classList.toggle('hidden',!canManageLayout());
     el('fridgeDetailEdit').disabled=locked;el('fridgeDetailProduct').disabled=locked;
@@ -414,6 +415,12 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
     if(product)el('fridgeField_product_id')?.focus();else el('fridgeEditorTitle').focus();
   }
   el('fridgeDetailClose').addEventListener('click',()=>el('fridgeDetailDialog').close());
+  el('fridgeDetailTransfer').addEventListener('click',()=>{
+    const slot=detailSlot();
+    if(!slot||el('fridgeDetailTransfer').disabled)return;
+    el('fridgeDetailDialog').close();
+    void openTransfer?.(slot);
+  });
   el('fridgeDetailDialog').addEventListener('close',()=>{
     const id=detailSlotId;detailSlotId=null;
     if(!editing&&!document.querySelector('dialog[open]'))el('fridgeMap').querySelector('[data-open-slot="'+id+'"]')?.focus({preventScroll:true});
@@ -445,7 +452,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
         const url=new URL(entry.signedUrl);
         if(url.origin===origin&&url.pathname.startsWith('/storage/v1/object/sign/guigs-product-images/'))photoUrls.set(entry.path,url.href);
       }
-      if(photoUrls.size)for(const wrap of document.querySelectorAll('#fridgesView [data-photo-path],#fridgeDetailDialog [data-photo-path]'))fillPhoto(wrap);
+      if(photoUrls.size)for(const wrap of document.querySelectorAll('#fridgesView [data-photo-path],#fridgeDetailDialog [data-photo-path],#transferPositions [data-photo-path]'))fillPhoto(wrap);
     }catch{/* Sem foto, conservar o placeholder e os dados de estoque. */}
   }
   function renderRestock(){
@@ -494,6 +501,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
       data=next;photoUrls=new Map();renderMap();if(editing)renderEditor(keepId);if(restocking)renderRestock();if(detailSlotId)renderDetail();
       void loadPhotos(next,client,stamp);
       if(announce)msg('');
+      return next;
     }catch(error){if(stamp===generation)msg(safeError(error));}
     finally{
       if(stamp===generation){
@@ -849,6 +857,13 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
   window.addEventListener('offline',sync);
   window.addEventListener('hashchange',()=>{if(!view()){el('fridgeDetailDialog').close();library.reset();}});
   return {
+    async transferMap(){
+      if(!busy)return load({announce:false});
+      const {client,shop}=getContext();
+      const result=await client.rpc('guigs_get_fridge_map',{p_shop_id:shop.shop_id});
+      return result.error ? null : result.data;
+    },
+    transferPhoto:photo,
     activate(){sync();if(view()&&getContext().shop&&navigator.onLine)void load();},
     reset(){generation++;library.reset();detailSlotId=null;el('fridgeDetailDialog').close();data=null;photoUrls=new Map();allocationRetry=null;replenishRetry=null;replenishQuote=null;replenishSlot=null;stockQuote=null;stockRetry=null;editing=false;restocking=false;busy=false;pendingRefresh=false;el('fridgeStockDialog').close();el('fridgeReplenishDialog').close();el('fridgeAllocationDialog').close();el('fridgeLayoutFields').replaceChildren();renderMap();renderRestock();msg('');sync();}
   };

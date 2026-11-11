@@ -23,6 +23,12 @@ async function dispatch({role,table,name,args}){
     guigs_list_fridge_layout_access:['select public.guigs_list_fridge_layout_access($1) as data',[args?.p_shop_id]],
     guigs_set_fridge_layout_access:['select public.guigs_set_fridge_layout_access($1,$2,$3) as data',[args?.p_shop_id,args?.p_user_id,args?.p_allowed]],
     guigs_get_fridge_map:['select public.guigs_get_fridge_map($1) as data',[args?.p_shop_id]],
+    guigs_get_lot_balances:['select coalesce(jsonb_agg(c),\'[]\'::jsonb) data from public.guigs_get_lot_balances($1) c',[args?.p_shop]],
+    guigs_quote_fridge_transfer:['select public.guigs_quote_fridge_transfer($1,$2) as data',[args?.p_shop_id,args?.p_spec]],
+    guigs_get_fefo_candidates:['select coalesce(jsonb_agg(c),\'[]\'::jsonb) data from public.guigs_get_fefo_candidates($1,$2) c',
+      [args?.p_shop_id,args?.p_lot_id]],
+    guigs_apply_fridge_transfer:['select public.guigs_apply_fridge_transfer($1,$2,$3,$4,$5) as data',
+      [args?.p_shop_id,args?.p_request_id,args?.p_spec,args?.p_expected,args?.p_note]],
     guigs_save_fridge_layout:['select public.guigs_save_fridge_layout($1,$2,$3,$4,$5) as data',
       [args?.p_shop_id,args?.p_kind,JSON.stringify(args?.p_values??null),args?.p_id,args?.p_revision]],
     guigs_allocate_fridge_stock:['select public.guigs_allocate_fridge_stock($1,$2,$3) as data',
@@ -79,7 +85,7 @@ function bridge({role,shop}){
   c.supabaseUrl=location.origin;
   const fixturePng=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='),c=>c.charCodeAt(0));
   c.storage={from:()=>({upload:(name,bytes,opts)=>send({name:'storage_upload',args:{name,type:opts.contentType,size:bytes.length}}),download:async()=>({data:new Blob([fixturePng]),error:null}),remove:names=>send({name:'storage_remove',args:{names}}),createSignedUrls:async paths=>({data:paths.map(path=>({path,signedUrl:location.origin+'/storage/v1/object/sign/guigs-product-images/'+path}))})})};
-  c.rpc=(name,args)=>/^(guigs_list_image_admin|guigs_edit_product_image|guigs_begin_image_delete|guigs_finish_image_delete|guigs_cancel_image_delete|guigs_register_product_image|guigs_list_product_images|guigs_set_product_image|guigs_list_fridge_layout_access|guigs_set_fridge_layout_access|guigs_get_fridge_map|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item|guigs_get_spatial_history|guigs_get_reports)$/.test(name)?send({name,args}):original(name,args);
+  c.rpc=(name,args)=>/^(guigs_list_image_admin|guigs_edit_product_image|guigs_begin_image_delete|guigs_finish_image_delete|guigs_cancel_image_delete|guigs_register_product_image|guigs_list_product_images|guigs_set_product_image|guigs_list_fridge_layout_access|guigs_set_fridge_layout_access|guigs_get_fridge_map|guigs_get_lot_balances|guigs_quote_fridge_transfer|guigs_apply_fridge_transfer|guigs_get_fefo_candidates|guigs_save_fridge_layout|guigs_allocate_fridge_stock|guigs_get_fridge_replenishment|guigs_replenish_fridge_slot|guigs_get_fridge_operation|guigs_apply_fridge_operation|guigs_list_inventories|guigs_create_spatial_inventory|guigs_get_spatial_inventory|guigs_count_spatial_inventory_item|guigs_get_spatial_history|guigs_get_reports)$/.test(name)?send({name,args}):original(name,args);
   c.from=table=>{
     if(table==='guigs_product_images')return {select(){return this},eq(k,v){if(k==='sha256')this.sha=v;return this},async maybeSingle(){const r=await send({table,args:{sha:this.sha}});return {data:r.data?.[0]||null,error:r.error}}};
     if(table==='guigs_memberships')return {select(){return this},eq(){return this},then(a,b){return Promise.resolve({data:[{shop_id:shop,role,active:true}],error:null}).then(a,b)}};
@@ -106,6 +112,7 @@ function bridge({role,shop}){
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105182536_image_library_administration.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261111130125_spatial_replay_integrity.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261111130126_nullable_stock_thresholds.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261111164204_integrated_fridge_transfers.sql'),'utf8'));
     const ledger=()=>db.query('select id,delta,slot_id from public.guigs_movements order by id').then(r=>r.rows);
     const before=await ledger();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -492,6 +499,72 @@ function bridge({role,shop}){
     check((await worker.page.textContent('#history')).includes('Geladeira — não alocado'),'Filtro inclui partição legada sem inventar posição');
     await worker.context.close();
     const historyChecks=checks;checks=0;
+    const transferLot=id(98), transferSlot=id(99);
+    await db.query("insert into public.guigs_lots(id,shop_id,product_id,code,expiry) values($1,$2,$3,'V18A-TESTE',current_date+2)",[transferLot,shop,id(21)]);
+    await db.query("insert into public.guigs_fridge_slots(id,shop_id,fridge_id,shelf_id,product_id,name,capacity_quantity) values($1,$2,$3,$4,$5,'Bloco integrado',12)",[transferSlot,shop,a,h,id(21)]);
+    await db.query("insert into public.guigs_movements(shop_id,lot_id,event_id,movement_type,location,delta,actor_id) values($1,$2,gen_random_uuid(),'receipt','stock',10,$3)",[shop,transferLot,id(1)]);
+    const transfer=await open('attendant',{width:820,height:980});
+    await transfer.page.locator('[data-open-slot="'+transferSlot+'"]').click();
+    await transfer.page.click('#fridgeDetailTransfer');
+    await transfer.page.waitForSelector('#transferPositions [name=transferSlot]:checked');
+    check(await transfer.page.locator('#transferPositions [name=transferSlot]:checked').inputValue()===transferSlot,'Mapa abre transferência com posição selecionada');
+    await transfer.page.selectOption('#transferLot',transferLot,{force:true});
+    await transfer.page.fill('#transferQuantity','4');
+    await transfer.page.click('#saveTransfer');
+    await transfer.page.waitForFunction(()=>document.querySelector('#operationConfirmDialog').open||
+      document.querySelector('#fefoDialog').open||document.querySelector('#transferMessage').textContent);
+    check(await transfer.page.isVisible('#operationConfirmDialog'),await transfer.page.textContent('#transferMessage')||
+      await transfer.page.textContent('#fefoSelected'));
+    check((await transfer.page.textContent('#operationConfirmDialog')).includes('Bloco integrado'),'Confirmação mostra o bloco de destino');
+    await transfer.page.click('#confirmOperation');
+    await transfer.page.waitForFunction(slot=>!document.querySelector('#transferDialog').open&&document.querySelector('[data-slot-id="'+slot+'"]').textContent.includes('4 un.'),transferSlot);
+    check(true,'Mapa mostra saldo atualizado após transferência integrada');
+    await transfer.page.setViewportSize({width:390,height:844});
+    await transfer.page.click('#navOverview');
+    await transfer.page.click('#transferStock');
+    await transfer.page.selectOption('#transferLot',transferLot,{force:true});
+    await transfer.page.fill('#transferQuantity','2');
+    await transfer.page.click('#saveTransfer');
+    await transfer.page.waitForSelector('#transferDialog',{state:'hidden'});
+    check((await db.query("select sum(delta)::int n from public.guigs_movements where lot_id=$1 and location='fridge' and slot_id is null",[transferLot])).rows[0].n===2,'Modo padrão envia ao não alocado');
+    await transfer.page.click('#transferStock');
+    await transfer.page.selectOption('#transferDirection','fridge-stock');
+    await transfer.page.selectOption('#transferLot',transferLot,{force:true});
+    const source=transfer.page.locator('#transferPositions input[data-source="'+transferSlot+'"]');
+    await transfer.page.fill('#transferQuantity','2');
+    await source.fill('1');
+    await transfer.page.locator('#transferPositions input[data-source=""]').fill('1');
+    check(await transfer.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Seletor de origem cabe no celular');
+    await transfer.page.click('#saveTransfer');
+    await transfer.page.waitForSelector('#operationConfirmDialog[open]');
+    check((await transfer.page.textContent('#operationConfirmDialog')).includes('V18A-TESTE'),'Retorno confirma lote e posição');
+    await transfer.context.setOffline(true);
+    await transfer.page.click('#confirmOperation');
+    await transfer.page.waitForFunction(()=>document.querySelector('#transferMessage').textContent.includes('internet'));
+    check((await db.query("select count(*)::int n from public.guigs_movements where lot_id=$1 and movement_type='return'",[transferLot])).rows[0].n===0,'Offline durante a confirmação não enfileira retorno');
+    await transfer.context.setOffline(false);
+    const transferKeys=[];
+    await transfer.page.route('**/fixture',async route=>{
+      const payload=route.request().postDataJSON();
+      if(payload.name!=='guigs_apply_fridge_transfer')return route.continue();
+      transferKeys.push(payload.args.p_request_id);
+      if(transferKeys.length>1)return route.continue();
+      const response=await route.fetch();
+      assert.ok((await response.json()).data.event_id);
+      return route.fulfill({json:{data:null,error:{message:'Failed to fetch'}}});
+    });
+    await transfer.page.click('#saveTransfer');
+    await transfer.page.waitForSelector('#operationConfirmDialog[open]');
+    await transfer.page.click('#confirmOperation');
+    await transfer.page.waitForFunction(()=>document.querySelector('#transferMessage').textContent.includes('Confira o histórico'));
+    await transfer.page.click('#saveTransfer');
+    await transfer.page.waitForSelector('#transferDialog',{state:'hidden'});
+    check(transferKeys.length===2&&transferKeys[0]===transferKeys[1],'Resposta perdida conserva a chave do retorno');
+    check((await db.query("select sum(delta)::int n from public.guigs_movements where lot_id=$1 and slot_id=$2",[transferLot,transferSlot])).rows[0].n===3,'Retorno debita a posição selecionada');
+    check((await db.query("select sum(delta)::int n from public.guigs_movements where lot_id=$1 and location='fridge' and slot_id is null",[transferLot])).rows[0].n===1,'Retorno também debita o não alocado uma única vez');
+    check(transfer.errors.length===0,'Transferência integrada sem erro JavaScript');
+    await transfer.context.close();
+    const transferChecks=checks;checks=0;
     const countBefore=await ledger();
     const inventory=await open('owner',{width:390,height:844});
     await inventory.page.click('#navReports');
@@ -520,7 +593,7 @@ function bridge({role,shop}){
     await inventory.page.waitForFunction(()=>document.querySelector('#newSpatialInventory').disabled);
     offline(await inventory.page.isDisabled('#inventoryReview'),'Inventário espacial sem mutações offline');
     await inventory.context.close();
-    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+replenishChecks+operationChecks+restockChecks+historyChecks+reportingChecks+checks+offlineChecks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${replenishChecks} reposição, ${operationChecks} saída, ${restockChecks} lista, ${historyChecks+reportingChecks} observabilidade, ${checks} inventário, ${offlineChecks} offline); navegador e PGlite artificiais.`);
+    console.log(`Fluxos espaciais: ${editorChecks+mapChecks+allocationChecks+replenishChecks+operationChecks+restockChecks+historyChecks+reportingChecks+checks+offlineChecks+transferChecks} verificações passaram (${editorChecks} editor, ${mapChecks} mapa, ${allocationChecks} distribuição, ${replenishChecks} reposição, ${operationChecks} saída, ${restockChecks} lista, ${historyChecks+reportingChecks} observabilidade, ${checks} inventário, ${offlineChecks} offline, ${transferChecks} transferências integradas); navegador e PGlite artificiais.`);
   }finally{
     if(browser)await browser.close();
     if(server.listening)await new Promise(resolve=>server.close(resolve));

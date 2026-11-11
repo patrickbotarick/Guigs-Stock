@@ -69,9 +69,10 @@ function fixture({role, session, searchable = false, readOnly = false, operation
       async signOut() {session = false; return {error:null};}
     },
     async rpc(name,args) {
-      if (readOnly && !name.startsWith('guigs_get_')) throw Error(`Escrita proibida no teste: ${name}`);
+      const isRead=name.startsWith('guigs_get_')||name==='guigs_quote_fridge_transfer';
+      if (readOnly && !isRead) throw Error(`Escrita proibida no teste: ${name}`);
       calls.push({name,args:structuredClone(args)});
-      if (!name.startsWith('guigs_get_')) {
+      if (!isRead) {
         if (window.__test.writeDelay) await new Promise(resolve=>setTimeout(resolve,window.__test.writeDelay));
         if (window.__test.writeError) return {error:{message:window.__test.writeError==='network' ? 'Failed to fetch' : 'Falha de gravação simulada'}};
       }
@@ -99,11 +100,25 @@ function fixture({role, session, searchable = false, readOnly = false, operation
         data = lots.filter(l => l.id!==selected.id && l.product_id===selected.product_id && (l.expiry<selected.expiry || (l.expiry===selected.expiry && l.created_at<selected.created_at)) && balances.find(b=>b.lot_id===l.id)?.stock>0)
           .sort((a,b) => a.expiry.localeCompare(b.expiry)||a.created_at.localeCompare(b.created_at))
           .map(l => ({...l,lot_id:l.id,stock:balances.find(b=>b.lot_id===l.id).stock}));
-      } else if (name === 'guigs_transfer_stock') {
-        const b = balances.find(b => b.lot_id===args.p_lot_id);
-        if (b[args.p_from_location]<args.p_quantity) return {error:{message:'Saldo insuficiente'}};
-        b[args.p_from_location]-=args.p_quantity; b[args.p_to_location]+=args.p_quantity;
-        data = {success:true,quantity:args.p_quantity};
+      } else if (name === 'guigs_get_fridge_map') {
+        data={fridges:[],shelves:[],slots:[],dry:[],unallocated:balances.filter(b=>b.fridge>0)
+          .map(b=>({...lots.find(l=>l.id===b.lot_id),lot_id:b.lot_id,quantity:b.fridge,product_name:product.name}))};
+      } else if (name === 'guigs_quote_fridge_transfer') {
+        const spec=args.p_spec;
+        const lot=lots.find(l=>l.id===spec.lot_id);
+        const outbound=spec.direction==='stock-fridge';
+        const destination=outbound?'Geladeira — não alocado':'Estoque seco';
+        const balance=balances.find(b=>b.lot_id===lot.id);
+        if (balance[outbound?'stock':'fridge']<spec.quantity) return {error:{message:'Saldo insuficiente'}};
+        data={direction:spec.direction,quantity:spec.quantity,destination,plan:[{lot_id:lot.id,code:lot.code,
+          expiry:lot.expiry,quantity:spec.quantity,label:'Geladeira — não alocado'}]};
+      } else if (name === 'guigs_apply_fridge_transfer') {
+        const spec=args.p_spec;
+        const b=balances.find(row=>row.lot_id===spec.lot_id);
+        const from=spec.direction==='stock-fridge'?'stock':'fridge',to=from==='stock'?'fridge':'stock';
+        if (b[from]<spec.quantity) return {error:{message:'Saldo insuficiente'}};
+        b[from]-=spec.quantity; b[to]+=spec.quantity;
+        data={...args.p_expected,event_id:'event-fixture'};
       } else if (name === 'guigs_register_sale' || name === 'guigs_register_loss') {
         const balance=balances.find(b=>b.lot_id===args.p_lot_id);
         const location=name==='guigs_register_sale' ? 'fridge' : args.p_location;
@@ -119,7 +134,7 @@ function fixture({role, session, searchable = false, readOnly = false, operation
         else products.push({...updated,id:`product-${products.length+1}`});
         data=true;
       }
-      if (!name.startsWith('guigs_get_') && window.__test.failRefreshAfterWrite) window.__test.readError=true;
+      if (!isRead && window.__test.failRefreshAfterWrite) window.__test.readError=true;
       return {data,error:null};
     }
   };
@@ -209,7 +224,7 @@ if (require.main === module) (async () => {
     check(!(await page.textContent('#receiveSupplier')).includes('Fornecedor novo'), 'Fornecedor inativo sai do recebimento');
     await page.click('[data-close="receiveDialog"]');
 
-    const transfers = () => page.evaluate(() => window.__test.calls.filter(c=>c.name==='guigs_transfer_stock').length);
+    const transfers = () => page.evaluate(() => window.__test.calls.filter(c=>c.name==='guigs_apply_fridge_transfer').length);
     const openB = async () => {await page.click('#transferStock'); await page.selectOption('#transferLot','lot-b',{force:true}); await page.fill('#transferQuantity','5');};
     await openB(); await page.click('#saveTransfer');
     await page.waitForSelector('#fefoDialog[open]');
@@ -268,7 +283,7 @@ if (require.main === module) (async () => {
     if (artifacts) await page.screenshot({path:path.join(artifacts,'fefo-mobile.png')});
     await page.click('#cancelFefo'); await page.click('[data-close="transferDialog"]');
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v16')), 'Novo cache PWA instalado');
+    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v17')), 'Novo cache PWA instalado');
     await context.setOffline(true);
     await page.waitForFunction(() => document.getElementById('receiveStock').disabled);
     check((await page.textContent('#status')).includes('sem conexão'), 'Offline informa indisponibilidade e desabilita operações');

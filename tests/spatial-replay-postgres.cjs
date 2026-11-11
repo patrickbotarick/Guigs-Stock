@@ -38,8 +38,9 @@ async function run() {
     child.stdin.end(statement);
   });
   const id = n => '20000000-0000-0000-0000-'+String(n).padStart(12,'0');
-  const asOwner = statement => `begin; set local statement_timeout='8s'; set local role authenticated;
-    set local request.jwt.claim.sub='${id(1)}'; ${statement} commit;`;
+  const asMember = (statement, actor=id(1)) => `begin; set local statement_timeout='8s'; set local role authenticated;
+    set local request.jwt.claim.sub='${actor}'; ${statement} commit;`;
+  const asOwner = statement => asMember(statement);
   const allocate = key => `select public.guigs_allocate_fridge_stock('${id(10)}','${key}',
     '[{"lot_id":"${id(30)}","slot_id":"${id(60)}","quantity":1}]')::text;`;
   execFileSync(tool('initdb'),['-D',cluster,'-U','guigs_test','-A','trust','--locale=C','-E','UTF8'],options);
@@ -87,6 +88,28 @@ async function run() {
     assert.equal(sql('select count(*) from public.guigs_movements where spatial;'),'2');
     assert.equal(sql('select count(*) from guigs_private.spatial_commands;'),'2');
     console.log('Replay PostgreSQL: 8 verificações passaram em duas conexões reais locais.');
+    sql(`insert into auth.users values('${id(2)}','attendant@test.invalid');
+      insert into public.guigs_memberships(shop_id,user_id,role) values('${id(10)}','${id(2)}','attendant');
+      insert into public.guigs_movements(shop_id,lot_id,event_id,movement_type,location,delta,actor_id)
+        values('${id(10)}','${id(30)}',gen_random_uuid(),'receipt','stock',10,'${id(1)}');`);
+    const spec=JSON.stringify({direction:'stock-fridge',product_id:id(20),lot_id:id(30),slot_id:id(60),quantity:6});
+    const quote=sql(asOwner(`select public.guigs_quote_fridge_transfer('${id(10)}','${spec}');`));
+    const apply=key=>`select public.guigs_apply_fridge_transfer('${id(10)}','${key}','${spec}','${quote}');`;
+    const winner=session(asOwner(apply(id(90))+' select pg_sleep(3);'));
+    overlap=false;
+    for(let attempt=0;attempt<10&&!overlap;attempt++){
+      overlap=sql("select exists(select 1 from pg_stat_activity where wait_event='PgSleep');")==='t';
+      if(!overlap)await new Promise(resolve=>setTimeout(resolve,100));
+    }
+    assert.ok(overlap);
+    await assert.rejects(session(asMember(apply(id(91)),id(2))),/could not obtain lock on relation/);
+    const confirmed=JSON.parse(await winner);
+    await assert.rejects(session(asMember(apply(id(91)),id(2))),/Espaço insuficiente/);
+    assert.deepEqual(JSON.parse(await session(asOwner(apply(id(90))))),confirmed);
+    assert.equal(sql(`select count(*)||':'||sum(delta) from public.guigs_movements where event_id='${confirmed.event_id}';`),'2:0');
+    assert.equal(sql(`select coalesce(sum(delta) filter(where location='stock'),0)||':'||
+      coalesce(sum(delta) filter(where slot_id='${id(60)}'),0) from public.guigs_movements where lot_id='${id(30)}';`),'4:7');
+    console.log('Transferência concorrente: 6 verificações passaram entre owner e attendant.');
   } finally {
     ctl(['-m','fast','stop']);
   }

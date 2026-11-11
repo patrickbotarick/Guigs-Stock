@@ -298,7 +298,7 @@ function setOnlineDashboardState() {
     }
   }
   populateReceiveSuppliers();
-  if (el('transferDialog').open && !operationPending('transferForm')) populateTransferLots();
+  if (el('transferDialog').open && !operationPending('transferForm') && !transferRetry) populateTransferLots();
   syncOperationButtons();
 }
 
@@ -403,7 +403,7 @@ function syncOperationButtons() {
     ['editProductForm', 'saveProductEdit', true, !!el('editProductSelect').value],
     ['supplierForm', 'saveSupplier', true, true],
     ['receiveForm', 'saveReceipt', false, !!el('receiveProduct').value && suppliers.some(s => s.active)],
-    ['transferForm', 'saveTransfer', false, !!el('transferLot').value],
+    ['transferForm', 'saveTransfer', false, transferReady()],
     ['saleForm', 'saveSale', false, !!el('saleLot').value],
     ['lossForm', 'saveLoss', false, !!el('lossLot').value],
     ['adjustForm', 'saveAdjust', true, !!el('adjustLot').value]
@@ -2302,132 +2302,201 @@ function lotLabel(lot) {
 }
 
 
+let transferMap = null;
+let transferMapVersion = 0;
+let transferShortcut = null;
+let transferRetry = null;
+const transferOutbound = () => el('transferDirection').value === 'stock-fridge';
+const transferPositioned = () => el('transferForm').elements.transferMode.value === 'position';
+const transferDestination = () => el('transferPositions').querySelector('[name="transferSlot"]:checked')?.value || null;
+const transferSources = () => [...el('transferPositions').querySelectorAll('input[data-source]')]
+  .map(input => ({slot_id:input.dataset.source || null, quantity:Number(input.value)})).filter(row=>row.quantity>0);
+const transferQuantity = () => Number(el('transferQuantity').value);
+const transferNeedsMap = () => !transferOutbound() || transferPositioned();
+const transferOnlyUnallocated = () => el('transferPositions').dataset.onlyUnallocated === 'true';
+
+function transferReady() {
+  if (!el('transferLot').value || !Number.isInteger(transferQuantity()) || transferQuantity()<1) return false;
+  if (!transferNeedsMap()) return true;
+  if (!transferMap) return false;
+  if (transferOutbound()) return !!transferDestination();
+  return transferOnlyUnallocated() || transferSources().reduce((sum,row)=>sum+row.quantity,0)===transferQuantity();
+}
+
 function populateTransferLots() {
-
-  const select = el('transferLot');
-
-  select.replaceChildren();
-
-  const direction =
-    el('transferDirection').value;
-
-  const source =
-    direction === 'stock-fridge'
-      ? 'stock'
-      : 'fridge';
-
-  const available =
-    lots
-      .filter(lot => {
-        const balance =
-          lotBalances.get(lot.id);
-
-        return balance
-          && balance[source] > 0;
-      })
-      .sort(
-        (a, b) =>
-          a.expiry.localeCompare(b.expiry) || a.created_at.localeCompare(b.created_at)
-      );
-
-  if (!available.length) {
-
-    const option =
-      document.createElement('option');
-
-    option.value = '';
-
-    option.textContent =
-      'Nenhum lote disponível';
-
-    select.append(option);
-
-    el('saveTransfer').disabled = true;
-
-    updateTransferBalance();
-
-    return;
-  }
-
-  for (const lot of available) {
-
-    const balance =
-      lotBalances.get(lot.id);
-
-    const option =
-      document.createElement('option');
-
-    option.value = lot.id;
-
-    option.textContent =
-      `${lotLabel(lot)} · ${balance[source]} un.`;
-
-    select.append(option);
-  }
-
-  el('saveTransfer').disabled = false;
-
+  const select=el('transferLot'), previous=select.value;
+  const source=transferOutbound()?'stock':'fridge';
+  const available=lots.filter(lot=>(!transferShortcut || lot.product_id===transferShortcut.product_id) &&
+    lotBalances.get(lot.id)?.[source]>0).sort((a,b)=>a.expiry.localeCompare(b.expiry)||a.created_at.localeCompare(b.created_at));
+  select.replaceChildren(...available.map(lot=>new Option(
+    lotLabel(lot)+' · Validade: '+dateBR(lot.expiry)+' · '+lotBalances.get(lot.id)[source]+' un.',lot.id)));
+  if (!available.length) select.append(new Option('Nenhum lote disponível',''));
+  if (available.some(lot=>lot.id===previous)) select.value=previous;
   updateTransferBalance();
 }
 
-
 function updateTransferBalance() {
-
-  const lotId =
-    el('transferLot').value;
-
-  const direction =
-    el('transferDirection').value;
-
-  const source =
-    direction === 'stock-fridge'
-      ? 'stock'
-      : 'fridge';
-
-  const balance =
-    lotBalances.get(lotId);
-
-  el('transferBalance').textContent =
-    balance
-      ? `Disponível na origem: ${balance[source]} unidade(s).`
-      : '';
+  const balance=lotBalances.get(el('transferLot').value), source=transferOutbound()?'stock':'fridge';
+  el('transferBalance').textContent=balance ? 'Disponível '+(source==='stock'?'no estoque seco':'na geladeira')+
+    ': '+balance[source]+' unidade(s) neste lote.' : '';
+  renderTransferPositions();
 }
 
-function confirmFefo(context, selected, candidates, args, risk) {
+function renderTransferPositions() {
+  const container=el('transferPositions'), previous=transferDestination();
+  const parcels=new Map(transferSources().map(row=>[row.slot_id,row.quantity]));
+  const lot=lots.find(row=>row.id===el('transferLot').value);
+  container.replaceChildren();
+  delete container.dataset.onlyUnallocated;
+  el('transferSendMode').classList.toggle('hidden',!transferOutbound());
+  container.classList.toggle('hidden',!transferNeedsMap());
+  if (!transferNeedsMap() || !transferMap || !lot) {syncOperationButtons();return;}
+  const positions=transferMap.fridges.filter(fridge=>fridge.active).flatMap(fridge=>
+    transferMap.shelves.filter(shelf=>shelf.active&&shelf.fridge_id===fridge.id).flatMap(shelf=>
+      transferMap.slots.filter(slot=>slot.active&&slot.fridge_id===fridge.id&&slot.shelf_id===shelf.id)
+        .map(slot=>({slot,label:[fridge.name,shelf.name,slot.name].join(' / ')}))));
+  const instruction=document.createElement('p');
+  container.append(instruction);
+  if (transferOutbound()) {
+    instruction.textContent=positions.length?'Escolha a geladeira, a prateleira e o bloco.':'Nenhum bloco ativo disponível.';
+    for (const {slot,label} of positions) {
+      const space=slot.capacity_quantity==null ? null : Math.max(0,slot.capacity_quantity-slot.quantity);
+      const compatible=slot.product_id===lot.product_id && slot.product_active;
+      const choice=document.createElement('input');
+      choice.type='radio'; choice.name='transferSlot'; choice.value=slot.id;
+      choice.disabled=!compatible || space===null || space<transferQuantity();
+      choice.checked=!choice.disabled && slot.id===(previous || transferShortcut?.id);
+      const reason=!compatible ? (slot.product_id?'Associado a outro produto':'Produto pendente')
+        : space===null ? 'Capacidade pendente' : space<transferQuantity() ? 'Espaço insuficiente' : 'Disponível';
+      const card=document.createElement('label'); card.className='panel transfer-position';
+      card.append(choice,fridgesUI.transferPhoto(slot),document.createTextNode(
+        label+' · '+(slot.product_name||'Sem produto')+' · Capacidade: '+(slot.capacity_quantity??'Não configurado')+
+        ' · Espaço: '+(space??'Não configurado')+' · '+reason));
+      container.append(card);
+    }
+  } else {
+    const unallocated=transferMap.unallocated.find(item=>item.lot_id===lot.id);
+    const sources=positions.flatMap(({slot,label})=>{
+      const entry=slot.lots.find(item=>item.lot_id===lot.id);
+      return entry?.quantity>0 ? [{id:slot.id,label,quantity:entry.quantity}] : [];
+    });
+    if (unallocated?.quantity>0) sources.unshift({id:null,label:'Geladeira — não alocado',quantity:unallocated.quantity});
+    const onlyUnallocated=sources.length===1 && sources[0].id===null;
+    container.dataset.onlyUnallocated=String(onlyUnallocated);
+    instruction.textContent=onlyUnallocated ? 'Origem: Geladeira — não alocado · '+sources[0].quantity+' un.'
+      : sources.length ? 'Informe quantas unidades retirar de cada origem.' : 'Nenhuma origem disponível para este lote.';
+    if (!onlyUnallocated) for (const source of sources) {
+      const row=document.createElement('label'); row.className='field';
+      const input=document.createElement('input');
+      input.type='number'; input.min='0'; input.max=source.quantity; input.step='1';
+      input.value=parcels.get(source.id) || ''; input.dataset.source=source.id || '';
+      row.append(document.createTextNode(source.label+' · '+source.quantity+' un. · '+lot.code+' · Validade: '+dateBR(lot.expiry)),input);
+      container.append(row);
+    }
+  }
+  syncOperationButtons();
+}
+
+async function loadTransferPositions() {
+  if (!transferNeedsMap() || transferMap) {renderTransferPositions();return;}
+  const version=++transferMapVersion;
+  renderTransferPositions();
+  el('transferPositions').textContent='Consultando posições…';
+  const map=await fridgesUI.transferMap().catch(()=>null);
+  if (version!==transferMapVersion || !el('transferDialog').open) return;
+  transferMap=map;
+  renderTransferPositions();
+  if (!map && transferNeedsMap()) el('transferPositions').textContent='Mapa indisponível. Feche a movimentação e tente novamente.';
+}
+
+async function openIntegratedTransfer(slot=null) {
+  if (el('transferDialog').open || operationPending('transferForm') || !navigator.onLine) return;
+  formMessage('transferMessage');
+  if (!transferRetry) {
+    transferShortcut=slot;
+    transferMap=null;
+    transferMapVersion++;
+    el('transferPositions').replaceChildren();
+    if (slot) {
+      el('transferDirection').value='stock-fridge';
+      el('transferForm').elements.transferMode.value='position';
+    }
+    await refresh();
+    populateTransferLots();
+  }
+  if (!el('transferDialog').open) el('transferDialog').showModal();
+  if (!transferRetry) await loadTransferPositions();
+}
+
+function confirmFefo(context, selected, candidates, args, risk, destination) {
   const list = el('fefoCandidates');
   list.replaceChildren();
   for (const candidate of candidates) {
     const item = document.createElement('p');
-    item.textContent = `Lote: ${candidate.code} · Validade: ${dateBR(candidate.expiry)} · Disponível no estoque: ${candidate.stock} unidades`;
+    item.textContent = 'Lote: '+candidate.code+' · Validade: '+dateBR(candidate.expiry)+' · Disponível no estoque: '+candidate.stock+' unidades';
     list.append(item);
   }
-  el('fefoSelected').textContent = `Você está movimentando: ${lotLabel(selected)} · Validade: ${dateBR(selected.expiry)} · ${args.p_quantity} unidade(s) de estoque seco para geladeira. ${risk} Observação: ${args.p_note || 'Não informada'}.`;
+  el('fefoSelected').textContent = 'Você está movimentando: '+lotLabel(selected)+' · Validade: '+dateBR(selected.expiry)+
+    ' · '+args.p_quantity+' unidade(s) de estoque seco para '+destination+'. '+risk+' Observação: '+(args.p_note || 'Não informada')+'.';
   return context.waitForConfirmation(el('fefoDialog'),'cancelFefo','continueFefo');
 }
 
 async function transferStockOperation(event) {
   return runOperation(event, {buttonId:'saveTransfer',messageId:'transferMessage',task:async context => {
-    const from = el('transferDirection').value==='stock-fridge' ? 'stock' : 'fridge';
-    const to = from==='stock' ? 'fridge' : 'stock';
-    const args = {p_shop_id:shop.shop_id,p_lot_id:el('transferLot').value,p_from_location:from,p_to_location:to,
-      p_quantity:Number(el('transferQuantity').value),p_note:el('transferNote').value.trim()};
-    const selected = lots.find(lot=>lot.id===args.p_lot_id);
+    const from=transferOutbound()?'stock':'fridge', to=from==='stock'?'fridge':'stock';
+    const args={p_shop_id:shop.shop_id,p_lot_id:el('transferLot').value,p_quantity:transferQuantity(),p_note:el('transferNote').value.trim()};
+    const selected=lots.find(lot=>lot.id===args.p_lot_id);
     if (!selected) throw Error('Selecione um lote disponível.');
-    const risk = quantityRisk(args.p_quantity,lotBalances.get(selected.id)?.[from]);
-    let fefoConfirmed = false;
+    const risk=quantityRisk(args.p_quantity,lotBalances.get(selected.id)?.[from]);
+    const spec={direction:el('transferDirection').value,product_id:selected.product_id,lot_id:selected.id,quantity:args.p_quantity};
     if (from==='stock') {
-      const result = await client.rpc('guigs_get_fefo_candidates',{p_shop_id:shop.shop_id,p_lot_id:args.p_lot_id});
+      if (el('transferAutoFefo').checked) spec.lot_id=null;
+      if (transferPositioned()) {
+        spec.slot_id=transferDestination();
+        if (!spec.slot_id) throw Error('Escolha um bloco disponível.');
+      }
+    } else {
+      spec.sources=transferOnlyUnallocated() ? [{slot_id:null,quantity:args.p_quantity}] : transferSources();
+    }
+    const key=JSON.stringify([args.p_shop_id,spec,args.p_note]);
+    if (transferRetry && transferRetry.key!==key) throw Error('Confira o histórico e repita com os mesmos dados para resolver a transferência anterior.');
+    let write=transferRetry?.write;
+    if (!write) {
+      const result=await client.rpc('guigs_quote_fridge_transfer',{p_shop_id:args.p_shop_id,p_spec:spec});
       if (result.error) throw result.error;
       context.ensure();
-      if (result.data?.length) {
-        if (!await confirmFefo(context,selected,result.data,args,risk)) return;
-        fefoConfirmed = true;
+      const quote=result.data;
+      let fefoConfirmed=false;
+      if (from==='stock' && spec.lot_id) {
+        const fefo=await client.rpc('guigs_get_fefo_candidates',{p_shop_id:args.p_shop_id,p_lot_id:args.p_lot_id});
+        if (fefo.error) throw fefo.error;
+        context.ensure();
+        if (fefo.data?.length) {
+          if (!await confirmFefo(context,selected,fefo.data,args,risk,quote.destination)) return;
+          fefoConfirmed=true;
+        }
       }
+      if ((spec.slot_id || !spec.lot_id || (from==='fridge' && !transferOnlyUnallocated()) || risk) && !fefoConfirmed &&
+        !await confirmOperation(context,'Confirmar movimentação',risk || 'Confira os lotes e as quantidades antes de confirmar.',[
+          ['Produto',productById(selected.product_id)?.name || 'Produto'],['Quantidade',quote.quantity+' unidade(s)'],
+          ['Origem',locationLabel(from)],['Destino',quote.destination],
+          ...quote.plan.map(item=>['Lote',item.code+' · Validade: '+dateBR(item.expiry)+' · '+item.quantity+' un. · '+item.label]),
+          ['Observação',args.p_note || 'Não informada']
+        ])) return;
+      write={p_shop_id:args.p_shop_id,p_request_id:crypto.randomUUID(),p_spec:spec,p_expected:quote,p_note:args.p_note};
     }
-    if (risk && !fefoConfirmed && !await confirmOperation(context,'Confirmar movimentação',risk,
-      [...lotDetails(selected,args.p_quantity,from,args.p_note),['Destino',locationLabel(to)]])) return;
-    const data = await context.write('guigs_transfer_stock',args);
-    return `${data.quantity} unidade(s) de ${productById(selected.product_id)?.name} movidas para ${locationLabel(to).toLowerCase()}.`;
+    let data;
+    context.ensure();
+    try {
+      data=await context.write('guigs_apply_fridge_transfer',write);
+    } catch (error) {
+      if (/fetch|network|timeout|internet|connection/i.test(error.message || '')) transferRetry={key,write};
+      else transferRetry=null;
+      throw error;
+    }
+    transferRetry=null;
+    return data.quantity+' unidade(s) de '+productById(selected.product_id)?.name+' movidas para '+
+      (spec.slot_id?data.destination:locationLabel(to).toLowerCase())+'.';
   }});
 }
 
@@ -2756,6 +2825,7 @@ const inventoryUI = createInventoryUI({getContext:()=>({client,shop}),enhanceSel
   confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[]),refreshStock:refresh});
 const reportsUI = createReportsUI({getContext:()=>({client,shop}),dayDifference,replenishmentFor});
 const fridgesUI = createFridgesUI({getContext:()=>({client,shop,products,lots}),refreshStock:refresh,
+  openTransfer:openIntegratedTransfer,
   confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[])});
 window.addEventListener('hashchange', applyView);
 applyView();
@@ -3144,21 +3214,7 @@ el('newReceiveSupplier').addEventListener('click', openSupplierDialog);
 el('supplierSelect').addEventListener('change', fillSupplierForm);
 el('supplierForm').addEventListener('submit', saveSupplier);
 
-el('transferStock')
-  .addEventListener(
-    'click',
-    async () => {
-
-      formMessage('transferMessage');
-
-      await refresh();
-
-      populateTransferLots();
-
-      el('transferDialog')
-        .showModal();
-    }
-  );
+el('transferStock').addEventListener('click',()=>void openIntegratedTransfer());
 
 
 el('registerSale')
@@ -3198,15 +3254,19 @@ el('registerLoss')
 el('transferDirection')
   .addEventListener(
     'change',
-    populateTransferLots
+    () => { el('transferPositions').replaceChildren(); populateTransferLots(); void loadTransferPositions(); }
   );
 
 
 el('transferLot')
   .addEventListener(
     'change',
-    updateTransferBalance
+    () => { el('transferPositions').replaceChildren(); updateTransferBalance(); }
   );
+
+el('transferSendMode').addEventListener('change',()=>void loadTransferPositions());
+el('transferQuantity').addEventListener('input',renderTransferPositions);
+el('transferPositions').addEventListener('input',syncOperationButtons);
 
 
 el('saleLot')

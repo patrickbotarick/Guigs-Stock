@@ -130,8 +130,8 @@ const server = http.createServer((req,res)=>{
       await click('#transferStock');await choose('transferLot','lot-a');await page.fill('#transferQuantity','1');
       // O lote vencido mantém prioridade no servidor; não é descartado pelo frontend.
       await page.evaluate(()=>window.__test.balances.find(b=>b.lot_id==='lot-expired').stock=0);
-      const transfers=await count('guigs_transfer_stock');await click('#saveTransfer');
-      await repeatDuringWrite('transferForm','saveTransfer','guigs_transfer_stock',transfers);await closed('transferDialog');await settled('transferForm');
+      const transfers=await count('guigs_apply_fridge_transfer');await click('#saveTransfer');
+      await repeatDuringWrite('transferForm','saveTransfer','guigs_apply_fridge_transfer',transfers);await closed('transferDialog');await settled('transferForm');
       check((await page.textContent('#operationFeedback')).includes('movidas para geladeira'),'Feedback de movimentação');
 
       // Recebimento: normal sem confirmação; alta quantidade exige revisão.
