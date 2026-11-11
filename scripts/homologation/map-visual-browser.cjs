@@ -113,7 +113,7 @@ const date=days=>new Date(Date.now()+days*86400000).toISOString().slice(0,10);
     await page.click('#fridgeOperate');
    }
    await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
-   const names=await page.evaluate(()=>caches.keys());check(names.includes('guigs-stock-shell-v15'),'PWA v15 '+role);
+   const names=await page.evaluate(()=>caches.keys());check(names.includes('guigs-stock-shell-v16'),'PWA v16 '+role);
    await ctx.setOffline(true);await page.waitForFunction(()=>!document.querySelector('#fridgeOffline').classList.contains('hidden'));
    check(await page.isDisabled('#fridgeOperateStock'),'Operação bloqueada offline '+role);
    await page.reload();await page.waitForFunction(()=>document.querySelector('#status')?.textContent.toLowerCase().includes('sem conexão'));

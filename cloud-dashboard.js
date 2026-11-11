@@ -877,8 +877,12 @@ await loadHistory();
 // RENDERIZAÇÃO DO DASHBOARD
 // ============================================================
 
+const belowThreshold = (balance, threshold) => threshold != null && balance < threshold;
+const thresholdLabel = value => value ?? 'Não configurado';
+const optionalThreshold = id => el(id).value === '' ? null : Number(el(id).value);
+
 function replenishmentFor(product, balance, sourceLots = lots, sourceBalances = lotBalances) {
-  const deficit = Math.max(0, product.target_fridge - balance.fridge);
+  const deficit = product.target_fridge == null ? 0 : Math.max(0, product.target_fridge - balance.fridge);
   const eligible = sourceLots.filter(lot => lot.product_id === product.id && dayDifference(lot.expiry) >= 0 && (sourceBalances.get(lot.id)?.stock || 0) > 0)
     .sort((a, b) => a.expiry.localeCompare(b.expiry) || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
   const available = eligible.reduce((total, lot) => total + sourceBalances.get(lot.id).stock, 0);
@@ -888,8 +892,8 @@ function replenishmentFor(product, balance, sourceLots = lots, sourceBalances = 
 function matchesAttention(product, balance, lotList) {
   if (attentionFilter === 'all') return true;
   if (!product.active) return false;
-  if (attentionFilter === 'minimum') return balance.stock + balance.fridge < product.min_total || balance.fridge < product.min_fridge;
-  if (attentionFilter === 'replenish') return balance.fridge < product.target_fridge;
+  if (attentionFilter === 'minimum') return belowThreshold(balance.stock + balance.fridge, product.min_total) || belowThreshold(balance.fridge, product.min_fridge);
+  if (attentionFilter === 'replenish') return belowThreshold(balance.fridge, product.target_fridge);
   return lotList.some(lot => lot.product_id === product.id &&
     (attentionFilter === 'expired' ? lot.days < 0 : lot.days >= 0 && lot.days <= 30));
 }
@@ -897,20 +901,21 @@ function matchesAttention(product, balance, lotList) {
 function renderReplenishment(productBalances, visibleIds) {
   const list = el('replenishmentList');
   list.replaceChildren();
-  const ordered = products.filter(product => product.active && visibleIds.has(product.id) && productBalances.get(product.id).fridge < product.target_fridge)
-    .sort((a, b) => Number(productBalances.get(b.id).fridge < b.min_fridge) - Number(productBalances.get(a.id).fridge < a.min_fridge) || a.name.localeCompare(b.name, 'pt-BR'));
+  const ordered = products.filter(product => product.active && visibleIds.has(product.id) && belowThreshold(productBalances.get(product.id).fridge, product.target_fridge))
+    .sort((a, b) => Number(belowThreshold(productBalances.get(b.id).fridge, b.min_fridge)) - Number(belowThreshold(productBalances.get(a.id).fridge, a.min_fridge)) || a.name.localeCompare(b.name, 'pt-BR'));
   for (const product of ordered) {
     const balance = productBalances.get(product.id);
     const advice = replenishmentFor(product, balance);
     const card = document.createElement('article');
-    card.className = 'replenishment-card' + (balance.fridge < product.min_fridge ? ' warning' : '');
+    const belowMinimum = belowThreshold(balance.fridge, product.min_fridge);
+    card.className = 'replenishment-card' + (belowMinimum ? ' warning' : '');
     card.dataset.productId = product.id;
     const title = document.createElement('strong');
     title.textContent = product.name;
     const quantities = document.createElement('p');
-    quantities.textContent = `Geladeira: ${balance.fridge} · Mínimo: ${product.min_fridge} · Meta: ${product.target_fridge} · Estoque seco: ${balance.stock} (${advice.available} não vencidas).`;
+    quantities.textContent = `Geladeira: ${balance.fridge} · Mínimo: ${thresholdLabel(product.min_fridge)} · Meta: ${thresholdLabel(product.target_fridge)} · Estoque seco: ${balance.stock} (${advice.available} não vencidas).`;
     const suggestion = document.createElement('p');
-    suggestion.textContent = `Sugestão de reposição: ${advice.suggested} unidade(s). ${balance.fridge < product.min_fridge ? 'Abaixo do mínimo.' : 'Reposição sugerida até a meta.'}`;
+    suggestion.textContent = `Sugestão de reposição: ${advice.suggested} unidade(s). ${belowMinimum ? 'Abaixo do mínimo.' : 'Reposição sugerida até a meta.'}`;
     const guidance = document.createElement('p');
     guidance.className = 'muted';
     guidance.textContent = advice.first ? `Primeiro lote FEFO: ${advice.first.code} · ${dateBR(advice.first.expiry)}. Confira os lotes no modal Movimentar.` : 'Sem estoque seco não vencido para repor.';
@@ -1070,9 +1075,9 @@ function render() {
         return (
           total === 0
           ||
-          total < p.min_total
+          belowThreshold(total, p.min_total)
           ||
-          b.fridge < p.min_fridge
+          belowThreshold(b.fridge, p.min_fridge)
         );
       }
     ).length;
@@ -1141,7 +1146,7 @@ function render() {
     }
 
 
-    if (total < p.min_total) {
+    if (belowThreshold(total, p.min_total)) {
 
       alerts.push({
         level: 'warning',
@@ -1152,7 +1157,7 @@ function render() {
     }
 
 
-    if (b.fridge < p.min_fridge) {
+    if (belowThreshold(b.fridge, p.min_fridge)) {
 
       alerts.push({
         level: 'warning',
@@ -1350,7 +1355,7 @@ function render() {
       );
 
     }
-    else if (total < p.min_total) {
+    else if (belowThreshold(total, p.min_total)) {
 
       statusText =
         'Estoque baixo';
@@ -1363,7 +1368,7 @@ function render() {
       );
 
     }
-    else if (b.fridge < p.min_fridge) {
+    else if (belowThreshold(b.fridge, p.min_fridge)) {
 
       statusText =
         'Geladeira baixa';
@@ -1374,9 +1379,11 @@ function render() {
       r.classList.add(
         'product-row-warning'
       );
-    } else if (total < p.target_total || b.fridge < p.target_fridge) {
+    } else if (belowThreshold(total, p.target_total) || belowThreshold(b.fridge, p.target_fridge)) {
       statusText = 'Reposição sugerida';
       statusClass = 'warning';
+    } else if ([p.min_total, p.target_total, p.min_fridge, p.target_fridge].some(value => value == null)) {
+      statusText = 'Configuração pendente';
     }
 
 
@@ -1386,7 +1393,7 @@ function render() {
     );
     const thresholds = document.createElement('small');
     thresholds.className = 'muted stock-thresholds';
-    thresholds.textContent = `Total: mínimo ${p.min_total} / meta ${p.target_total} · Geladeira: mínimo ${p.min_fridge} / meta ${p.target_fridge}`;
+    thresholds.textContent = `Total: mínimo ${thresholdLabel(p.min_total)} / meta ${thresholdLabel(p.target_total)} · Geladeira: mínimo ${thresholdLabel(p.min_fridge)} / meta ${thresholdLabel(p.target_fridge)}`;
     r.cells[0].append(thresholds);
 
 
@@ -2076,8 +2083,8 @@ function populateReceiveProducts() {
 async function createProduct(event) {
   return runOperation(event, {buttonId:'saveProduct',messageId:'productMessage',owner:true,task:async context => {
     const args = {p_shop_id:shop.shop_id,p_name:el('productName').value.trim(),p_category:el('productCategory').value,
-      p_min_total:Number(el('minTotal').value),p_target_total:Number(el('targetTotal').value),
-      p_min_fridge:Number(el('minFridge').value),p_target_fridge:Number(el('targetFridge').value)};
+      p_min_total:optionalThreshold('minTotal'),p_target_total:optionalThreshold('targetTotal'),
+      p_min_fridge:optionalThreshold('minFridge'),p_target_fridge:optionalThreshold('targetFridge')};
     await context.write('guigs_create_product',args);
     return `Produto cadastrado: ${args.p_name}.`;
   }});
@@ -2194,9 +2201,9 @@ function fillEditProductForm() {
 async function updateProductOperation(event) {
   return runOperation(event, {buttonId:'saveProductEdit',messageId:'editProductMessage',owner:true,reset:false,task:async context => {
     const args = {p_shop_id:shop.shop_id,p_product_id:el('editProductSelect').value,p_name:el('editProductName').value.trim(),
-      p_category:el('editProductCategory').value,p_min_total:Number(el('editMinTotal').value),
-      p_target_total:Number(el('editTargetTotal').value),p_min_fridge:Number(el('editMinFridge').value),
-      p_target_fridge:Number(el('editTargetFridge').value),p_active:el('editProductActive').value==='true'};
+      p_category:el('editProductCategory').value,p_min_total:optionalThreshold('editMinTotal'),
+      p_target_total:optionalThreshold('editTargetTotal'),p_min_fridge:optionalThreshold('editMinFridge'),
+      p_target_fridge:optionalThreshold('editTargetFridge'),p_active:el('editProductActive').value==='true'};
     const data = await context.write('guigs_update_product',args);
     return data ? `Produto atualizado: ${args.p_name}.` : 'Nenhuma alteração realizada no produto.';
   }});

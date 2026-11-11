@@ -17,6 +17,8 @@ export function fridgeSlotState({quantity,min_quantity,target_quantity,capacity_
 export function fridgeVisualStatus(slot){
   if(fridgeSlotConfiguration(slot)==='PENDENTE')return {tone:'pending',icon:'○',label:slot.product_id?'Configuração pendente':'Produto pendente',state:'PENDENTE'};
   const state=fridgeSlotState(slot);
+  if(state!=='CRÍTICO'&&state!=='ATENÇÃO'&&(slot.min_quantity==null||slot.target_quantity==null))
+    return {tone:'pending',icon:'○',label:'Configuração pendente',state:'PENDENTE'};
   return {tone:state==='OK'?'healthy':state==='ATENÇÃO'?'attention':'critical',
     icon:state==='OK'?'✓':state==='ATENÇÃO'?'!':'↓',label:state==='OK'?'Em dia':state==='ATENÇÃO'?'Atenção':state==='VAZIO'?'Vazio':'Crítico',state};
 }
@@ -31,7 +33,7 @@ export function fridgeReplenishmentRows(data,today){
   const dry=new Map();
   for(const lot of data.dry)if(lot.expiry>=today&&lot.product_active&&lot.quantity>0)
     dry.set(lot.product_id,(dry.get(lot.product_id)||0)+Number(lot.quantity));
-  const rows=data.slots.filter(x=>x.active&&x.capacity_quantity!==null&&x.product_active&&x.product_id&&f.has(x.fridge_id)&&h.has(x.shelf_id))
+  const rows=data.slots.filter(x=>x.active&&x.capacity_quantity!=null&&x.target_quantity!=null&&x.product_active&&x.product_id&&f.has(x.fridge_id)&&h.has(x.shelf_id))
     .map(slot=>({slot,fridge:f.get(slot.fridge_id),shelf:h.get(slot.shelf_id),
       demand:Math.max(0,Math.min(slot.target_quantity,slot.capacity_quantity)-Number(slot.quantity))}))
     .filter(x=>x.demand>0)
@@ -151,7 +153,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
         const products=(getContext().products||[]).filter(p=>p.active||p.id===item?.product_id);
         field('product_id','Produto associado',{options:[['','Sem associação'],...products.map(p=>[p.id,p.name+(p.active?'':' (inativo)')])],value:item?.product_id});
         for(const [key,label] of [['min_quantity','Mínimo'],['target_quantity','Meta']]){
-          field(key,label,{type:'number',value:item?.[key]??0,min:0,max:1000000,step:1,required:true});
+          field(key,label,{type:'number',value:item?.[key],min:0,max:1000000,step:1}).placeholder='Não configurado';
         }
         const capacity=field('capacity_quantity','Capacidade',{type:'number',value:item?.capacity_quantity,min:1,max:1000000,step:1});
         capacity.placeholder='Capacidade pendente';
@@ -334,9 +336,10 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
           card.style.setProperty('--slot-column',start+' / '+end);card.style.setProperty('--slot-row',String(lane+1));
           const button=node('button');button.type='button';button.className='fridge-slot-open';button.dataset.openSlot=x.id;button.setAttribute('aria-haspopup','dialog');
           const name=x.product_name||x.name;
-          button.setAttribute('aria-label',name+' · '+state.label+(state.tone!=='pending'?' · '+x.quantity+' unidades':'')+' · '+f.name+' / '+h.name+' / '+x.name);
+          const showQuantity=state.tone!=='pending'||Number(x.quantity)>0;
+          button.setAttribute('aria-label',name+' · '+state.label+(showQuantity?' · '+x.quantity+' unidades':'')+' · '+f.name+' / '+h.name+' / '+x.name);
           button.append(photo(x));const label=node('span',name);label.className='fridge-slot-name';button.append(label,statusBadge(x));
-          if(state.tone!=='pending'){const quantity=node('span',x.quantity+' un.');quantity.className='fridge-slot-quantity';button.append(quantity);}
+          if(showQuantity){const quantity=node('span',x.quantity+' un.');quantity.className='fridge-slot-quantity';button.append(quantity);}
           button.addEventListener('click',()=>openDetail(x.id));card.append(button);rail.append(card);
         }
         shelf.append(rail);glass.append(shelf);
@@ -352,7 +355,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
   function detailSlot(){return data?.slots.find(s=>s.id===detailSlotId);}
   function syncDetail(){
     const slot=detailSlot(),locked=busy||!navigator.onLine;
-    el('fridgeDetailReplenish').disabled=locked||!slot||fridgeSlotConfiguration(slot)==='PENDENTE'||!slot.product_active;
+    el('fridgeDetailReplenish').disabled=locked||!slot||fridgeSlotConfiguration(slot)==='PENDENTE'||slot.target_quantity==null||!slot.product_active;
     el('fridgeDetailEdit').classList.toggle('hidden',!canManageLayout());el('fridgeDetailProduct').classList.toggle('hidden',!canManageLayout());
     el('fridgeDetailEdit').disabled=locked;el('fridgeDetailProduct').disabled=locked;
     el('fridgeDetailStock').disabled=locked||!slot?.product_id||fridgeSlotConfiguration(slot)==='PENDENTE'||(!owner()&&Number(slot.quantity)===0);
@@ -376,15 +379,22 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
     text.append(statusBadge(slot),node('p',fridgeSlotConfiguration(slot)==='PRONTO'?'Pronto para abastecer':fridgeSlotConfiguration(slot)==='ATIVO'?'Bloco ativo':'Configuração pendente'));
     text.append(node('small',slot.product_id?'ID do produto · '+slot.product_id:'Produto pendente'));
     hero.append(photo(slot,true),text);body.append(hero);
-    if(pending){const note=node('p',!slot.product_id?'Associe um produto para preparar este bloco.':'Defina a capacidade para ativar este bloco.');note.className='notice';body.append(note);}
+    if(pending){
+      const guidance=!slot.product_id?'Associe um produto para preparar este bloco.':
+        slot.capacity_quantity==null?'Defina a capacidade para ativar este bloco.':'Configure o mínimo e a meta do bloco.';
+      const note=node('p',guidance);note.className='notice';body.append(note);
+    }
     const stats=node('dl');stats.className='fridge-detail-stats';
     const stat=(label,value)=>{const cell=node('div');cell.append(node('dt',label),node('dd',String(value)));stats.append(cell);};
     stat('No bloco',slot.quantity+' un.');
-    if(!pending){
-      stat('Mínimo',slot.min_quantity+' un.');stat('Meta desejada',slot.target_quantity+' un.');stat('Capacidade',slot.capacity_quantity+' un.');
+    const threshold=value=>value==null?'Não configurado':value+' un.';
+    stat('Mínimo',threshold(slot.min_quantity));
+    stat('Meta desejada',threshold(slot.target_quantity));
+    stat('Capacidade',threshold(slot.capacity_quantity));
+    if(slot.capacity_quantity!=null){
       stat('Ocupação',Math.round(Number(slot.quantity)/slot.capacity_quantity*100)+'%');
       const meter=node('meter');meter.min=0;meter.max=slot.capacity_quantity;meter.value=slot.quantity;meter.setAttribute('aria-label','Ocupação de '+slot.name);body.append(meter);
-    }else stat('Capacidade',slot.capacity_quantity==null?'Pendente':slot.capacity_quantity+' un.');
+    }
     const today=new Date().toISOString().slice(0,10),dry=data.dry.filter(l=>l.product_id===slot.product_id),unallocated=data.unallocated.filter(l=>l.product_id===slot.product_id);
     stat('Seco disponível',dry.filter(l=>l.expiry>=today&&l.product_active).reduce((n,l)=>n+Number(l.quantity),0)+' un. elegíveis');
     stat('Não alocado',unallocated.reduce((n,l)=>n+Number(l.quantity),0)+' un.');body.append(stats);
@@ -669,7 +679,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
       if(!quote||!Array.isArray(quote.plan))throw Error('Sugestão indisponível.');
       replenishQuote=quote;
       el('fridgeReplenishQuantity').value=quote.quantity||'';
-      el('fridgeReplenishStats').textContent=quote.product_name+' · Atual: '+quote.current+' / '+quote.capacity+' · Mínimo: '+quote.min+' · Meta: '+quote.target+' · Seco elegível: '+quote.dry_available;
+      el('fridgeReplenishStats').textContent=quote.product_name+' · Atual: '+quote.current+' / '+quote.capacity+' · Mínimo: '+(quote.min??'Não configurado')+' · Meta: '+quote.target+' · Seco elegível: '+quote.dry_available;
       el('fridgeReplenishPlan').replaceChildren(...quote.plan.map(l=>node('li',l.code+' · '+l.quantity+' un. · '+l.expiry.split('-').reverse().join('/'))));
       replenishMessage(quote.deficit===0?'Posição já atingiu a meta.':quote.dry_available<quote.deficit?'Estoque seco insuficiente para atingir a meta.':quote.expired_dry>0?'Lotes vencidos não foram incluídos.':'Confira os lotes antes de confirmar.');
     }catch(error){if(stamp===generation)replenishMessage(safeError(error));}
@@ -777,7 +787,8 @@ export function createFridgesUI({getContext,refreshStock,confirmAction}){
     values.active=form.elements.active.checked;
     if(type==='slot'){
       values.product_id=values.product_id||null;
-      values.capacity_quantity=values.capacity_quantity===''?null:Number(values.capacity_quantity);
+      for(const key of ['min_quantity','target_quantity','capacity_quantity'])
+        values[key]=values[key]===''?null:Number(values[key]);
     }
     for(const key of ['width_ratio','height_ratio','x_ratio','y_ratio'])if(key in values)values[key]=Number(values[key])/100;
     if(!String(values.name||'').trim()){msg('Informe um nome.');return;}

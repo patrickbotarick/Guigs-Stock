@@ -36,8 +36,20 @@ $null = New-Item -ItemType Directory -Path $nestedGit
 'gitdir: fixture' | Set-Content -LiteralPath (Join-Path $nestedGit '.git')
 $bad = $settings.Clone(); $bad.BackupRoot=$nestedGit; Assert-Rejected $bad
 $junction = Join-Path $testRoot 'LinkedDestination'
-$null = New-Item -ItemType Junction -Path $junction -Target $backupRoot
-$bad = $settings.Clone(); $bad.BackupRoot=$junction; Assert-Rejected $bad
+$junctionCreated = $false
+try {
+    $null = New-Item -ItemType Junction -Path $junction -Target $backupRoot -ErrorAction Stop
+    $junctionCreated = $true
+} catch {
+    # Ambientes Windows sem SeCreateSymbolicLinkPrivilege não conseguem criar
+    # o fixture. Mantemos a cobertura estática da mesma guarda, sem relaxá-la.
+}
+if ($junctionCreated) {
+    $bad = $settings.Clone(); $bad.BackupRoot=$junction; Assert-Rejected $bad
+} else {
+    $backupSource = Get-Content -LiteralPath $backupScript -Raw
+    Assert-True ($backupSource -match 'ReparsePoint') 'Proteção contra reparse-point ausente'
+}
 $bad = $settings.Clone(); $bad.Execute=$true; Assert-Rejected $bad
 $bad.Acknowledgement='EXPORTAR_APENAS_LEITURA'; $bad.PasswordFile=''; Assert-Rejected $bad
 $bad.PasswordFile=Join-Path $repo 'config.example.js'; Assert-Rejected $bad

@@ -5,7 +5,7 @@ let checks=0;
 const eq=(a,b)=>{assert.deepEqual(a,b);checks++;};
 const reject=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
 (async()=>{
- const {fridgeSlotConfiguration,fridgeVisualStatus,fridgeDraftGeometry}=await import('../fridges.js');
+ const {fridgeSlotConfiguration,fridgeVisualStatus,fridgeDraftGeometry,fridgeReplenishmentRows}=await import('../fridges.js');
  for(const [quantity,tone]of [[0,'critical'],[1,'critical'],[2,'attention'],[5,'healthy']]){
   const state=fridgeVisualStatus({product_id:id(20),capacity_quantity:10,quantity,min_quantity:2,target_quantity:5});eq(state.tone,tone);eq(typeof state.icon,'string');
  }
@@ -44,6 +44,7 @@ const reject=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
   const values={name:'Bloco',fridge_id:f.id,shelf_id:h.id,product_id:null,capacity_quantity:null};
   let slot=await save('attendant','slot',values);
   eq(slot.capacity_quantity,null);eq(slot.product_id,null);
+  eq(slot.min_quantity,null);eq(slot.target_quantity,null);
   const capacityOnly=await save('attendant','slot',{...values,name:'Só capacidade',capacity_quantity:12});
   await reject(()=>get('owner','select public.guigs_allocate_fridge_stock($1,$2,$3) data',[shop,randomUUID(),JSON.stringify([{lot_id:lot,slot_id:capacityOnly.id,quantity:1}])]),/Defina o produto/);
   slot=await save('attendant','slot',{...values,product_id:product,capacity_quantity:10},slot);
@@ -71,6 +72,25 @@ const reject=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
   slot=await save('attendant','slot',{...slot,x_ratio:0,width_ratio:1,capacity_quantity:14},slot);
   eq(slot.width_ratio,1);eq(slot.capacity_quantity,14);
   eq(await ledger(),afterStock);
+  eq(fridgeVisualStatus({...slot,quantity:3}).tone,'pending');
+  eq(fridgeReplenishmentRows(await map('owner'),'2000-01-01'),[]);
+  const quote=()=>get('owner','select public.guigs_get_fridge_replenishment($1,$2) data',[shop,slot.id]);
+  await reject(quote,/Defina a meta/);
+  for(const change of [{target_quantity:-1},{min_quantity:-1},{min_quantity:15},{min_quantity:3,target_quantity:2},{target_quantity:15}]){
+   await reject(()=>save('attendant','slot',{...slot,...change},slot),/check constraint/);
+  }
+  slot=await save('attendant','slot',{...slot,target_quantity:6},slot);
+  eq((await quote()).quantity,3);
+  eq((await quote()).min,null);
+  slot=await save('attendant','slot',{...slot,target_quantity:0},slot);
+  eq((await quote()).quantity,0);
+  slot=await save('attendant','slot',{...slot,target_quantity:null},slot);
+  await reject(quote,/Defina a meta/);
+  const makeProduct=(target=null)=>get('owner','select public.guigs_create_product($1,$2,$3,null,$4,null,null) data',[shop,'Produto pendente artificial','Teste',target]);
+  await reject(()=>makeProduct(-1),/mínim|meta|limite/i);
+  await makeProduct();
+  const created=(await db.query("select min_total,target_total,min_fridge,target_fridge from public.guigs_products where name='Produto pendente artificial'")).rows[0];
+  eq(created,{min_total:null,target_total:null,min_fridge:null,target_fridge:null});
   await reject(()=>get('attendant',"select public.guigs_get_reports($1,now()-interval '1 day',now()) data",[shop]),/proprietário/);
   await reject(()=>get('attendant','select public.guigs_list_fridge_layout_access($1) data',[shop]),/proprietários/);
   await reject(()=>grant('attendant',false),/proprietários/);
@@ -81,6 +101,44 @@ const reject=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
   const last=await map('attendant');
   eq(last.slots.reduce((n,s)=>n+s.quantity,0)+last.unallocated.reduce((n,l)=>n+l.quantity,0),8);
   eq((await db.query("select sum(delta)::int n from public.guigs_movements where location='stock' and lot_id=$1",[lot])).rows[0].n,10);
+
+  // Simulação local do reset manual. As chaves permanecem, como em produção.
+  const request=randomUUID(), payload=[{lot_id:lot,slot_id:slot.id,quantity:1}];
+  const allocate=(key,entries=payload)=>get('owner','select public.guigs_allocate_fridge_stock($1,$2,$3) data',[shop,key,JSON.stringify(entries)]);
+  const old=await allocate(request);
+  eq(await allocate(request),old);
+  await db.exec('delete from public.guigs_movements');
+  await reject(()=>allocate(request),/ciclo anterior/);
+  await reject(()=>allocate(request,[{...payload[0],quantity:2}]),/Identificador já utilizado/);
+  const stalePayloadRequest=randomUUID();
+  await reject(()=>allocate(stalePayloadRequest),/não alocado|insuficiente/i);
+  eq((await db.query('select count(*)::int n from guigs_private.spatial_commands where request_id=$1',[stalePayloadRequest])).rows[0].n,0);
+  eq(await ledger(),[]);
+  await get('owner',"select public.guigs_receive_stock($1,$2,'NOVO-CICLO',current_date+45,6,'',null) data",[shop,product]);
+  const newLot=(await db.query("select id from public.guigs_lots where code='NOVO-CICLO'")).rows[0].id;
+  await get('owner',"select public.guigs_transfer_stock($1,$2,'stock','fridge',3,'') data",[shop,newLot]);
+  const newRequest=randomUUID(), newPayload=[{...payload[0],lot_id:newLot}];
+  const [first,retry]=await Promise.all([allocate(newRequest,newPayload),allocate(newRequest,newPayload)]);
+  eq(first,retry);
+  eq((await db.query('select count(*)::int n from public.guigs_movements where event_id=$1',[first.event_id])).rows[0].n,2);
+  eq((await map('owner')).slots.find(s=>s.id===slot.id).quantity,1);
+  await reject(()=>allocate(newRequest,[{...newPayload[0],quantity:2}]),/Identificador já utilizado/);
+  const preserved=(await db.query('select result from guigs_private.spatial_commands where request_id=$1',[request])).rows[0].result;
+  eq(preserved,old);
+  const sale=JSON.stringify({kind:'sale',origin:'slot',slot_id:slot.id,product_id:product,quantity:1});
+  const salePlan=await get('attendant','select public.guigs_get_fridge_operation($1,$2) data',[shop,sale]);
+  eq(salePlan.plan.map(line=>line.lot_id),[newLot]);
+  await get('attendant','select public.guigs_apply_fridge_operation($1,$2,$3,$4,$5) data',[shop,randomUUID(),sale,JSON.stringify(salePlan),'fixture']);
+  eq((await map('owner')).slots.find(s=>s.id===slot.id).quantity,0);
+  const inventory=await get('owner',"select public.guigs_create_spatial_inventory($1,'novo ciclo artificial') data",[shop]);
+  const detail=await get('attendant','select public.guigs_get_spatial_inventory($1,$2) data',[shop,inventory]);
+  const historicalItems=detail.items.filter(item=>item.lot_id!==newLot);
+  eq(historicalItems.length>0,true);
+  eq(historicalItems.every(item=>item.basis_quantity===0&&item.basis_movement_count===0),true);
+  const count=detail.items.find(item=>item.lot_id===newLot&&item.location==='stock');
+  await get('attendant','select public.guigs_count_spatial_inventory_item($1,$2,$3,$4,$5) data',[shop,inventory,count.id,3,count.version]);
+  const counted=await get('owner','select public.guigs_get_spatial_inventory($1,$2) data',[shop,inventory]);
+  eq(counted.items.find(item=>item.id===count.id).counted_quantity,3);
   console.log('Mapa modular: '+checks+' verificações passaram; dados artificiais.');
  }finally{await db.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -167,6 +167,8 @@ const server = http.createServer((req,res)=>{
         await click('#newProduct');await page.fill('#productName','Produto artificial');
         const creates=await count('guigs_create_product');await click('#saveProduct');await repeatDuringWrite('productForm','saveProduct','guigs_create_product',creates);await closed('productDialog');await settled('productForm');
         check((await page.textContent('#operationFeedback')).includes('Produto cadastrado'),'Cadastro de produto protegido');
+        const createArgs=await page.evaluate(()=>window.__test.calls.filter(c=>c.name==='guigs_create_product').at(-1).args);
+        check(['p_min_total','p_target_total','p_min_fridge','p_target_fridge'].every(key=>createArgs[key]===null),'Cadastro envia NULL para limites em branco');
 
         await click('#manageSuppliers');await page.fill('#supplierName','Fornecedor artificial');
         const supplierCreates=await count('guigs_create_supplier');await click('#saveSupplier');await repeatDuringWrite('supplierForm','saveSupplier','guigs_create_supplier',supplierCreates);await closed('supplierDialog');await settled('supplierForm');

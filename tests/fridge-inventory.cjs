@@ -8,7 +8,7 @@ const reject=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
  const db=await createTestDatabase();
  try{
   const folder=path.join(__dirname,'../supabase/migrations');
-  for(const f of fs.readdirSync(folder).filter(f=>/spatial_fridge_.*\.sql$/.test(f)).sort())await db.exec(fs.readFileSync(path.join(folder,f),'utf8'));
+  for(const f of fs.readdirSync(folder).filter(f=>/spatial_(fridge_.*|replay_integrity)\.sql$/.test(f)).sort())await db.exec(fs.readFileSync(path.join(folder,f),'utf8'));
   const get=(role,sql,args)=>asUser(db,role,async tx=>(await tx.query(sql,args)).rows[0].data);
   const legacy=await get('owner',"select public.guigs_create_inventory($1,'fixture legado') as data",[shop]);
   const legacyDetail=await get('owner','select public.guigs_get_inventory($1,$2) as data',[shop,legacy]);

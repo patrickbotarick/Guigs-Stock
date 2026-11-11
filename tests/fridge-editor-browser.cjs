@@ -104,6 +104,8 @@ function bridge({role,shop}){
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105124008_map_image_storage_access.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105170140_product_image_library.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261105182536_image_library_administration.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261111130125_spatial_replay_integrity.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261111130126_nullable_stock_thresholds.sql'),'utf8'));
     const ledger=()=>db.query('select id,delta,slot_id from public.guigs_movements order by id').then(r=>r.rows);
     const before=await ledger();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -154,6 +156,14 @@ function bridge({role,shop}){
     await page.click('#fridgeEdit');await page.selectOption('#fridgeEditItem',x);
     check(await page.inputValue('#fridgeField_capacity_quantity')==='','Capacidade pendente foi persistida');
     await fill('capacity_quantity',18);await save();
+    await fill('target_quantity','');await fill('min_quantity','');await save();
+    const limits=(await db.query('select min_quantity,target_quantity,capacity_quantity from public.guigs_fridge_slots where id=$1',[x])).rows[0];
+    check(limits.min_quantity===null&&limits.target_quantity===null&&limits.capacity_quantity===18,'Editor salva mínimo e meta em branco como NULL sem mexer na capacidade');
+    await page.click('#fridgeOperate');await pendingCard.locator('button').click();
+    check((await page.textContent('#fridgeDetailBody')).includes('Não configurado'),'Modal distingue limites pendentes');
+    check(await page.isDisabled('#fridgeDetailReplenish'),'Reposição bloqueada sem meta');
+    await page.keyboard.press('Escape');await page.click('#fridgeEdit');await page.selectOption('#fridgeEditItem',x);
+    await fill('target_quantity',12);await fill('min_quantity',4);await save();
     await fill('width_ratio',50);await fill('x_ratio',25);await fill('sort_order',2);await save();
     await page.reload();await page.click('#fridgeEdit');await page.selectOption('#fridgeEditKind','slot');await page.selectOption('#fridgeEditItem',x);
     check(await page.inputValue('#fridgeField_width_ratio')==='50','Resize persiste após reload');
@@ -276,7 +286,7 @@ function bridge({role,shop}){
     const create=async(kind,values)=>(await dispatch({role:'owner',name:'guigs_save_fridge_layout',args:{p_shop_id:shop,p_kind:kind,p_values:values,p_id:null,p_revision:null}}));
     const critical=await create('slot',{fridge_id:a,shelf_id:h,name:'Crítico',product_id:id(20),min_quantity:2,target_quantity:4,capacity_quantity:6,x_ratio:.15,width_ratio:.2});
     const ok=await create('slot',{fridge_id:a,shelf_id:h,name:'Pronto',product_id:id(20),min_quantity:1,target_quantity:2,capacity_quantity:6,x_ratio:.75,width_ratio:.25});
-    await create('slot',{fridge_id:a,shelf_id:h,name:'Vazio',product_id:id(20),capacity_quantity:24,x_ratio:0,width_ratio:.15});
+    await create('slot',{fridge_id:a,shelf_id:h,name:'Vazio',product_id:id(20),min_quantity:0,target_quantity:0,capacity_quantity:24,x_ratio:0,width_ratio:.15});
     await db.transaction(async tx=>{
       const e=(await tx.query('select gen_random_uuid() as id')).rows[0].id;
       for(const [slot,delta] of [[null,-7],[x,4],[critical.id,1],[ok.id,2]])

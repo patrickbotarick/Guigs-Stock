@@ -107,14 +107,16 @@ export function createReportsUI({getContext, dayDifference, replenishmentFor}) {
         const b=lotBalances.get(l.id) || {stock:0,fridge:0};sum.stock+=b.stock;sum.fridge+=b.fridge;return sum;
       },{stock:0,fridge:0});
       const advice = replenishmentFor(product,balance,lots,lotBalances);
-      const totalLow = balance.stock+balance.fridge<product.min_total, fridgeLow = balance.fridge<product.min_fridge;
+      const totalLow = product.min_total != null && balance.stock+balance.fridge<product.min_total;
+      const fridgeLow = product.min_fridge != null && balance.fridge<product.min_fridge;
       if (totalLow || fridgeLow || advice.deficit>0) rows.push({product,balance,advice,totalLow,fridgeLow});
     }
     list('reportsRestock',rows,'Nenhum produto ativo abaixo do mínimo ou com reposição pendente.',r=>card(r.product.name,[
-      `Total: ${r.balance.stock+r.balance.fridge} · Mínimo total: ${r.product.min_total}${r.totalLow?' · Abaixo do mínimo total':''}`,
-      `Geladeira: ${r.balance.fridge} · Mínimo: ${r.product.min_fridge} · Meta: ${r.product.target_fridge}${r.fridgeLow?' · Abaixo do mínimo da geladeira':''}`,
+      `Total: ${r.balance.stock+r.balance.fridge} · Mínimo total: ${r.product.min_total ?? 'Não configurado'}${r.totalLow?' · Abaixo do mínimo total':''}`,
+      `Geladeira: ${r.balance.fridge} · Mínimo: ${r.product.min_fridge ?? 'Não configurado'} · Meta: ${r.product.target_fridge ?? 'Não configurado'}${r.fridgeLow?' · Abaixo do mínimo da geladeira':''}`,
       `Reposição sugerida: ${r.advice.suggested} unidades · Seco não vencido disponível: ${r.advice.available}`,
-      r.advice.suggested<r.advice.deficit?`Estoque seco insuficiente: faltam ${r.advice.deficit-r.advice.suggested} unidades para atingir a meta.`:'Estoque seco suficiente para a meta.'
+      r.product.target_fridge == null ? 'Meta da geladeira não configurada.' :
+        r.advice.suggested<r.advice.deficit?`Estoque seco insuficiente: faltam ${r.advice.deficit-r.advice.suggested} unidades para atingir a meta.`:'Estoque seco suficiente para a meta.'
     ]));
     el('reportsStockDate').textContent = `Estoque atual consultado em ${stockDate}. Validade usa o dia local do aparelho; não é fotografia do período.`;
   }

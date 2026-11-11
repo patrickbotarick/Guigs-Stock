@@ -22,6 +22,9 @@ function fixture({role, session, searchable = false, readOnly = false, operation
   if (searchable) {
     product.name = 'COCA COLA 2L';
     lots[0].code = 'L3-2103';
+    const expiry = new Date();
+    expiry.setDate(expiry.getDate()+30);
+    lots[0].expiry = `${expiry.getFullYear()}-${String(expiry.getMonth()+1).padStart(2,'0')}-${String(expiry.getDate()).padStart(2,'0')}`;
     balances[0].fridge = 8;
     suppliers[0].name = 'BEBIDAS POTY';
     suppliers.push({id:'supplier-2',name:'ARCO ÍRIS (COTUBA)',active:true});
@@ -265,7 +268,7 @@ if (require.main === module) (async () => {
     if (artifacts) await page.screenshot({path:path.join(artifacts,'fefo-mobile.png')});
     await page.click('#cancelFefo'); await page.click('[data-close="transferDialog"]');
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v15')), 'Novo cache PWA instalado');
+    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v16')), 'Novo cache PWA instalado');
     await context.setOffline(true);
     await page.waitForFunction(() => document.getElementById('receiveStock').disabled);
     check((await page.textContent('#status')).includes('sem conexão'), 'Offline informa indisponibilidade e desabilita operações');
