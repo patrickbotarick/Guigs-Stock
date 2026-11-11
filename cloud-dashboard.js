@@ -682,7 +682,7 @@ async function bootstrap() {
   }
 
 
-  shop = {...membership.data[0],user_id:user.id};
+  shop = {...membership.data[0],user_id:user.id,operator:user.email?.split('@')[0]};
 
 
   el('identity').textContent =
@@ -2833,7 +2833,7 @@ const reportsUI = createReportsUI({getContext:()=>({client,shop}),dayDifference,
 const shoppingUI = createShoppingUI({getContext:()=>({client,shop}),
   confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[]),
   openReceipt:()=>{location.hash='#visao-geral';applyView();el('receiveStock').click();}});
-const fridgesUI = createFridgesUI({getContext:()=>({client,shop,products,lots}),refreshStock:refresh,
+const fridgesUI = createFridgesUI({getContext:()=>({client,shop,products,lots,operator:shop?.operator}),refreshStock:refresh,
   openTransfer:openIntegratedTransfer,
   confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[])});
 window.addEventListener('hashchange', applyView);

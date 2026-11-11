@@ -5,7 +5,7 @@ const {fixture}=require('./browser.cjs');const {seed,report,id}=require('./repor
 let checks=0,db,queue=Promise.resolve();const calls=[];
 const check=(value,message)=>{assert.ok(value,message);checks++;};
 const root=path.resolve(__dirname,'..');
-const allowed=['index.html','cloud-dashboard.js','inventory.js','reports.js','fridges.js','image-library.js','shopping.js','pwa.js','manifest.webmanifest','logo-guigs.png'];
+const allowed=['index.html','cloud-dashboard.js','inventory.js','reports.js','fridges.js','fridge-moves.js','image-library.js','shopping.js','pwa.js','manifest.webmanifest','logo-guigs.png'];
 const server=http.createServer(async(req,res)=>{
  const file=new URL(req.url,'http://localhost').pathname.slice(1);
  res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.html')?'text/html':'application/json');

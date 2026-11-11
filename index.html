@@ -1251,12 +1251,24 @@
       .fridge-state[data-state="OK"] { color:var(--map-healthy); background:#e0f0e5; }
       .fridge-state[data-state="ATENÇÃO"] { color:var(--map-attention); background:#f9ebcf; }
       .fridge-state[data-state="CRÍTICO"], .fridge-state[data-state="VAZIO"] { color:var(--map-critical); background:#f9e0e2; }
+      .fridge-map-filters { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr)); gap:.65rem; margin:.75rem 0; }
+      .fridge-map-filters fieldset { display:flex; flex-wrap:wrap; align-items:center; gap:.15rem .8rem; min-width:0; }
+      .fridge-map-filters label { min-block-size:44px; }
+      .fridge-map-filters fieldset label { display:flex; align-items:center; gap:.35rem; }
+      .fridge-alerts { display:flex; flex-wrap:wrap; justify-content:center; gap:.2rem; }
+      .fridge-detail-hero .fridge-alerts { justify-content:flex-start; }
+      .fridge-alert { background:#edf0ed; color:#283d33; font-size:.68rem; padding:.18rem .38rem; border-radius:1rem; overflow-wrap:anywhere; }
+      .fridge-alert[data-alert="low"], .fridge-alert[data-alert="expiry"] { background:#f9ebcf; color:#704815; }
+      .fridge-detail-history { padding:.75rem 0; overflow-wrap:anywhere; }
+      .fridge-detail-history summary { min-block-size:44px; cursor:pointer; }
+      .fridge-history-entry { border-block-start:1px solid #e2e4df; padding:.55rem 0; }
+      .fridge-history-entry p,.fridge-history-entry ul { margin:.35rem 0; }
       .fridge-cabinet-base { color:#b8bbbf; font-size:.6rem; letter-spacing:.2em; text-align:center; padding:1rem; border-block-start:5px double #4b4d52; }
       .fridge-unallocated { margin-block:1.25rem; padding:1rem; border:1px solid #d8d8d6; border-radius:12px; background:#f1f0ed; color:var(--map-muted); font-size:.85rem; }
       .fridge-unallocated summary { cursor:pointer; min-block-size:28px; }
       .fridge-detail-dialog { inline-size:min(650px,calc(100vw - 24px)); max-block-size:calc(100dvh - 24px); border:1px solid #d5d9d8; border-radius:20px; padding:1.4rem; color:var(--map-ink); background:#fffdfa; overflow:auto; overscroll-behavior:contain; }
       .fridge-detail-dialog[open] { display:flex; flex-direction:column; }
-      #fridgeDetailBody { min-block-size:0; overflow:auto; overscroll-behavior:contain; padding-inline-end:.3rem; }
+      .fridge-detail-scroll { min-block-size:0; overflow:auto; overscroll-behavior:contain; padding-inline-end:.3rem; }
       .fridge-detail-heading, .fridge-detail-actions, .fridge-detail-edit { flex-shrink:0; }
       .fridge-detail-dialog::backdrop { background:#14171bb3; backdrop-filter:blur(3px); }
       .fridge-detail-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
@@ -1645,6 +1657,17 @@
               <p id="fridgeOffline" class="notice hidden">Sem conexão. O mapa exibido pode estar desatualizado; edição bloqueada.</p>
               <p id="fridgeMessage" role="status" aria-live="polite"></p>
             </div>
+            <div id="fridgeMapFilters" class="fridge-map-filters">
+              <label class="field">Buscar no mapa <input id="fridgeMapSearch" type="search" autocomplete="off" placeholder="Produto, geladeira, prateleira ou bloco"></label>
+              <label class="field">Estoque no bloco <select id="fridgeMapStock"><option value="all">Todos</option><option value="stock">Com estoque</option><option value="empty">Vazios</option></select></label>
+              <fieldset><legend>Alertas</legend>
+                <label><input type="checkbox" value="low"> Abaixo do mínimo</label>
+                <label><input type="checkbox" value="full"> Capacidade atingida</label>
+                <label><input type="checkbox" value="pending"> Configuração pendente</label>
+                <label><input type="checkbox" value="expiry"> Atenção à validade</label>
+              </fieldset>
+            </div>
+            <p id="fridgeMapFilterSummary" role="status"></p>
             <div id="fridgeMap"></div>
             <section id="fridgeRestockView" class="panel hidden" aria-labelledby="fridgeRestockTitle">
               <h2 id="fridgeRestockTitle">Lista de reposição</h2>
@@ -1692,8 +1715,14 @@
           <dialog id="fridgeDetailDialog" class="fridge-detail-dialog" aria-labelledby="fridgeDetailTitle" aria-describedby="fridgeDetailLocation">
             <div class="fridge-detail-heading"><div><h2 id="fridgeDetailTitle"></h2><p id="fridgeDetailLocation"></p></div><button id="fridgeDetailClose" class="btn" type="button" autofocus aria-label="Fechar detalhes do bloco">✕</button></div>
             <p id="fridgeDetailOffline" class="notice hidden">Sem conexão. Dados da última leitura; ações bloqueadas.</p>
-            <div id="fridgeDetailBody"></div>
-            <div class="fridge-detail-actions"><button id="fridgeDetailTransfer" class="btn" type="button">Transferir para este bloco</button><button id="fridgeDetailReplenish" class="btn green" type="button">Repor</button><button id="fridgeDetailLibrary" class="btn" type="button">Biblioteca de imagens</button><button id="fridgeDetailShowLots" class="btn" type="button">Ver lotes</button><button id="fridgeDetailStock" class="btn" type="button">Registrar saída</button></div>
+            <div class="fridge-detail-scroll">
+              <div id="fridgeDetailBody"></div>
+              <details id="fridgeSlotHistory" class="fridge-detail-history"><summary>Histórico deste bloco</summary>
+                <p id="fridgeSlotHistoryMessage" role="status"></p><div id="fridgeSlotHistoryEntries"></div>
+                <button id="fridgeSlotHistoryMore" class="btn hidden" type="button">Carregar mais</button>
+              </details>
+            </div>
+            <div class="fridge-detail-actions"><button id="fridgeDetailTransfer" class="btn" type="button">Transferir para este bloco</button><button id="fridgeDetailMove" class="btn" type="button">Mover entre blocos</button><button id="fridgeDetailReplenish" class="btn green" type="button">Repor</button><button id="fridgeDetailLibrary" class="btn" type="button">Biblioteca de imagens</button><button id="fridgeDetailShowLots" class="btn" type="button">Ver lotes</button><button id="fridgeDetailStock" class="btn" type="button">Registrar saída</button></div>
             <div class="fridge-detail-edit"><button id="fridgeDetailEdit" class="btn hidden" type="button">Editar bloco</button><button id="fridgeDetailProduct" class="btn hidden" type="button">Trocar produto</button></div>
           </dialog>
           <dialog id="imageLibraryDialog" class="image-library-dialog" aria-labelledby="imageLibraryTitle">
@@ -1843,6 +1872,25 @@
           <a id="shoppingWhatsApp" class="btn" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>
           <button class="btn" type="button" data-close="shoppingShareDialog">Fechar</button>
         </div>
+      </div>
+    </dialog>
+    <dialog id="fridgeMoveDialog" aria-labelledby="fridgeMoveTitle">
+      <div class="modal"><h2 id="fridgeMoveTitle">Mover entre blocos</h2><p id="fridgeMoveSource"></p>
+        <form id="fridgeMoveForm" class="modalform">
+          <label class="field">Movimentação <select id="fridgeMoveMode"><option value="lot">Mover um lote</option><option value="all">Consolidar todos os lotes</option></select></label>
+          <div id="fridgeMoveLotFields" class="shopping-filters">
+            <label class="field">Lote da origem <select id="fridgeMoveLot"></select></label>
+            <label class="field">Quantidade <input id="fridgeMoveQuantity" type="number" inputmode="numeric" min="1" max="1000000" step="1" value="1"></label>
+          </div>
+          <div class="shopping-filters">
+            <label class="field">Geladeira de destino <select id="fridgeMoveFridge"></select></label>
+            <label class="field">Prateleira de destino <select id="fridgeMoveShelf"></select></label>
+            <label class="field">Bloco de destino <select id="fridgeMoveDestination"></select></label>
+          </div>
+          <div id="fridgeMoveSummary" class="balancebox hidden"></div>
+          <p id="fridgeMoveMessage" role="status" aria-live="polite"></p>
+          <div class="shopping-actions"><button id="fridgeMoveClose" class="btn" type="button">Voltar ao bloco</button><button id="fridgeMoveQuote" class="btn" type="submit">Conferir movimentação</button><button id="fridgeMoveConfirm" class="btn green" type="button">Confirmar movimentação</button></div>
+        </form>
       </div>
     </dialog>
     <dialog id="fridgeStockDialog" aria-labelledby="fridgeStockTitle">
