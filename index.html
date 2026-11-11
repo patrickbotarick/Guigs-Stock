@@ -902,6 +902,23 @@
       .inventory-partitions { display:grid; gap:.45rem; }
       .inventory-items .inventory-item { padding:.65rem .75rem; }
       .inventory-item h4, .inventory-item p { margin:.25rem 0; }
+      .shopping-layout { display:grid; gap:1rem; }
+      .shopping-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr)); gap:.55rem; }
+      .shopping-metrics p { margin:0; padding:.7rem; border:1px solid #e7e3df; border-radius:.7rem; }
+      .shopping-metrics strong { display:block; font-size:1.35rem; }
+      .shopping-filters { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr)); gap:.7rem; }
+      .shopping-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr)); gap:.65rem; }
+      .shopping-card { border:1px solid #e7e3df; border-radius:.7rem; padding:.75rem; min-width:0; overflow-wrap:anywhere; }
+      .shopping-card h3,.shopping-card h4,.shopping-card p { margin:.35rem 0; }
+      .shopping-card header { display:flex; align-items:center; gap:.6rem; }
+      .shopping-photo { flex:none; display:grid; place-items:center; width:44px; height:44px; background:#f1eeea; border-radius:.55rem; }
+      .shopping-photo img { width:100%; height:100%; object-fit:contain; border-radius:inherit; }
+      .shopping-state { display:inline-block; background:#f4f0ec; border:1px solid #e7e3df; border-radius:1rem; padding:.16rem .5rem; margin:.2rem .2rem .2rem 0; font-size:.82rem; }
+      .shopping-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin:.55rem 0; }
+      .shopping-actions .btn, #shoppingView input, #shoppingView select { min-height:44px; }
+      .shopping-line { margin:.6rem 0; }
+      .shopping-line .field { min-width:0; }
+      #shoppingShareText { width:100%; min-height:10rem; }
       .inventory-item, .inventory-history-card { border: 1px solid #e7e3df; border-radius: 12px; padding: 16px; min-width: 0; overflow-wrap: anywhere; }
       .inventory-history-card { margin: 10px 0; }
       .inventory-item h3 { margin-top: 0; }
@@ -1345,6 +1362,7 @@
           <a id="navFridges" class="menu" href="#geladeiras">▥ Geladeiras</a>
           <a id="navInventory" class="menu" href="#inventario">▤ Inventário</a>
           <a id="navReports" class="menu hidden" href="#relatorios">▥ Relatórios</a>
+          <a id="navShopping" class="menu" href="#compras">▤ Lista de Compras</a>
         </nav>
 
         <p>
@@ -1743,6 +1761,40 @@
               <details><summary>Auditoria das contagens e estados</summary><div id="inventoryAudit"></div></details>
             </section>
           </section>
+          <section id="shoppingView" class="shopping-layout hidden" aria-label="Lista de Compras">
+            <div id="shoppingOffline" class="notice hidden" role="status">Sem conexão. As compras exibidas podem estar desatualizadas.</div>
+            <p id="shoppingMessage" class="notice hidden" role="status" aria-live="polite"></p>
+            <section class="panel">
+              <div class="panelhead"><h2>Necessidades de compra</h2><button id="shoppingReload" class="btn" type="button">Atualizar</button></div>
+              <div id="shoppingMetrics" class="shopping-metrics" aria-label="Resumo de compras"></div>
+              <div class="shopping-filters">
+                <label class="field">Pesquisar produto <input id="shoppingSearch" type="search" autocomplete="off"></label>
+                <label class="field">Exibir <select id="shoppingFilter"><option value="all">Todos</option><option value="need">Para comprar</option><option value="unconfigured">Sem configuração</option><option value="expiry">Atenção à validade</option></select></label>
+              </div>
+              <div id="shoppingNeeds" class="shopping-cards"></div>
+            </section>
+            <section class="panel">
+              <div class="panelhead"><h2>Listas e pedidos</h2><button id="shoppingNew" class="btn green" type="button" data-shopping-write>Novo rascunho</button></div>
+              <div id="shoppingOrders" class="shopping-cards"></div>
+              <div class="shopping-actions"><button id="shoppingPrevious" class="btn" type="button">Anteriores</button><span id="shoppingPage"></span><button id="shoppingNext" class="btn" type="button">Próximos</button></div>
+            </section>
+            <section id="shoppingDetail" class="panel hidden" aria-labelledby="shoppingDetailTitle">
+              <div class="panelhead"><h2 id="shoppingDetailTitle" tabindex="-1">Lista de compras</h2><button id="shoppingClose" class="btn" type="button">Fechar lista</button></div>
+              <p id="shoppingDetailInfo" class="muted"></p>
+              <form id="shoppingDraftForm">
+                <label class="field">Observação da lista <textarea id="shoppingNote" maxlength="1000"></textarea></label>
+                <div class="shopping-actions">
+                  <label class="field">Produto para inclusão manual <select id="shoppingManualProduct"></select></label>
+                  <button id="shoppingAddManual" class="btn" type="button" data-shopping-write>Adicionar manualmente</button>
+                </div>
+                <div id="shoppingDraftItems"></div>
+                <button id="shoppingSave" class="btn green" type="submit" data-shopping-write>Salvar rascunho</button>
+              </form>
+              <div id="shoppingSavedItems" class="shopping-cards"></div>
+              <div id="shoppingOrderActions" class="shopping-actions"></div>
+              <details id="shoppingHistory" class="hidden"><summary>Histórico da lista</summary><div id="shoppingEvents"></div></details>
+            </section>
+          </section>
           <section id="reportsView" class="hidden" aria-label="Relatórios operacionais">
             <div id="reportsOffline" class="notice danger hidden" role="status">Sem internet: atualização e exportação indisponíveis. Dados já exibidos podem estar desatualizados.</div>
             <div class="panel">
@@ -1770,6 +1822,29 @@
       </main>
     </div>
 
+    <dialog id="shoppingLimitsDialog" aria-labelledby="shoppingLimitsTitle">
+      <div class="modal"><h2 id="shoppingLimitsTitle">Parâmetros de compra</h2>
+        <form id="shoppingLimitsForm" class="modalform">
+          <label class="field">Estoque mínimo <input id="shoppingMinimum" type="number" min="0" max="2147483647" step="1" placeholder="Não configurado"></label>
+          <label class="field">Estoque-alvo <input id="shoppingTarget" type="number" min="0" max="2147483647" step="1" placeholder="Não configurado"></label>
+          <p id="shoppingLimitsMessage" role="status"></p>
+          <div class="shopping-actions"><button class="btn" type="button" data-close="shoppingLimitsDialog">Cancelar</button><button class="btn green" type="submit" data-shopping-write>Salvar parâmetros</button></div>
+        </form>
+      </div>
+    </dialog>
+    <dialog id="shoppingShareDialog" aria-labelledby="shoppingShareTitle">
+      <div class="modal"><h2 id="shoppingShareTitle">Revisar compartilhamento</h2>
+        <label class="field">Fornecedor <select id="shoppingShareSupplier"></select></label>
+        <label class="field">Texto da lista <textarea id="shoppingShareText" readonly></textarea></label>
+        <p id="shoppingShareMessage" role="status"></p>
+        <div class="shopping-actions">
+          <button id="shoppingCopy" class="btn" type="button">Copiar texto</button>
+          <button id="shoppingCsv" class="btn" type="button">Baixar CSV</button>
+          <a id="shoppingWhatsApp" class="btn" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>
+          <button class="btn" type="button" data-close="shoppingShareDialog">Fechar</button>
+        </div>
+      </div>
+    </dialog>
     <dialog id="fridgeStockDialog" aria-labelledby="fridgeStockTitle">
       <div class="modal">
         <h2 id="fridgeStockTitle">Movimentar saldo da geladeira</h2>

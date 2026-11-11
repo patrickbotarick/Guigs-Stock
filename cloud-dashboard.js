@@ -1,6 +1,7 @@
 import { createInventoryUI } from './inventory.js';
 import { createFridgesUI } from './fridges.js';
 import { createReportsUI } from './reports.js';
+import { createShoppingUI } from './shopping.js';
 
 const el = id => document.getElementById(id);
 
@@ -681,7 +682,7 @@ async function bootstrap() {
   }
 
 
-  shop = membership.data[0];
+  shop = {...membership.data[0],user_id:user.id};
 
 
   el('identity').textContent =
@@ -730,6 +731,7 @@ async function bootstrap() {
           .add('hidden');
 
         reportsUI.reset();
+        shoppingUI.reset();
         fridgesUI.reset();
 
         location.replace(
@@ -851,6 +853,7 @@ await loadHistory();
     el('navReports').classList.toggle('hidden', shop?.role !== 'owner');
     reportsUI.sync();
     if (location.hash === '#relatorios') reportsUI.activate();
+    if (location.hash === '#compras') shoppingUI.activate();
 
 
     say(
@@ -2805,25 +2808,31 @@ function applyView() {
   const inventory = location.hash === '#inventario';
   const reports = location.hash === '#relatorios';
   const fridges = location.hash === '#geladeiras';
-  el('overviewView').classList.toggle('hidden', history || inventory || reports || fridges);
+  const shopping = location.hash === '#compras';
+  el('overviewView').classList.toggle('hidden', history || inventory || reports || fridges || shopping);
   el('historyView').classList.toggle('hidden', !history);
   el('inventoryView').classList.toggle('hidden', !inventory);
   el('reportsView').classList.toggle('hidden', !reports);
   el('fridgesView').classList.toggle('hidden', !fridges);
-  document.querySelector('.main').classList.toggle('history-view', history || inventory || reports || fridges);
-  el('viewTitle').textContent = fridges ? 'Mapa de Geladeiras' : reports ? 'Relatórios operacionais' : inventory ? 'Inventário físico' : history ? 'Histórico de movimentações' : 'Painel do estoque';
-  for (const [id, active] of [['navOverview', !history && !inventory && !reports && !fridges], ['navHistory', history], ['navInventory',inventory], ['navReports',reports], ['navFridges',fridges]]) {
+  el('shoppingView').classList.toggle('hidden', !shopping);
+  document.querySelector('.main').classList.toggle('history-view', history || inventory || reports || fridges || shopping);
+  el('viewTitle').textContent = shopping ? 'Lista de Compras' : fridges ? 'Mapa de Geladeiras' : reports ? 'Relatórios operacionais' : inventory ? 'Inventário físico' : history ? 'Histórico de movimentações' : 'Painel do estoque';
+  for (const [id, active] of [['navOverview', !history && !inventory && !reports && !fridges && !shopping], ['navHistory', history], ['navInventory',inventory], ['navReports',reports], ['navFridges',fridges],['navShopping',shopping]]) {
     if (active) el(id).setAttribute('aria-current', 'page');
     else el(id).removeAttribute('aria-current');
   }
   if (inventory) inventoryUI.activate();
   if (reports) reportsUI.activate();
   if (fridges) fridgesUI.activate();
+  if (shopping) shoppingUI.activate();
 }
 
 const inventoryUI = createInventoryUI({getContext:()=>({client,shop,products}),
   confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[]),refreshStock:refresh});
 const reportsUI = createReportsUI({getContext:()=>({client,shop}),dayDifference,replenishmentFor});
+const shoppingUI = createShoppingUI({getContext:()=>({client,shop}),
+  confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[]),
+  openReceipt:()=>{location.hash='#visao-geral';applyView();el('receiveStock').click();}});
 const fridgesUI = createFridgesUI({getContext:()=>({client,shop,products,lots}),refreshStock:refresh,
   openTransfer:openIntegratedTransfer,
   confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[])});
@@ -2856,6 +2865,7 @@ el('signout')
         .classList
         .add('hidden');
       reportsUI.reset();
+      shoppingUI.reset();
       fridgesUI.reset();
 
 

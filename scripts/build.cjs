@@ -1,6 +1,6 @@
 // Build estático por allowlist. Nunca lê config.js local nem faz conexão de rede.
 const fs=require('node:fs'),path=require('node:path');
-const files=Object.freeze(['index.html','auth-preview.html','reset-password.html','cloud-dashboard.js','inventory.js','reports.js','fridges.js','image-library.js',
+const files=Object.freeze(['index.html','auth-preview.html','reset-password.html','cloud-dashboard.js','inventory.js','reports.js','fridges.js','image-library.js','shopping.js',
  'auth-preview.js','reset-password.js','pwa.js','service-worker.js','manifest.webmanifest','logo-guigs.png',
  'icons/guigs-stock-192.png','icons/guigs-stock-512.png','icons/guigs-stock-maskable-512.png']);
 function build({sourceRoot=path.resolve(__dirname,'..'),env=process.env}={}) {

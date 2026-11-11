@@ -99,7 +99,7 @@ function bridge(shopId){
     await page.evaluate(()=>caches.open('guigs-stock-shell-v12'));
     await page.evaluate(()=>caches.open('guigs-stock-shell-v14'));
     await page.evaluate(()=>caches.open('guigs-stock-shell-v15'));
-    await page.evaluate(()=>Promise.all([caches.open('guigs-stock-shell-v16'),caches.open('guigs-stock-shell-v17')]));
+    await page.evaluate(()=>Promise.all([caches.open('guigs-stock-shell-v16'),caches.open('guigs-stock-shell-v17'),caches.open('guigs-stock-shell-v18')]));
     await page.waitForLoadState('networkidle');
     workerVersion=14;await page.evaluate(async()=>{
      const registration=await navigator.serviceWorker.getRegistration(),previous=registration.active;
@@ -117,23 +117,23 @@ function bridge(shopId){
     });
     await page.waitForFunction(async()=>{
      const keys=await caches.keys(),registration=await navigator.serviceWorker.getRegistration();
-     return registration?.active?.state==='activated'&&keys.includes('guigs-stock-shell-v18')&&!keys.includes('guigs-stock-shell-v11')&&!keys.includes('guigs-stock-shell-v12')&&!keys.includes('guigs-stock-shell-v14')&&!keys.includes('guigs-stock-shell-v15')&&!keys.includes('guigs-stock-shell-v16')&&!keys.includes('guigs-stock-shell-v17');
+     return registration?.active?.state==='activated'&&keys.includes('guigs-stock-shell-v19')&&!keys.includes('guigs-stock-shell-v11')&&!keys.includes('guigs-stock-shell-v12')&&!keys.includes('guigs-stock-shell-v14')&&!keys.includes('guigs-stock-shell-v15')&&!keys.includes('guigs-stock-shell-v16')&&!keys.includes('guigs-stock-shell-v17')&&!keys.includes('guigs-stock-shell-v18');
     });
     check(true,'Atualização remove caches antigos e ativa v16');
     check(await page.evaluate(async()=>(await caches.keys()).includes('outro-cache-fixture')),'Cache alheio preservado');
-    for(const file of ['inventory.js','reports.js','fridges.js','config.js','pwa.js','icons/guigs-stock-192.png'])check(await page.evaluate(async name=>{
-     const cache=await caches.open('guigs-stock-shell-v18');return !!await cache.match(new URL('./'+name,location.href).href);
+    for(const file of ['inventory.js','reports.js','fridges.js','shopping.js','config.js','pwa.js','icons/guigs-stock-192.png'])check(await page.evaluate(async name=>{
+     const cache=await caches.open('guigs-stock-shell-v19');return !!await cache.match(new URL('./'+name,location.href).href);
     },file),'Shell contém '+file);
     check(await page.evaluate(async()=>{
       await fetch('/auth-preview.html?audit=fixture-only');
-      const cache=await caches.open('guigs-stock-shell-v18');
+      const cache=await caches.open('guigs-stock-shell-v19');
       return !(await cache.keys()).some(request=>new URL(request.url).search);
     }),'URL com query de Auth não é armazenada');
     redirectAsset=true;
     check(await page.evaluate(async()=> (await fetch('/fridges.js')).redirected),'Redirect online continua navegável');
     redirectAsset=false;
     check(await page.evaluate(async()=>{
-      const cache=await caches.open('guigs-stock-shell-v18');
+      const cache=await caches.open('guigs-stock-shell-v19');
       const responses=await Promise.all((await cache.keys()).map(key=>cache.match(key)));
       return responses.every(r=>r.ok&&!r.redirected)&&!(await cache.match('/redirected.js'));
     }),'Shell só contém respostas OK sem redirecionamento');
