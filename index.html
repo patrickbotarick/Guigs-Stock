@@ -654,16 +654,31 @@
 
       .historyfilters {
         display: grid;
-        grid-template-columns:
-          minmax(150px, 1.2fr)
-          minmax(130px, 1fr)
-          minmax(130px, 0.8fr)
-          minmax(130px, 0.8fr)
-          minmax(170px, 1.2fr)
-          minmax(190px, 1.4fr)
-          auto;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+        align-items: end;
         gap: 8px;
         margin-bottom: 15px;
+      }
+
+      .history-filter {
+        display: grid;
+        gap: 5px;
+        min-width: 0;
+      }
+
+      .history-filter:has(> #historyPartition.hidden) {
+        display: none;
+      }
+
+      .history-filter label {
+        font-size: 12px;
+        font-weight: 750;
+        overflow-wrap: anywhere;
+      }
+
+      .historyfilters .btn {
+        min-width: 0;
+        overflow-wrap: anywhere;
       }
 
       .historyfilters input,
@@ -942,10 +957,6 @@
       }
 
       @media (max-width: 950px) {
-        .historyfilters {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
         .quickactions {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -991,10 +1002,6 @@
       }
 
       @media (max-width: 500px) {
-        .historyfilters {
-          grid-template-columns: 1fr;
-        }
-
         .historypaging {
           width: 100%;
           justify-content: flex-end;
@@ -1573,51 +1580,63 @@
                 </div>
               </div>
               <div class="historyfilters">
-                <select id="historyProduct">
-                  <option value="">Todos os produtos</option>
-                </select>
+                <div class="history-filter">
+                  <label for="historyProduct">Produto</label>
+                  <select id="historyProduct">
+                    <option value="">Todos os produtos</option>
+                  </select>
+                </div>
 
-                <select id="historyType">
-                  <option value="">Todos os tipos</option>
-                  <option value="receipt">Recebimento</option>
-                  <option value="transfer">Transferência</option>
-                  <option value="return">Retorno</option>
-                  <option value="sale">Venda</option>
-                  <option value="loss">Perda</option>
-                  <option value="adjust">Ajuste</option>
-                  <option value="relocate">Distribuição física</option>
-                </select>
+                <div class="history-filter">
+                  <label for="historyType">Tipo</label>
+                  <select id="historyType">
+                    <option value="">Todos os tipos</option>
+                    <option value="receipt">Recebimento</option>
+                    <option value="transfer">Transferência</option>
+                    <option value="return">Retorno</option>
+                    <option value="sale">Venda</option>
+                    <option value="loss">Perda</option>
+                    <option value="adjust">Ajuste</option>
+                    <option value="relocate">Distribuição física</option>
+                  </select>
+                </div>
 
-                <select id="historyPartition" aria-label="Filtrar localização">
-                  <option value="">Todas as localizações</option>
-                  <option value="stock">Estoque seco</option>
-                  <option value="unallocated">Geladeira — não alocado</option>
-                  <option value="slot">Posições físicas</option>
-                </select>
+                <div class="history-filter">
+                  <label for="historyPartition">Localização</label>
+                  <select id="historyPartition">
+                    <option value="">Todas as localizações</option>
+                    <option value="stock">Estoque seco</option>
+                    <option value="unallocated">Geladeira — não alocado</option>
+                    <option value="slot">Posições físicas</option>
+                  </select>
+                </div>
 
-                <input
-                  id="historyDateFrom"
-                  type="date"
-                  aria-label="Data inicial"
-                  title="Data inicial"
-                />
+                <div class="history-filter">
+                  <label for="historyDateFrom">Data inicial</label>
+                  <input id="historyDateFrom" type="date" />
+                </div>
 
-                <input
-                  id="historyDateTo"
-                  type="date"
-                  aria-label="Data final"
-                  title="Data final"
-                />
+                <div class="history-filter">
+                  <label for="historyDateTo">Data final</label>
+                  <input id="historyDateTo" type="date" />
+                </div>
 
-                <select id="historyActor">
-                  <option value="">Todos os usuários</option>
-                </select>
+                <div class="history-filter">
+                  <label for="historyActor">Responsável</label>
+                  <select id="historyActor">
+                    <option value="">Todos os usuários</option>
+                  </select>
+                </div>
 
-                <input
-                  id="search"
-                  type="search"
-                  placeholder="Buscar produto, lote, posição ou observação…"
-                />
+                <div class="history-filter">
+                  <label for="search">Busca</label>
+                  <input
+                    id="search"
+                    type="search"
+                    placeholder="Ex.: produto ou lote"
+                    title="Buscar produto, lote, posição ou observação"
+                  />
+                </div>
 
                 <button id="clearHistoryFilters" class="btn" type="button">
                   Limpar filtros
