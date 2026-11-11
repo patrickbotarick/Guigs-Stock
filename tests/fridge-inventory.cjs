@@ -9,6 +9,7 @@ const reject=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
  try{
   const folder=path.join(__dirname,'../supabase/migrations');
   for(const f of fs.readdirSync(folder).filter(f=>/spatial_(fridge_.*|replay_integrity)\.sql$/.test(f)).sort())await db.exec(fs.readFileSync(path.join(folder,f),'utf8'));
+  await db.exec(fs.readFileSync(path.join(folder,'20261111173911_blind_grouped_inventory.sql'),'utf8'));
   const get=(role,sql,args)=>asUser(db,role,async tx=>(await tx.query(sql,args)).rows[0].data);
   const legacy=await get('owner',"select public.guigs_create_inventory($1,'fixture legado') as data",[shop]);
   const legacyDetail=await get('owner','select public.guigs_get_inventory($1,$2) as data',[shop,legacy]);
@@ -38,13 +39,16 @@ const reject=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
   const ledger=()=>db.query('select id,delta,slot_id from public.guigs_movements order by id').then(r=>r.rows);
   const item=(d,l,s,location='fridge')=>d.items.find(x=>x.lot_id===l&&x.slot_id===s&&x.location===location);
   let d=await read();eq(d.inventory.spatial,true);
-  eq(item(d,lot,a.id).expected_initial,4);eq(item(d,lot,b.id).expected_initial,2);
-  eq(item(d,lot,null).expected_initial,2);eq(item(d,second,b.id).expected_initial,2);
-  eq(item(d,second,a.id).expected_initial,0);eq(item(d,lot,a.id).fridge_id,a.fridge_id);
+  const persisted=async()=>new Map((await db.query('select id,expected_initial,basis_quantity from public.guigs_inventory_items where inventory_id=$1',[inv])).rows.map(row=>[row.id,row]));
+  const initial=await persisted();
+  eq(item(d,lot,a.id).expected_initial,undefined);
+  eq(initial.get(item(d,lot,a.id).id).expected_initial,4);eq(initial.get(item(d,lot,b.id).id).expected_initial,2);
+  eq(initial.get(item(d,lot,null).id).expected_initial,2);eq(initial.get(item(d,second,b.id).id).expected_initial,2);
+  eq(initial.get(item(d,second,a.id).id).expected_initial,0);eq(item(d,lot,a.id).fridge_id,a.fridge_id);
   eq(item(d,lot,a.id).slot_label,'Geladeira A / Prateleira 1 / Posição');
   const before=await ledger();
   for(const x of d.items){
-    const value=x.id===item(d,second,b.id).id?9:x.id===item(d,lot,null).id?1:x.basis_quantity;
+    const value=x.id===item(d,second,b.id).id?9:x.id===item(d,lot,null).id?1:initial.get(x.id).basis_quantity;
     await count(x,value);
   }
   eq(await ledger(),before);
@@ -59,7 +63,7 @@ const reject=async(fn,pattern)=>{await assert.rejects(fn,pattern);checks++;};
   await reject(()=>finish(version,key),/Movimentações posteriores/);
   await status('open');
   await recount(item(await read(),lot,a.id));
-  const current=item(await read(),lot,a.id);eq(current.basis_quantity,3);
+  const current=item(await read(),lot,a.id);eq((await persisted()).get(current.id).basis_quantity,3);
   await count(current,2);
   await status('review');
   version=(await read()).inventory.version;

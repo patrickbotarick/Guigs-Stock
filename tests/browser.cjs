@@ -283,7 +283,7 @@ if (require.main === module) (async () => {
     if (artifacts) await page.screenshot({path:path.join(artifacts,'fefo-mobile.png')});
     await page.click('#cancelFefo'); await page.click('[data-close="transferDialog"]');
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v17')), 'Novo cache PWA instalado');
+    check(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v18')), 'Novo cache PWA instalado');
     await context.setOffline(true);
     await page.waitForFunction(() => document.getElementById('receiveStock').disabled);
     check((await page.textContent('#status')).includes('sem conexão'), 'Offline informa indisponibilidade e desabilita operações');

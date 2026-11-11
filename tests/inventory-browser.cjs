@@ -35,7 +35,7 @@ function inventoryClient({role,shopId}){
  try{
   browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE||'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'});
   for(const mobile of [false,true])for(const role of ['owner','attendant']){
-   db=await createTestDatabase();calls.length=0;
+   db=await createTestDatabase({groupedInventory:true});calls.length=0;
    if(role==='attendant')await callRPC(db,'owner','guigs_create_inventory',{p_shop_id:id(10),p_observation:'Inventário do atendente artificial'});
    const context=await browser.newContext({viewport:mobile?{width:390,height:700}:{width:1440,height:900},isMobile:mobile,hasTouch:mobile,serviceWorkers:'block'});
    const external=[];const errors=[];
@@ -64,10 +64,10 @@ function inventoryClient({role,shopId}){
    check(await page.locator('.inventory-item').count()===4,'Snapshot UI com dois lotes e duas localizações');
    if(process.env.TEST_ARTIFACTS_DIR){fs.mkdirSync(process.env.TEST_ARTIFACTS_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.TEST_ARTIFACTS_DIR,`inventario-contagem-${role}-${mobile?'mobile':'desktop'}.png`),fullPage:true});}
    check(await page.locator('.inventory-item').first().textContent().then(text=>text.includes('Contagem cega')&&!text.includes('Esperado inicial')),'Contagem cega antes de registrar');
-   await click('#inventoryItemSelectSearch');await page.fill('#inventoryItemSelectSearch','2103');
-   check(await page.locator('#inventoryItemSelectOptions [role="option"]').count()===2,'Busca existente encontra lote nos dois locais');
-   await page.keyboard.press('Enter');check(await page.locator('.inventory-item').count()===1,'Selecionar item pesquisado filtra cards');
-   await page.selectOption('#inventoryItemSelect','',{force:true});
+   await page.fill('#inventorySearch','2103');
+   check(await page.locator('.inventory-item').count()===2,'Busca encontra lote nos dois locais');
+   check(await page.locator('.inventory-lot').count()===1,'Busca mantém as posições no mesmo lote');
+   await page.fill('#inventorySearch','');
    await page.selectOption('#inventoryLocation','stock');check(await page.locator('.inventory-item').count()===2,'Filtro estoque seco');
    await page.selectOption('#inventoryLocation','fridge');check(await page.locator('.inventory-item').count()===2,'Filtro geladeira');
    await page.selectOption('#inventoryLocation','');
@@ -86,8 +86,8 @@ function inventoryClient({role,shopId}){
    await card().locator('input').fill('9');await card().locator('button[type="submit"]').click();
    await page.waitForFunction(()=>document.getElementById('inventoryMessage').textContent.includes('Contagem salva'));await ready();
    check((await db.query('select count(*)::int as n from public.guigs_movements')).rows[0].n===3,'Salvar contagem não altera estoque');
-   await page.selectOption('#inventoryFilter','divergent');check(await page.locator('.inventory-item').count()===1,'Filtro de divergentes');
-   check((await card().textContent()).includes('Diferença negativa'),'Diferença negativa claramente indicada');
+   check(await page.locator('#inventoryFilter option[value="divergent"]').isDisabled(),'Divergências indisponíveis durante a contagem');
+   check(!(await card().textContent()).includes('Diferença negativa'),'Diferença oculta mesmo após salvar a contagem');
    await page.selectOption('#inventoryFilter','counted');check(await page.locator('.inventory-item').count()===2,'Filtro de conferidos');
    await page.selectOption('#inventoryFilter','all');
    await card().getByRole('button',{name:'Recontar',exact:true}).click();await confirm();
@@ -114,6 +114,9 @@ function inventoryClient({role,shopId}){
    if(role==='owner'){
     await click('#inventoryReview');await page.waitForFunction(()=>document.getElementById('inventoryDetailTitle').textContent.includes('Em revisão'));await ready();
     check((await page.textContent('#inventoryDifferences')).includes('11 → contado 10'),'Revisão mostra base atual e diferença');
+    await page.selectOption('#inventoryFilter','divergent');check(await page.locator('.inventory-item').count()===1,'Filtro de divergentes na revisão');
+    check((await card().textContent()).includes('Diferença negativa'),'Diferença negativa claramente indicada na revisão');
+    await page.selectOption('#inventoryFilter','all');
     check(await page.isDisabled('#inventoryComplete'),'Fechamento exige revisão explícita');
     if(process.env.TEST_ARTIFACTS_DIR)await page.screenshot({path:path.join(process.env.TEST_ARTIFACTS_DIR,`inventario-revisao-${mobile?'mobile':'desktop'}.png`),fullPage:true});
     await page.check('#inventoryReviewCheck');await click('#inventoryComplete');await page.waitForSelector('#operationConfirmDialog[open]');
@@ -126,12 +129,13 @@ function inventoryClient({role,shopId}){
     await page.waitForFunction(()=>document.getElementById('inventoryDetailTitle').textContent.includes('Concluído'));await ready();
     check((await db.query("select count(*)::int as n from public.guigs_movements where note like 'Ajuste por inventário%'")).rows[0].n===1,'Fechamento gera ajuste oficial, somente após confirmação');
     check(await page.locator('.inventory-count-input').count()===0,'Concluído abre somente leitura');
+    check((await page.textContent('#inventoryTotals')).includes('Pendentes: 0'),'Ajustes do fechamento não reabrem pendências no histórico');
     check((await page.textContent('#inventoryLastCompleted')).includes('Último concluído:'),'Último concluído no histórico');
     check((await page.textContent('#inventoryAudit')).includes('Fechamento'),'Auditoria de conclusão exibida');
     await click('#newInventory');await click('#inventoryCreateSubmit');await page.waitForFunction(()=>document.getElementById('inventoryDetailTitle').textContent.includes('Aberto'));await ready();
     await db.query("insert into public.guigs_lots(shop_id,product_id,code,expiry) values($1,$2,'NOVO-UI',current_date+100)",[id(10),id(20)]);
     await click('#inventoryReload');await page.waitForSelector('#inventoryScope:not(.hidden)');
-    await click('#inventoryScope');await confirm();await page.waitForFunction(()=>document.getElementById('inventoryTotals').textContent.includes('Itens: 6'));await ready();
+    await click('#inventoryScope');await confirm();await page.waitForFunction(()=>document.getElementById('inventoryTotals').textContent.includes('Posições de contagem: 6'));await ready();
     check((await page.textContent('#inventoryItems')).includes('NOVO-UI'),'Novos lotes incluídos explicitamente para contagem');
     await click('#inventoryCancel');await confirm();await page.waitForFunction(()=>document.getElementById('inventoryDetailTitle').textContent.includes('Cancelado'));await ready();
     check((await current()).status==='cancelled','Cancelamento preservado no histórico');

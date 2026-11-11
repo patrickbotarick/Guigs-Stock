@@ -1,9 +1,17 @@
 // Módulo carregado com o dashboard; RPCs de inventário só são consultadas nesta view.
-export function createInventoryUI({getContext, enhanceSelect, confirmAction, refreshStock}) {
+import { IMAGE_BUCKET } from './image-library.js';
+
+const LOTS_PER_PAGE = 24;
+const normalizeSearch = value => value.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/\p{Diacritic}/gu,'');
+const counted = item => item.counted_quantity != null;
+const partitionRank = item => item.location==='stock' ? 0 : item.slot_id ? 2 : 1;
+
+export function createInventoryUI({getContext, confirmAction, refreshStock}) {
   const el = id => document.getElementById(id);
   const statusLabel = {open:'Aberto',review:'Em revisão',completed:'Concluído',cancelled:'Cancelado'};
   const localLabel = value => value === 'stock' ? 'Estoque seco' : 'Geladeira';
-  const itemLabel = item => item.slot_label || (data?.inventory.spatial&&item.location==='fridge'?'Geladeira — não alocado':localLabel(item.location));
+  const itemLabel = item => positionLabels.get(item.slot_id) || item.slot_label ||
+    (data?.inventory.spatial&&item.location==='fridge'?'Geladeira — não alocado':localLabel(item.location));
   const date = value => value ? new Date(value).toLocaleString('pt-BR') : '—';
   const actor = (value,label) => label || (value ? `Usuário ${value.slice(0,8)}` : '—');
   let data = null;
@@ -14,6 +22,11 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
   let total = 0;
   let loaded = false;
   let reviewApproved = false;
+  let lotPage = 0;
+  let lots = [];
+  let positionLabels = new Map();
+  const lotExpansion = new Map();
+  const images = new Map();
   let createSpatial=false;
   const spatialIds=new Set(),closeKeys=new Map();
   const spatialRPC={
@@ -25,7 +38,6 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     guigs_complete_inventory:'guigs_complete_spatial_inventory'
   };
   const drafts = new Map(); // Somente memória da página; não salva contagem automaticamente.
-  enhanceSelect('inventoryItemSelect');
   function message(text, error = false) {
     el('inventoryMessage').textContent = text;
     el('inventoryMessage').className = `notice ${error ? 'danger' : 'good'}`;
@@ -86,7 +98,8 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
       const entry = document.createElement('article');
       entry.className = 'inventory-history-card';
       const info = document.createElement('p');
-      info.textContent = `#${inv.id.slice(0,8)} · ${statusLabel[inv.status]} · Início: ${date(inv.started_at)} · ${actor(inv.started_by,inv.started_by_label)} · Itens: ${inv.item_count} · Conferidos: ${inv.counted_count} · Divergentes: ${inv.divergent_count} · Conclusão: ${date(inv.completed_at)}`;
+      const difference=inv.status==='open'||inv.divergent_count==null?'':` · Divergentes: ${inv.divergent_count}`;
+      info.textContent = `#${inv.id.slice(0,8)} · ${statusLabel[inv.status]} · Início: ${date(inv.started_at)} · ${actor(inv.started_by,inv.started_by_label)} · Itens: ${inv.item_count} · Conferidos: ${inv.counted_count}${difference} · Conclusão: ${date(inv.completed_at)}`;
       const open = document.createElement('button');
       open.type = 'button'; open.className = 'btn'; open.textContent = 'Abrir inventário';
       open.dataset.inventoryOpen='true';
@@ -104,6 +117,11 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     try {
       const result = await rpc('guigs_get_inventory',{p_inventory_id:id});
       if (ticket !== detailLoading) return;
+      if (data?.inventory.id !== result.inventory.id) {
+        lotPage=0; lotExpansion.clear(); drafts.clear();
+        for(const field of ['inventorySearch','inventoryLocation','inventoryFridge','inventoryPosition']) el(field).value='';
+        el('inventoryFilter').value='all';
+      }
       if (data?.inventory.id !== result.inventory.id || data?.inventory.version !== result.inventory.version) reviewApproved = false;
       data = result;
       renderDetail();
@@ -114,8 +132,33 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     sync();
   }
   function stateOf(item) {
-    if (item.counted_quantity === null) return 'pending';
+    if (!counted(item)) return 'pending';
+    if (data.inventory.status==='open' || item.basis_quantity==null) return 'counted';
     return Number(item.counted_quantity) === Number(item.basis_quantity) ? 'equal' : Number(item.counted_quantity) > Number(item.basis_quantity) ? 'positive' : 'negative';
+  }
+  const divergent = item => ['positive','negative'].includes(stateOf(item));
+  const needsRecount = item => ['open','review'].includes(data.inventory.status) && item.conflict;
+  const verified = item => counted(item) && !needsRecount(item);
+
+  function prepareGroups(items) {
+    const groups=new Map(), positions=new Map(), labels=new Map();
+    for(const item of items) {
+      const key=item.product_id+':'+item.lot_id;
+      if(!groups.has(key)) groups.set(key,{key,head:item,items:[],search:normalizeSearch(item.product_name+' '+item.lot_code)});
+      groups.get(key).items.push(item);
+      if(item.slot_id) positions.set(item.slot_id,item.slot_label);
+    }
+    for(const [id,label] of positions) {
+      if(!labels.has(label)) labels.set(label,[]);
+      labels.get(label).push(id);
+    }
+    positionLabels=new Map([...labels].flatMap(([label,ids])=>ids.sort().map((id,index)=>
+      [id,ids.length===1?label:`${label} · posição ${index+1}`])));
+    const order=(a,b)=>a.localeCompare(b,'pt-BR',{numeric:true});
+    lots=[...groups.values()].sort((a,b)=>order(a.head.product_name,b.head.product_name)||
+      a.head.product_id.localeCompare(b.head.product_id)||a.head.expiry.localeCompare(b.head.expiry)||
+      order(a.head.lot_code,b.head.lot_code)||a.head.lot_id.localeCompare(b.head.lot_id));
+    for(const group of lots) group.items.sort((a,b)=>partitionRank(a)-partitionRank(b)||order(itemLabel(a),itemLabel(b)));
   }
   function renderDetail() {
     const current = data.inventory;
@@ -123,29 +166,38 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     el('inventoryDetail').classList.remove('hidden');
     el('inventoryDetailTitle').textContent = `Inventário #${current.id.slice(0,8)} · ${statusLabel[current.status]}`;
     el('inventoryDetailInfo').textContent = `${current.spatial?'Por posição · ':''}Iniciado ${date(current.started_at)} · ${actor(current.started_by,current.started_by_label)} · ${current.observation || 'Sem observação'}`;
-    const counted = items.filter(item => item.counted_quantity !== null).length;
-    const different = items.filter(item => ['positive','negative'].includes(stateOf(item))).length;
-    el('inventoryTotals').textContent = `Itens: ${items.length} · Conferidos: ${counted} · Pendentes: ${items.length-counted} · Sem divergência: ${counted-different} · Divergentes: ${different}`;
+    prepareGroups(items);
+    const confirmed=items.filter(verified).length;
+    const localCount=new Set(items.map(i=>i.slot_id || i.location)).size;
+    const productCount=new Set(items.map(i=>i.product_id)).size;
+    const differencesSummary=current.status==='open'?'':` · Divergentes: ${items.filter(divergent).length}`;
+    el('inventoryTotals').textContent = `Produtos: ${productCount} · Lotes: ${lots.length} · Locais distintos: ${localCount} · Posições de contagem: ${items.length} · Conferidos: ${confirmed} · Pendentes: ${items.length-confirmed}${differencesSummary}`;
     const active = ['open','review'].includes(current.status);
     const conflicts = items.filter(item=>item.conflict).length;
     el('inventoryMovementWarning').classList.toggle('hidden', !active || !(data.movements_after_start || data.new_lots));
     el('inventoryMovementWarning').classList.toggle('danger', conflicts > 0 || data.new_lots > 0);
     el('inventoryMovementWarning').textContent = `${data.movements_after_start} movimentação(ões) após o início. Itens ainda exigindo recontagem: ${conflicts}. Lotes novos fora do escopo: ${data.new_lots}. ${conflicts ? 'Reconte os locais afetados.' : 'Os itens já reconferidos não estão bloqueados por esses movimentos.'} O fechamento verifica novamente no servidor.`;
-    const selected = el('inventoryItemSelect').value;
-    el('inventoryItemSelect').replaceChildren(new Option('Todos os produtos / lotes',''));
-    for (const item of items) el('inventoryItemSelect').add(new Option(`${item.product_name} · ${item.lot_code} · ${itemLabel(item)}`,item.id));
-    el('inventoryItemSelect').value = items.some(item=>item.id===selected) ? selected : '';
     const position=el('inventoryPosition'),previousPosition=position.value;
     const positions=new Map(items.filter(i=>i.location==='fridge').map(i=>[i.slot_id||'unallocated',itemLabel(i)]));
-    position.replaceChildren(new Option('Todas as posições',''),...[...positions].map(([id,label])=>new Option(label,id)));
+    position.replaceChildren(new Option('Todas as posições',''),...[...positions].sort(([idA,a],[idB,b])=>
+      Number(idB==='unallocated')-Number(idA==='unallocated')||a.localeCompare(b,'pt-BR',{numeric:true})).map(([id,label])=>new Option(label,id)));
     position.value=positions.has(previousPosition)?previousPosition:'';
     el('inventoryPositionField').classList.toggle('hidden',!current.spatial);
+    const fridge=el('inventoryFridge'), previousFridge=fridge.value;
+    const fridges=new Map(items.filter(i=>i.fridge_id).map(i=>[i.fridge_id,i.slot_label?.split(' / ')[0]||'Geladeira']));
+    fridge.replaceChildren(new Option('Todas as geladeiras',''),...[...fridges].sort((a,b)=>a[1].localeCompare(b[1],'pt-BR')).map(([id,name])=>new Option(name,id)));
+    fridge.value=fridges.has(previousFridge)?previousFridge:'';
+    el('inventoryFridgeField').classList.toggle('hidden',!fridges.size);
+    const divergenceOption=el('inventoryFilter').querySelector('[value="divergent"]');
+    divergenceOption.hidden=current.status==='open';
+    divergenceOption.disabled=current.status==='open';
+    if (divergenceOption.disabled && el('inventoryFilter').value==='divergent') el('inventoryFilter').value='all';
     el('inventoryReviewCheck').checked = reviewApproved;
     el('inventoryReviewGate').classList.toggle('hidden', current.status !== 'review' || getContext().shop?.role !== 'owner');
     const differences = el('inventoryDifferences');
     differences.replaceChildren();
     if (current.status !== 'open') {
-      for (const item of items.filter(item=>['positive','negative'].includes(stateOf(item)))) {
+      for (const item of items.filter(divergent)) {
         const row=document.createElement('p');
         row.textContent=`${item.product_name} · ${item.lot_code} · ${itemLabel(item)}: base ${item.basis_quantity} → contado ${item.counted_quantity} (${Number(item.counted_quantity)-Number(item.basis_quantity)>0?'+':''}${Number(item.counted_quantity)-Number(item.basis_quantity)})${item.conflict && active?' · MOVIMENTADO: RECONTAR':''}`;
         differences.append(row);
@@ -154,88 +206,207 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
     }
     el('inventoryDifferencesPanel').classList.toggle('hidden',current.status==='open');
     const audit=el('inventoryAudit'); audit.replaceChildren();
+    const itemsById=new Map(items.map(item=>[item.id,item]));
     for (const entry of data.audit) {
       const row=document.createElement('p');
       const names={created:'Criação',counted:'Contagem',recount:'Recontagem preparada',scope_refreshed:'Escopo atualizado',review:'Revisão',reopened:'Reabertura',completed:'Fechamento',cancelled:'Cancelamento'};
-      const item=items.find(item=>item.id===entry.item_id);
+      const item=itemsById.get(entry.item_id);
       row.textContent=`${date(entry.created_at)} · ${actor(entry.actor_id,entry.actor_label)} · ${names[entry.action] || entry.action}${item?` · ${item.product_name} / ${item.lot_code} / ${itemLabel(item)}`:''}${entry.counted_quantity!==null?` · Contado: ${entry.counted_quantity}`:''}${entry.previous_quantity!==null?` · Contagem anterior: ${entry.previous_quantity}`:''}${entry.note?` · ${entry.note}`:''}`;
       audit.append(row);
     }
     renderItems(); sync();
   }
-  function renderItems() {
-    if (!data) return;
-    const list=el('inventoryItems'); list.replaceChildren();
+  function visibleLots() {
+    const query=normalizeSearch(el('inventorySearch').value.trim()).split(/\s+/).filter(Boolean);
     const filter=el('inventoryFilter').value;
     const location=el('inventoryLocation').value;
-    const selected=el('inventoryItemSelect').value;
-    const current=data.inventory;
-    const position=current.spatial?el('inventoryPosition').value:'';
-    const items=data.items.filter(item=>{
-      const state=stateOf(item);
-      return (!selected || item.id===selected) && (!location || item.location===location) &&
-        (!position || (item.location==='fridge' && (item.slot_id||'unallocated')===position)) &&
-        (filter==='all' || (filter==='divergent' && ['positive','negative'].includes(state)) || (filter==='pending' && state==='pending') || (filter==='counted' && state!=='pending'));
-    });
-    for (const item of items) {
-      const card=document.createElement('article');
-      const state=stateOf(item);
-      card.className=`inventory-item inventory-${state}`; card.dataset.itemId=item.id;
-      const title=document.createElement('h3');title.textContent=`${item.product_name} · ${item.lot_code}`;
-      const meta=document.createElement('p');meta.className='muted';meta.textContent=`${itemLabel(item)} · Validade: ${item.expiry.split('-').reverse().join('/')} · Fornecedor: ${item.supplier_name || 'Não informado'}`;
-      const info=document.createElement('p');
-      const reveal=current.status!=='open' || item.counted_quantity!==null;
-      info.textContent=reveal ? `Esperado inicial: ${item.expected_initial} · Base de conferência: ${item.basis_quantity} · Contado: ${item.counted_quantity ?? 'Não contado'} · Diferença: ${item.counted_quantity===null?'—':Number(item.counted_quantity)-Number(item.basis_quantity)}` : 'Contagem cega: saldo esperado oculto até registrar a quantidade.';
-      const status=document.createElement('strong');
-      status.textContent={pending:'Não contado',equal:'Sem divergência',positive:'Diferença positiva',negative:'Diferença negativa'}[state];
-      card.append(title,meta,info,status);
-      if (item.conflict && ['open','review'].includes(current.status)) {
-        const warning=document.createElement('p');warning.className='notice danger';warning.textContent='Movimentado após a base de conferência. Prepare uma recontagem física antes de finalizar.';card.append(warning);
+    const fridge=el('inventoryFridge').value;
+    const position=el('inventoryPosition').value;
+    return lots.filter(group=>query.every(word=>group.search.includes(word))).map(group=>({
+      group,
+      visible:group.items.filter(item=>
+        (!location || (location==='unallocated' ? item.location==='fridge'&&!item.slot_id : item.location===location)) &&
+        (!fridge || item.fridge_id===fridge) &&
+        (!position || (item.location==='fridge'&&(item.slot_id||'unallocated')===position)) &&
+        (filter==='all' || (filter==='divergent'&&divergent(item)) || (filter==='pending'&&!verified(item)) ||
+          (filter==='counted'&&verified(item)) || (filter==='recount'&&needsRecount(item))))
+    })).filter(entry=>entry.visible.length);
+  }
+
+  function textElement(tag,text,className) {
+    const node=document.createElement(tag);
+    node.textContent=text;
+    if(className)node.className=className;
+    return node;
+  }
+
+  function renderPartition(item) {
+    const current=data.inventory, state=stateOf(item);
+    const row=document.createElement('section');
+    const conflict=needsRecount(item);
+    row.className='inventory-item inventory-'+state;
+    row.dataset.itemId=item.id;
+    const labels={pending:'Não contado',counted:'Contagem registrada',equal:'Sem divergência',
+      positive:'Diferença positiva',negative:'Diferença negativa'};
+    row.append(textElement('h4',itemLabel(item)),textElement('strong',conflict?'Requer recontagem':labels[state]));
+    if (current.status==='open') {
+      row.append(textElement('p',counted(item) ? 'Quantidade física registrada: '+item.counted_quantity
+        : 'Contagem cega: saldo esperado disponível na revisão.','muted'));
+    } else if(item.basis_quantity!=null) {
+      const difference=counted(item)?Number(item.counted_quantity)-Number(item.basis_quantity):'—';
+      row.append(textElement('p','Esperado inicial: '+item.expected_initial+' · Base de conferência: '+item.basis_quantity+
+        ' · Contado: '+(item.counted_quantity??'Não contado')+' · Diferença: '+difference));
+    }
+    if (conflict) row.append(textElement('p','Movimentado após a base de conferência. Prepare uma recontagem física antes de finalizar.','notice danger'));
+    if (current.status==='open') {
+      if (!counted(item)) {
+        const form=document.createElement('form');form.className='inventory-count-form';
+        const label=textElement('label','Quantidade física');
+        label.htmlFor='count-'+item.id;
+        const input=document.createElement('input');input.id=label.htmlFor;input.type='number';input.inputMode='numeric';input.min='0';
+        input.max='2147483647';input.step='1';input.required=true;input.className='inventory-count-input';
+        input.setAttribute('aria-label','Quantidade física: '+item.product_name+' · lote '+item.lot_code+' · '+itemLabel(item));
+        const draft=drafts.get(item.id);
+        if (draft?.version===item.version) input.value=draft.value;
+        else drafts.delete(item.id);
+        input.addEventListener('input',()=>drafts.set(item.id,{value:input.value,version:item.version}));
+        const save=textElement('button','Salvar contagem','btn green');save.type='submit';save.dataset.inventoryWrite='true';
+        form.addEventListener('submit',event=>{
+          event.preventDefault();if (!form.reportValidity()) return;
+          const quantity=Number(input.value);
+          void action(save,async()=>{
+            await rpc('guigs_count_inventory_item',{p_inventory_id:current.id,p_item_id:item.id,p_quantity:quantity,p_version:item.version});
+            drafts.delete(item.id);
+            return 'Contagem salva. Estoque não alterado.';
+          },current.id,()=>focusNext(item.id));
+        });
+        form.append(label,input,save);row.append(form);
       }
-      if (current.status==='open') {
-        if (item.counted_quantity===null) {
-          const form=document.createElement('form');form.className='inventory-count-form';
-          const label=document.createElement('label'); label.htmlFor=`count-${item.id}`;label.textContent='Quantidade física';
-          const input=document.createElement('input');input.id=label.htmlFor;input.type='number';input.inputMode='numeric';input.min='0';input.max='2147483647';input.step='1';input.required=true;input.className='inventory-count-input';
-          const draft=drafts.get(item.id);
-          if (draft?.version===item.version) input.value=draft.value;
-          else drafts.delete(item.id);
-          input.addEventListener('input',()=>drafts.set(item.id,{value:input.value,version:item.version}));
-          const save=document.createElement('button');save.type='submit';save.className='btn green';save.dataset.inventoryWrite='true';save.textContent='Salvar contagem';
-          form.addEventListener('submit',event=>{
-            event.preventDefault();if (!form.reportValidity()) return;
-            const quantity=Number(input.value);
-            void action(save,async()=>{
-              await rpc('guigs_count_inventory_item',{p_inventory_id:current.id,p_item_id:item.id,p_quantity:quantity,p_version:item.version});
-              drafts.delete(item.id);
-              return 'Contagem salva. Estoque não alterado.';
-            },current.id,()=>focusNext(item.id));
-          });
-          form.append(label,input,save);card.append(form);
-        }
-        const recount=document.createElement('button');recount.type='button';recount.className='btn';recount.textContent='Recontar';recount.dataset.inventoryWrite='true';
+      if (counted(item)||conflict) {
+        const recount=textElement('button','Recontar','btn');recount.type='button';recount.dataset.inventoryWrite='true';
+        recount.dataset.inventoryRecount=item.id;
         recount.addEventListener('click',()=>void action(recount,async()=>{
-          if (!await confirmAction('Preparar recontagem',`Reconte fisicamente ${item.product_name} / ${item.lot_code} / ${itemLabel(item)}. A evidência anterior será preservada e a base será atualizada.`)) return;
+          if (!await confirmAction('Preparar recontagem','Reconte fisicamente '+item.product_name+' / '+item.lot_code+' / '+itemLabel(item)+
+            '. A evidência anterior será preservada e a base será atualizada.')) return;
           await rpc('guigs_recount_inventory_item',{p_inventory_id:current.id,p_item_id:item.id,p_version:item.version});
           drafts.delete(item.id);
           return 'Recontagem preparada. Conte novamente; estoque não alterado.';
-        },current.id,()=>el(`count-${item.id}`)?.focus()));
-        card.append(recount);
+        },current.id,()=>requestAnimationFrame(()=>el('count-'+item.id)?.focus())));
+        row.append(recount);
       }
-      if (item.counted_at) {const by=document.createElement('p');by.className='muted';by.textContent=`Contagem: ${actor(item.counted_by,item.counted_by_label)} · ${date(item.counted_at)}`;card.append(by);}
-      list.append(card);
     }
-    if (!items.length) list.textContent='Nenhum item para estes filtros.';
+    if (item.counted_at) row.append(textElement('p','Contagem: '+actor(item.counted_by,item.counted_by_label)+' · '+date(item.counted_at),'muted'));
+    return row;
+  }
+
+  async function loadImages(targets) {
+    const {client,shop}=getContext();
+    if (!targets.length || !navigator.onLine || !client?.storage || !client.supabaseUrl || !shop) return;
+    const origin=new URL(client.supabaseUrl).origin;
+    const missing=[...new Set(targets.map(({path})=>path))].filter(path=>!(images.get(path)?.expires>Date.now()));
+    if (missing.length) {
+      try {
+        const result=await client.storage.from(IMAGE_BUCKET).createSignedUrls(missing,300);
+        if(getContext().shop?.shop_id!==shop.shop_id) return;
+        for(const entry of result.data||[]) {
+          if(!entry.signedUrl||!missing.includes(entry.path))continue;
+          const url=new URL(entry.signedUrl);
+          if(url.origin===origin&&url.pathname.startsWith('/storage/v1/object/sign/'+IMAGE_BUCKET+'/')) {
+            images.set(entry.path,{url:url.href,expires:Date.now()+270000});
+          }
+        }
+      } catch { /* A contagem permanece disponível com o ícone de produto. */ }
+    }
+    for(const {photo,path} of targets) {
+      const entry=images.get(path);
+      if(!photo.isConnected||!(entry?.expires>Date.now()))continue;
+      const image=document.createElement('img');image.alt='';image.loading='lazy';image.decoding='async';image.src=entry.url;
+      image.addEventListener('error',()=>{images.delete(path);photo.textContent='▧';},{once:true});
+      photo.replaceChildren(image);
+    }
+  }
+
+  function renderItems() {
+    if (!data) return;
+    const list=el('inventoryItems');
+    const entries=visibleLots();
+    lotPage=Math.min(lotPage,Math.max(0,Math.ceil(entries.length/LOTS_PER_PAGE)-1));
+    list.replaceChildren();
+    const fragment=document.createDocumentFragment(), targets=[];
+    const products=new Map((getContext().products||[]).map(product=>[product.id,product]));
+    let productId, product;
+    const shown=entries.slice(lotPage*LOTS_PER_PAGE,(lotPage+1)*LOTS_PER_PAGE);
+    for(const {group,visible} of shown) {
+      const {head,items,key}=group;
+      if (head.product_id!==productId) {
+        productId=head.product_id;
+        product=document.createElement('section');product.className='inventory-product';
+        const header=document.createElement('header');header.className='inventory-product-head';
+        const photo=textElement('span','▧','inventory-photo');photo.setAttribute('aria-hidden','true');
+        const path=products.get(productId)?.image_path;
+        if(path)targets.push({photo,path});
+        header.append(photo,textElement('h3',head.product_name));
+        product.append(header);fragment.append(product);
+      }
+      const confirmed=items.filter(verified).length;
+      const conflict=items.some(needsRecount);
+      const total=items.filter(counted).reduce((sum,item)=>sum+Number(item.counted_quantity),0);
+      const differences=data.inventory.status==='open'?null:items.filter(divergent).length;
+      const status=conflict?'Requer recontagem':differences?'Divergente':confirmed===items.length?'Conferido':confirmed?'Em andamento':'Não iniciada';
+      const detail=document.createElement('details');detail.className='inventory-lot';detail.dataset.lotId=head.lot_id;
+      detail.open=lotExpansion.get(key)??(shown.length<=8 || visible.length<items.length);
+      detail.addEventListener('toggle',()=>lotExpansion.set(key,detail.open));
+      const summary=document.createElement('summary');
+      summary.append(textElement('strong','Lote '+head.lot_code),document.createTextNode(' · Validade: '+
+        head.expiry.split('-').reverse().join('/')+' · '+status+' · '+confirmed+' de '+items.length+' localizações conferidas'));
+      const progress=document.createElement('progress');progress.max=items.length;progress.value=confirmed;
+      progress.setAttribute('aria-label','Progresso do lote '+head.lot_code);
+      const stats=document.createElement('div');stats.className='inventory-lot-progress';
+      const diff=differences===null?'':' · Divergências: '+differences;
+      stats.append(progress,textElement('span',Math.floor(100*confirmed/items.length)+'% · Total contado: '+
+        (items.some(counted)?total+' un.':'—')+diff));
+      const locations=document.createElement('div');locations.className='inventory-partitions';
+      for(const item of visible)locations.append(renderPartition(item));
+      detail.append(summary,stats);
+      if(head.supplier_name)detail.append(textElement('p','Fornecedor: '+head.supplier_name,'muted'));
+      detail.append(locations);product.append(detail);
+    }
+    list.append(fragment);
+    if (!entries.length) list.textContent='Nenhum item para estes filtros.';
+    const matching=entries.reduce((sum,entry)=>sum+entry.visible.length,0);
+    const hidden=data.items.length-matching;
+    const paged=matching-shown.reduce((sum,entry)=>sum+entry.visible.length,0);
+    el('inventoryFilterSummary').textContent=matching+' de '+data.items.length+' posições correspondem aos filtros. '+
+      (hidden?hidden+' ocultas pelos filtros. ':'')+(paged?paged+' em outras páginas.':'');
+    const pages=Math.max(1,Math.ceil(entries.length/LOTS_PER_PAGE));
+    el('inventoryLotPager').classList.toggle('hidden',pages===1);
+    el('inventoryLotPage').textContent='Página de lotes '+(lotPage+1)+' de '+pages;
+    el('inventoryLotPrevious').disabled=lotPage===0;
+    el('inventoryLotNext').disabled=lotPage+1===pages;
+    void loadImages(targets);
     sync();
   }
+
   function focusNext(previousId) {
-    const next=data.items.find(item=>item.counted_quantity===null && item.id!==previousId);
-    if (!next) {el('inventoryTotals').focus();return;}
-    el('inventoryItemSelect').value='';el('inventoryFilter').value='pending';el('inventoryLocation').value='';
-    el('inventoryPosition').value='';
-    el('inventoryItemSelect').dispatchEvent(new Event('change',{bubbles:true}));
-    const input=el(`count-${next.id}`);input?.scrollIntoView({block:'center'});input?.focus();
+    if(data.inventory.status!=='open')return;
+    const entries=visibleLots();
+    const offset=entries.findIndex(entry=>entry.group.items.some(item=>item.id===previousId));
+    const order=entries.slice(Math.max(offset,0)).concat(offset>0?entries.slice(0,offset):[]);
+    const nextGroup=order.find(entry=>entry.visible.some(item=>!verified(item)&&item.id!==previousId));
+    if(!nextGroup){el('inventoryTotals').focus();return;}
+    const next=nextGroup.visible.find(item=>!verified(item)&&item.id!==previousId);
+    const nextPage=Math.floor(entries.indexOf(nextGroup)/LOTS_PER_PAGE);
+    lotExpansion.set(nextGroup.group.key,true);
+    if(nextPage!==lotPage){lotPage=nextPage;renderItems();}
+    const input=el('count-'+next.id)||el('inventoryItems').querySelector('[data-inventory-recount="'+CSS.escape(next.id)+'"]');
+    if(!input)return;
+    input.closest('details').open=true;
+    requestAnimationFrame(()=>{
+      input.scrollIntoView({block:'center'});
+      input.focus();
+    });
   }
+
   async function action(button, work, inventoryId, after) {
     if (pending || !navigator.onLine) return;
     pending=true;const label=button.textContent;button.textContent='Salvando…';button.disabled=true;sync();
@@ -259,10 +430,13 @@ export function createInventoryUI({getContext, enhanceSelect, confirmAction, ref
       }
     } finally {pending=false;button.textContent=label;button.disabled=false;createCancel.disabled=false;sync();}
   }
-  el('inventoryItemSelect').addEventListener('change',renderItems);
-  el('inventoryFilter').addEventListener('change',renderItems);
-  el('inventoryLocation').addEventListener('change',renderItems);
-  el('inventoryPosition').addEventListener('change',renderItems);
+  function applyFilters(){lotPage=0;renderItems();}
+  el('inventorySearch').addEventListener('input',applyFilters);
+  for(const field of ['inventoryFilter','inventoryLocation','inventoryFridge','inventoryPosition']) {
+    el(field).addEventListener('change',applyFilters);
+  }
+  el('inventoryLotPrevious').addEventListener('click',()=>{lotPage--;renderItems();});
+  el('inventoryLotNext').addEventListener('click',()=>{lotPage++;renderItems();});
   el('inventoryReviewCheck').addEventListener('change',()=>{reviewApproved=el('inventoryReviewCheck').checked;sync();});
   el('inventoryNextItem').addEventListener('click',()=>{if(data)focusNext('');});
   const openCreate=spatial=>{

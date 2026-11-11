@@ -783,7 +783,7 @@ if (!navigator.onLine) {
 
         allRows(
           'guigs_products',
-          'id,name,category,min_total,target_total,min_fridge,target_fridge,active'
+          'id,name,category,min_total,target_total,min_fridge,target_fridge,active,image_path'
         ),
 
         allRows(
@@ -2821,7 +2821,7 @@ function applyView() {
   if (fridges) fridgesUI.activate();
 }
 
-const inventoryUI = createInventoryUI({getContext:()=>({client,shop}),enhanceSelect:enhanceSearchableSelect,
+const inventoryUI = createInventoryUI({getContext:()=>({client,shop,products}),
   confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[]),refreshStock:refresh});
 const reportsUI = createReportsUI({getContext:()=>({client,shop}),dayDifference,replenishmentFor});
 const fridgesUI = createFridgesUI({getContext:()=>({client,shop,products,lots}),refreshStock:refresh,

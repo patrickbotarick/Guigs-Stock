@@ -63,7 +63,8 @@ export function createReportsUI({getContext, dayDifference, replenishmentFor}) {
     return element;
   }
   function inventoryCard(row) {
-    return card(statusLabel(row.status),[`Data de início: ${formatDate(row.started_at)}`,`Data do estado: ${formatDate(row.date)}`,`Iniciado por: ${row.actor}`,`Itens: ${row.items} · Contados: ${row.counted} · Divergentes: ${row.divergent}`]);
+    return card(statusLabel(row.status),[`Data de início: ${formatDate(row.started_at)}`,`Data do estado: ${formatDate(row.date)}`,`Iniciado por: ${row.actor}`,
+      `Itens: ${row.items} · Contados: ${row.counted}`+(row.status==='open' || row.divergent==null ? '' : ` · Divergentes: ${row.divergent}`)]);
   }
   function render(stockDate) {
     const s = data.summary;

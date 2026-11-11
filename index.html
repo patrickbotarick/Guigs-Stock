@@ -887,7 +887,21 @@
       .inventory-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
       .inventory-actions .btn, .inventory-item .btn, #inventoryComplete, #inventoryNextItem { min-height: 44px; }
       .inventory-filters { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr)); align-items: end; gap: 12px; margin: 20px 0; }
-      .inventory-items { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,300px),1fr)); gap: 12px; margin: 16px 0; }
+      .inventory-items { display: grid; gap: 12px; margin: 16px 0; }
+      .inventory-product { min-width:0; border:1px solid #e7e3df; border-radius:12px; background:#fff; padding:clamp(10px,2vw,18px); }
+      .inventory-product-head { display:flex; align-items:center; gap:.75rem; margin-bottom:.7rem; }
+      .inventory-product-head h3 { margin:0; overflow-wrap:anywhere; }
+      .inventory-photo { flex:none; display:grid; place-items:center; width:48px; height:48px; border-radius:9px; background:#f1eeea; }
+      .inventory-photo img { width:100%; height:100%; object-fit:contain; border-radius:inherit; }
+      .inventory-lot { border-top:1px solid #e7e3df; padding:.5rem 0; min-width:0; }
+      .inventory-lot summary { cursor:pointer; min-height:44px; padding:.5rem .2rem; overflow-wrap:anywhere; }
+      .inventory-lot summary:focus-visible, .inventory-count-input:focus-visible { outline:2px solid #a42924; outline-offset:2px; }
+      .inventory-lot summary strong { margin-inline-end:.5rem; }
+      .inventory-lot-progress { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem .65rem; margin:.3rem 0 .6rem; }
+      .inventory-lot-progress progress { width:min(100%,9rem); accent-color:#24734c; }
+      .inventory-partitions { display:grid; gap:.45rem; }
+      .inventory-items .inventory-item { padding:.65rem .75rem; }
+      .inventory-item h4, .inventory-item p { margin:.25rem 0; }
       .inventory-item, .inventory-history-card { border: 1px solid #e7e3df; border-radius: 12px; padding: 16px; min-width: 0; overflow-wrap: anywhere; }
       .inventory-history-card { margin: 10px 0; }
       .inventory-item h3 { margin-top: 0; }
@@ -1712,13 +1726,20 @@
               <div id="inventoryReviewGate" class="balancebox hidden"><label><input id="inventoryReviewCheck" type="checkbox" /> Revisei cada divergência e os avisos de movimentação.</label></div>
               <button type="button" id="inventoryComplete" class="btn red hidden" data-inventory-write>Fechar inventário e aplicar ajustes</button>
               <div class="inventory-filters">
-                <div class="field"><label for="inventoryItemSelect">Pesquisar produto / lote</label><select id="inventoryItemSelect"><option value="">Todos os produtos / lotes</option></select></div>
-                <div class="field"><label for="inventoryLocation">Localização</label><select id="inventoryLocation"><option value="">Ambas</option><option value="stock">Estoque seco</option><option value="fridge">Geladeira</option></select></div>
-                <div class="field"><label for="inventoryFilter">Conferência</label><select id="inventoryFilter"><option value="all">Todos</option><option value="divergent">Divergentes</option><option value="pending">Não contados</option><option value="counted">Conferidos</option></select></div>
+                <div class="field"><label for="inventorySearch">Pesquisar produto ou lote</label><input id="inventorySearch" type="search" autocomplete="off"></div>
+                <div class="field"><label for="inventoryLocation">Localização</label><select id="inventoryLocation"><option value="">Todas</option><option value="stock">Estoque seco</option><option value="fridge">Geladeira</option><option value="unallocated">Geladeira — não alocado</option></select></div>
+                <div class="field"><label for="inventoryFilter">Conferência</label><select id="inventoryFilter"><option value="all">Todos</option><option value="divergent">Divergentes</option><option value="pending">Pendentes</option><option value="counted">Conferidos</option><option value="recount">Requer recontagem</option></select></div>
+                <div id="inventoryFridgeField" class="field hidden"><label for="inventoryFridge">Geladeira física</label><select id="inventoryFridge"></select></div>
                 <div id="inventoryPositionField" class="field hidden"><label for="inventoryPosition">Posição física</label><select id="inventoryPosition"></select></div>
                 <button type="button" id="inventoryNextItem" class="btn">Próxima contagem pendente</button>
               </div>
+              <p id="inventoryFilterSummary" class="muted" role="status"></p>
               <div id="inventoryItems" class="inventory-items"></div>
+              <div id="inventoryLotPager" class="inventory-actions hidden">
+                <button type="button" id="inventoryLotPrevious" class="btn">Lotes anteriores</button>
+                <span id="inventoryLotPage"></span>
+                <button type="button" id="inventoryLotNext" class="btn">Próximos lotes</button>
+              </div>
               <details><summary>Auditoria das contagens e estados</summary><div id="inventoryAudit"></div></details>
             </section>
           </section>

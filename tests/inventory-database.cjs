@@ -27,6 +27,11 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
  await q("insert into public.guigs_movements(shop_id,lot_id,event_id,movement_type,location,delta,actor_id) values($1,$2,gen_random_uuid(),'receipt','stock',10,$3),($1,$2,gen_random_uuid(),'receipt','fridge',8,$3),($1,$4,gen_random_uuid(),'receipt','stock',5,$3)",[id(10),id(30),id(1),id(31)]);
  const create=()=>scalar('select public.guigs_create_inventory($1,$2)',[id(10),'Teste isolado']);
  const detail=inv=>scalar('select public.guigs_get_inventory($1,$2)',[id(10),inv]);
+ const persisted=async inv=>{
+  await db.exec('reset role');
+  try{return new Map((await q('select id,expected_initial,basis_quantity from public.guigs_inventory_items where inventory_id=$1',[inv])).rows.map(row=>[row.id,row]));}
+  finally{await db.exec('set role authenticated');}
+ };
  const transition=async(inv,status)=>scalar('select public.guigs_set_inventory_status($1,$2,$3,$4)',[id(10),inv,status,(await detail(inv)).inventory.version]);
  const count=async(inv,item,quantity,version=item.version)=>scalar('select public.guigs_count_inventory_item($1,$2,$3,$4,$5)',[id(10),inv,item.id,quantity,version]);
  const recount=async(inv,item)=>scalar('select public.guigs_recount_inventory_item($1,$2,$3,$4)',[id(10),inv,item.id,item.version]);
@@ -36,8 +41,10 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
  await login(id(1));const inv=await create();let d=await detail(inv);
  await denied('select public.guigs_list_inventories($1,0,0)',[id(10)],/Página inválida/);
  check(d.items.length===4,'Snapshot separado das duas localizações, inclusive zero');
- check(d.items.find(i=>i.lot_id===id(30)&&i.location==='stock').expected_initial===10,'Esperado inicial capturado');
- check(d.items.find(i=>i.lot_id===id(30)&&i.location==='fridge').expected_initial===8,'Geladeira não somada ao estoque seco');
+ let snapshot=await persisted(inv);
+ check(snapshot.get(d.items.find(i=>i.lot_id===id(30)&&i.location==='stock').id).expected_initial===10,'Esperado inicial capturado');
+ check(snapshot.get(d.items.find(i=>i.lot_id===id(30)&&i.location==='fridge').id).expected_initial===8,'Geladeira não somada ao estoque seco');
+ check(d.items.every(i=>!Object.hasOwn(i,'expected_initial')&&!Object.hasOwn(i,'basis_quantity')&&!Object.hasOwn(i,'current_quantity')),'API omite saldos durante a contagem');
  await denied('select public.guigs_create_inventory($1)',[id(10)],/Já existe/);
  for(const table of ['guigs_inventories','guigs_inventory_items','guigs_inventory_audit']){
   await denied(`insert into public.${table} default values`,[],/permission denied/);
@@ -46,7 +53,7 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
  }
  await denied('select guigs_private.inventory_add_items($1,$2)',[id(10),inv],/permission denied/);
  await login(id(3));check(await scalar('select count(*)::int from public.guigs_inventories')===0,'RLS esconde outra loja');
- for(const table of ['guigs_inventory_items','guigs_inventory_audit'])check(await scalar(`select count(*)::int from public.${table}`)===0,`RLS isola ${table}`);
+ for(const table of ['guigs_inventory_items','guigs_inventory_audit'])await denied(`select * from public.${table}`,[],/permission denied/);
  await denied('select public.guigs_get_inventory($1,$2)',[id(10),inv],/Acesso negado/);
  await denied('select public.guigs_get_inventory($1,$2)',[id(11),inv],/não encontrado/);
  await login(id(4));await denied('select public.guigs_get_inventory($1,$2)',[id(10),inv],/Acesso negado/);
@@ -57,10 +64,13 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
  await denied('select public.guigs_count_inventory_item($1,$2,$3,$4,$5)',[id(10),inv,id(999),1,1],/não encontrado/);
  await denied('select public.guigs_refresh_inventory_scope($1,$2,$3)',[id(10),inv,d.inventory.version],/proprietários/);
  await count(inv,item,9);check((await detail(inv)).audit.some(a=>a.action==='counted'&&a.actor_id===id(2)),'Atendente conta com autoria auditada');
+ check((await detail(inv)).audit.every(a=>!Object.hasOwn(a,'basis_quantity')),'Auditoria aberta não revela a base');
+ check((await scalar('select public.guigs_list_inventories($1)',[id(10)])).inventories[0].divergent_count===null,'Lista aberta não revela divergências');
+ for(const table of ['guigs_inventory_items','guigs_inventory_audit'])await denied(`select * from public.${table}`,[],/permission denied/);
  await denied('select public.guigs_count_inventory_item($1,$2,$3,$4,$5)',[id(10),inv,item.id,9,item.version],/outra pessoa/);
  item=(await detail(inv)).items.find(i=>i.id===item.id);await denied('select public.guigs_count_inventory_item($1,$2,$3,$4,$5)',[id(10),inv,item.id,9,item.version],/Recontar/);
  await recount(inv,item);d=await detail(inv);item=d.items.find(i=>i.id===item.id);
- check(item.counted_quantity===null&&item.expected_initial===10,'Recontagem mantém snapshot inicial');
+ check(item.counted_quantity===null&&(await persisted(inv)).get(item.id).expected_initial===10,'Recontagem mantém snapshot inicial');
  check(d.audit.some(a=>a.action==='recount'&&a.previous_quantity===9),'Recontagem preserva evidência válida anterior');
  await count(inv,item,9);
  await denied('select public.guigs_set_inventory_status($1,$2,$3,$4)',[id(10),inv,'cancelled',(await detail(inv)).inventory.version],/proprietários/);
@@ -68,7 +78,8 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
  await login(id(1));await transition(inv,'review');
  await denied('select public.guigs_count_inventory_item($1,$2,$3,$4,$5)',[id(10),inv,item.id,9,item.version],/Reabra/);
  await assert.rejects(complete(inv),/não contados/);checks++;
- await transition(inv,'open');d=await detail(inv);for(const it of d.items.filter(i=>i.counted_quantity===null))await count(inv,it,Number(it.basis_quantity));
+ await transition(inv,'open');d=await detail(inv);snapshot=await persisted(inv);
+ for(const it of d.items.filter(i=>i.counted_quantity===null))await count(inv,it,Number(snapshot.get(it.id).basis_quantity));
  check(await scalar('select count(*)::int from public.guigs_movements')===3,'Contagens não alteram estoque');
  await transition(inv,'review');
  // Movimento interveniente por RPC oficial, inclusive com diferença líquida zero.
@@ -78,7 +89,7 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
  await assert.rejects(complete(inv),/Movimentações posteriores/);checks++;
  check((await detail(inv)).inventory.status==='review','Falha não fecha parcialmente');
  await transition(inv,'open');d=await detail(inv);for(const it of d.items.filter(i=>i.conflict)){await recount(inv,it);const fresh=(await detail(inv)).items.find(i=>i.id===it.id);await count(inv,fresh,8);}
- d=await detail(inv);check(d.items.find(i=>i.id===item.id).expected_initial===10,'Rebase explícito não sobrescreve esperado inicial');
+ d=await detail(inv);check((await persisted(inv)).get(item.id).expected_initial===10,'Rebase explícito não sobrescreve esperado inicial');
  await transition(inv,'review');await assert.rejects(complete(inv,false),/confirme explicitamente/);checks++;
  await assert.rejects(complete(inv,true,1),/desatualizada/);checks++;
  // Erro no segundo ajuste: todo o primeiro deve voltar junto.
@@ -118,7 +129,8 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
  await db.exec('rollback');
  await db.exec('reset role');check(await stock()===8,'Saldo final esperado de ajuste oficial');
  await login(id(1));const positive=await create();d=await detail(positive);
- for(const it of d.items)await count(positive,it,Number(it.basis_quantity)+(it.lot_id===id(30)&&it.location==='stock'?2:0));
+ snapshot=await persisted(positive);
+ for(const it of d.items)await count(positive,it,Number(snapshot.get(it.id).basis_quantity)+(it.lot_id===id(30)&&it.location==='stock'?2:0));
  check((await detail(positive)).items.some(it=>it.counted_quantity===0),'Zero é contagem válida, diferente de não contado');
  await transition(positive,'review');const positiveResult=await complete(positive);
  check(positiveResult.adjustments===1,'Diferença positiva gera um único ajuste');
