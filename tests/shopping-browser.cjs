@@ -152,7 +152,7 @@ function bridge({role,shop,actor,names}){
   const beforeOffline=calls.length;
   await p.reload();
   await p.waitForFunction(()=>document.getElementById('status').textContent.includes('sem conexão'));
-  check(await p.evaluate(async()=> (await caches.keys()).includes('guigs-stock-shell-v20')),'PWA abre shell de compras offline');
+  check(await p.evaluate(async()=> (await caches.keys()).includes('guigs-stock-shell-v21')),'PWA abre shell de compras offline');
   check(calls.length===beforeOffline,'Reload offline não enfileira comandos');
   check(!attendant.errors.length,'Fluxo mobile sem erro JavaScript');
   await attendant.context.close();

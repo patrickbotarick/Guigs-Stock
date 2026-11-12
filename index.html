@@ -22,8 +22,31 @@
           -apple-system,
           "Segoe UI",
           sans-serif;
-        color: #252327;
-        background: #f6f5f2;
+        --ink: #252327;
+        --ink-muted: #615c63;
+        --canvas: #f6f5f2;
+        --surface: #fff;
+        --surface-soft: #faf8f5;
+        --line: #ded9d3;
+        --accent: #a52834;
+        --accent-hover: #84212b;
+        --focus: #804223;
+        --success: #17623d;
+        --danger: #982933;
+        --warning: #795019;
+        --info: #344f78;
+        --gap-1: .5rem;
+        --gap-2: .75rem;
+        --gap-3: 1rem;
+        --radius-field: .65rem;
+        --radius-panel: 1rem;
+        --radius-dialog: 1.25rem;
+        --shadow-panel: 0 1px 2px #25180e0d;
+        --shadow-dialog: 0 18px 65px #1f171842;
+        --touch: 44px;
+        --layer-sticky: 2;
+        color: var(--ink);
+        background: var(--canvas);
       }
 
       * {
@@ -1360,6 +1383,52 @@
       .report-filters input, .report-filters select { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; }
       #reportsView button { min-height: 44px; max-width: 100%; white-space: normal; }
       @media (max-width: 600px) { .report-filters { display: grid; grid-template-columns: minmax(0, 1fr); } }
+
+      /* Controles operacionais compartilhados. Dialog e details mantêm semântica nativa. */
+      :where(button, a, summary, input, select, textarea):focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: 2px;
+      }
+      .btn { min-height: var(--touch); background: var(--surface); border-color: var(--line); border-radius: var(--radius-field); }
+      .btn:not(:disabled):hover { background: var(--surface-soft); border-color: #a8a098; }
+      .btn.red, .btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+      .btn.red:not(:disabled):hover, .btn.primary:not(:disabled):hover { background: var(--accent-hover); color: white; }
+      .btn.green:not(:disabled):hover { background: var(--success); color: white; }
+      .btn[aria-pressed="true"] { border-color: var(--accent); }
+      .muted { color: var(--ink-muted); }
+      .panel, .metric, .operationbar { border-radius: var(--radius-panel); box-shadow: var(--shadow-panel); }
+      .field, .twocol > *, .modalform > * { min-inline-size: 0; }
+      .field :where(input:not([type="checkbox"], [type="radio"]), select, textarea) { min-height: var(--touch); border-color: var(--line); }
+      .formmsg:not(:empty) { margin: 0; font-size: .85rem; }
+      dialog {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-dialog);
+        color: var(--ink);
+        background: var(--surface);
+        box-shadow: var(--shadow-dialog);
+        overscroll-behavior: contain;
+        scroll-padding-block-end: 5.5rem;
+      }
+      dialog .modalactions { z-index: var(--layer-sticky); }
+      dialog .modalactions .btn { white-space: normal; }
+      .draft-warning { color: var(--warning); font-size: .85rem; margin: .5rem 0 0; }
+      .draft-warning:empty { display: none; }
+      .tools { display: flex; flex-wrap: wrap; gap: var(--gap-1); align-items: flex-start; }
+      .tool { min-inline-size: 0; max-inline-size: 100%; }
+      .tool > summary { width: fit-content; min-height: var(--touch); cursor: pointer; align-content: center; }
+      .tool[open] > summary { border-color: var(--accent); }
+      .tool-content { display: grid; gap: var(--gap-2); padding: var(--gap-2) 0; min-inline-size: 0; }
+      .tool-search[open] { flex: 1 1 15rem; }
+      .tool-filters[open] { flex: 1 1 100%; }
+      .tool-count { color: var(--warning); font-size: .8rem; margin-inline-start: .3rem; }
+      @media (max-width: 500px) {
+        dialog .modalactions { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+        dialog .twocol { grid-template-columns: repeat(2,minmax(0,1fr)); }
+        dialog .field :where(input, select, textarea) { min-inline-size: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .btn, .quickaction { transition: none; }
+      }
     </style>
   </head>
 
@@ -1671,7 +1740,7 @@
                 <button id="fridgeEdit" class="btn hidden" type="button" aria-pressed="false">Editar layout</button>
                 <button id="fridgeReload" class="btn" type="button">Atualizar mapa</button>
                 <button id="fridgeOperateStock" class="btn" type="button">Registrar saída</button>
-                <details id="fridgeMoreActions"><summary>Mais ações</summary><button id="fridgeAllocate" class="btn hidden" type="button">Distribuir estoque existente</button></details>
+                <details id="fridgeMoreActions" class="tool"><summary class="btn">Mais ações</summary><button id="fridgeAllocate" class="btn hidden" type="button">Distribuir estoque existente</button></details>
               </div>
               <p id="fridgeOffline" class="notice hidden">Sem conexão. O mapa exibido pode estar desatualizado; edição bloqueada.</p>
               <p id="fridgeMessage" role="status" aria-live="polite"></p>
@@ -1979,13 +2048,13 @@
     </dialog>
     <!-- NOVO PRODUTO -->
 
-    <dialog id="productDialog">
+    <dialog id="productDialog" aria-labelledby="productDialogTitle" data-protect-draft>
       <div class="modal">
         <div class="modalhead">
           <div class="modalicon gold">+</div>
 
           <div class="modalintro">
-            <h2>Novo produto</h2>
+            <h2 id="productDialogTitle">Novo produto</h2>
 
             <div class="muted">
               Cadastre uma nova bebida no catálogo da pizzaria.
@@ -2053,6 +2122,7 @@
 
           <div id="productMessage" class="formmsg"></div>
 
+          <div class="draft-warning" role="status" aria-live="polite"></div>
           <div class="modalactions">
             <button type="button" class="btn" data-close="productDialog">
               Cancelar
@@ -2068,13 +2138,13 @@
 
     <!-- EDITAR PRODUTO -->
 
-    <dialog id="editProductDialog">
+    <dialog id="editProductDialog" aria-labelledby="editProductDialogTitle" data-protect-draft>
       <div class="modal">
         <div class="modalhead">
           <div class="modalicon gray">✎</div>
 
           <div class="modalintro">
-            <h2>Editar produto</h2>
+            <h2 id="editProductDialogTitle">Editar produto</h2>
 
             <div class="muted">
               Atualize os dados, metas e situação do produto.
@@ -2145,6 +2215,7 @@
 
           <div id="editProductMessage" class="formmsg"></div>
 
+          <div class="draft-warning" role="status" aria-live="polite"></div>
           <div class="modalactions">
             <button type="button" class="btn" data-close="editProductDialog">
               Cancelar
@@ -2160,13 +2231,13 @@
 
     <!-- RECEBIMENTO -->
 
-    <dialog id="receiveDialog">
+    <dialog id="receiveDialog" aria-labelledby="receiveDialogTitle" data-protect-draft>
       <div class="modal">
         <div class="modalhead">
           <div class="modalicon green">↓</div>
 
           <div class="modalintro">
-            <h2>Receber estoque</h2>
+            <h2 id="receiveDialogTitle">Receber estoque</h2>
 
             <div class="muted">
               Registre a chegada de novas bebidas no estoque.
@@ -2231,6 +2302,7 @@
 
           <div id="receiveMessage" class="formmsg"></div>
 
+          <div class="draft-warning" role="status" aria-live="polite"></div>
           <div class="modalactions">
             <button type="button" class="btn" data-close="receiveDialog">
               Cancelar
@@ -2275,13 +2347,13 @@
 
     <!-- MOVIMENTAÇÃO -->
 
-    <dialog id="transferDialog">
+    <dialog id="transferDialog" aria-labelledby="transferDialogTitle" data-protect-draft>
       <div class="modal">
         <div class="modalhead">
           <div class="modalicon blue">⇄</div>
 
           <div class="modalintro">
-            <h2>Movimentar bebidas</h2>
+            <h2 id="transferDialogTitle">Movimentar bebidas</h2>
 
             <div class="muted">
               Transfira unidades entre estoque e geladeira.
@@ -2340,6 +2412,7 @@
 
           <div id="transferMessage" class="formmsg"></div>
 
+          <div class="draft-warning" role="status" aria-live="polite"></div>
           <div class="modalactions">
             <button type="button" class="btn" data-close="transferDialog">
               Cancelar
@@ -2381,13 +2454,13 @@
 
     <!-- VENDA -->
 
-    <dialog id="saleDialog">
+    <dialog id="saleDialog" aria-labelledby="saleDialogTitle" data-protect-draft>
       <div class="modal">
         <div class="modalhead">
           <div class="modalicon purple">−</div>
 
           <div class="modalintro">
-            <h2>Registrar venda</h2>
+            <h2 id="saleDialogTitle">Registrar venda</h2>
 
             <div class="muted">
               Dê baixa nas unidades vendidas diretamente da geladeira.
@@ -2421,6 +2494,7 @@
 
           <div id="saleMessage" class="formmsg"></div>
 
+          <div class="draft-warning" role="status" aria-live="polite"></div>
           <div class="modalactions">
             <button type="button" class="btn" data-close="saleDialog">
               Cancelar
@@ -2436,13 +2510,13 @@
 
     <!-- PERDA -->
 
-    <dialog id="lossDialog">
+    <dialog id="lossDialog" aria-labelledby="lossDialogTitle" data-protect-draft>
       <div class="modal">
         <div class="modalhead">
           <div class="modalicon red">!</div>
 
           <div class="modalintro">
-            <h2>Registrar perda</h2>
+            <h2 id="lossDialogTitle">Registrar perda</h2>
 
             <div class="muted">
               Registre quebra, vencimento, descarte ou outra perda identificada.
@@ -2486,6 +2560,7 @@
 
           <div id="lossMessage" class="formmsg"></div>
 
+          <div class="draft-warning" role="status" aria-live="polite"></div>
           <div class="modalactions">
             <button type="button" class="btn" data-close="lossDialog">
               Cancelar
@@ -2499,13 +2574,13 @@
       </div>
     </dialog>
 
-    <dialog id="adjustDialog">
+    <dialog id="adjustDialog" aria-labelledby="adjustDialogTitle" data-protect-draft>
       <div class="modal">
         <div class="modalhead">
           <div class="modalicon gold">≠</div>
 
           <div class="modalintro">
-            <h2>Ajustar inventário</h2>
+            <h2 id="adjustDialogTitle">Ajustar inventário</h2>
 
             <div class="muted">
               Corrija o saldo do sistema com base na contagem física.
@@ -2556,6 +2631,7 @@
 
           <div id="adjustMessage" class="formmsg"></div>
 
+          <div class="draft-warning" role="status" aria-live="polite"></div>
           <div class="modalactions">
             <button type="button" class="btn" data-close="adjustDialog">
               Cancelar

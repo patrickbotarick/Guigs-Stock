@@ -54,6 +54,18 @@ const server = http.createServer((req,res)=>{
         check(await count(name)===before+1,`${name}: somente uma chamada durante envio repetido`);
       };
 
+      await click('#receiveStock');
+      check(await page.getByRole('dialog',{name:'Receber estoque'}).isVisible(),'Modal tem nome acessível');
+      await page.fill('#lotCode','RASCUNHO-TESTE');
+      await page.keyboard.press('Escape');
+      check(await page.locator('#receiveDialog').evaluate(e=>e.open),'Escape preserva rascunho editado');
+      check(await page.inputValue('#lotCode')==='RASCUNHO-TESTE','Texto preservado ao tentar dispensar');
+      check((await page.locator('#receiveDialog .draft-warning').textContent()).includes('Use Cancelar'),'Proteção é anunciada');
+      await close('receiveDialog');
+      await closed('receiveDialog');
+      if(!mobile)check(await page.locator('#receiveStock').evaluate(e=>e===document.activeElement),'Cancelar devolve foco');
+      await page.evaluate(()=>document.getElementById('receiveForm').reset());
+
       const card=page.locator('[data-product-id="product-1"]');
       check((await card.textContent()).includes('Sugestão de reposição: 7'),'Meta menos saldo atual na geladeira');
       check((await card.textContent()).includes('Primeiro lote FEFO: LOTE-A'),'Orientação FEFO usa primeiro lote não vencido');

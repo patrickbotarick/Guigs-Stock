@@ -47,7 +47,7 @@ const {fixture} = require('./browser.cjs');
     await page.waitForSelector('#content:not(.hidden)');
     await page.evaluate(()=>navigator.serviceWorker.ready);
     await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
-    check('Cache v20 está ativo',await page.evaluate(async()=> (await caches.keys()).includes('guigs-stock-shell-v20')));
+    check('Cache v21 está ativo',await page.evaluate(async()=> (await caches.keys()).includes('guigs-stock-shell-v21')));
     const six=[[1920,1080],[1366,768],[1280,800],[1024,768],[390,844],[360,800]];
     for(const [width,height] of six){
       await page.setViewportSize({width,height});
@@ -90,7 +90,7 @@ const {fixture} = require('./browser.cjs');
     await context.setOffline(false);
     check('Sem exceção JavaScript crítica nas views',pageErrors.length===0);
     evidence.status=evidence.overflows.length?'FAIL':evidence.installation==='PASS'?'PASS':'PENDING';
-    console.log(`PWA v20: ${evidence.checks.length} verificações passaram; instalação: ${evidence.installation}; layouts com overflow: ${evidence.overflows.length}.`);
+    console.log(`PWA v21: ${evidence.checks.length} verificações passaram; instalação: ${evidence.installation}; layouts com overflow: ${evidence.overflows.length}.`);
     if(evidence.status!=='PASS')process.exitCode=2;
   }catch(error){evidence.error=error.message;throw error;}
   finally{

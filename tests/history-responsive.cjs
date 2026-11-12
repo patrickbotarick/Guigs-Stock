@@ -209,7 +209,7 @@ async function run() {
     evidence.regressions.push('Modal de recebimento abre e fecha pelo teclado');
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-    assert.ok(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v20')));
+    assert.ok(await page.evaluate(async () => (await caches.keys()).includes('guigs-stock-shell-v21')));
     cdp = await context.newCDPSession(page);
     const {installabilityErrors} = await cdp.send('Page.getInstallabilityErrors');
     assert.deepEqual(installabilityErrors, []);
@@ -258,7 +258,7 @@ async function run() {
     assert.match(await page.locator('#message').textContent(), /sem conexão/i);
     await context.setOffline(false);
     assert.deepEqual(errors, []);
-    evidence.regressions.push('PWA v20: instalação, standalone, cache, navegação offline e console');
+    evidence.regressions.push('PWA v21: instalação, standalone, cache, navegação offline e console');
     evidence.status = 'PASS';
     console.log('Histórico: 6 resoluções, 2 larguras equivalentes a zoom e 2 resoluções em PWA instalada passaram.');
   } catch (error) {

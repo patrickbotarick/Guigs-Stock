@@ -19,7 +19,7 @@ try {
  fs.writeFileSync(path.join(result.directory,'unwanted.txt'),'ARTEFATO ANTIGO');build({sourceRoot:root,env});
  check(!fs.existsSync(path.join(result.directory,'unwanted.txt')),'Build limpo remove sobra de artefato anterior');
  const sw=fs.readFileSync(path.join(result.directory,'service-worker.js'),'utf8');
- check(sw.includes('guigs-stock-shell-v20'),'PWA final v20');
+ check(sw.includes('guigs-stock-shell-v21'),'PWA final v21');
  for(const entry of sw.match(/const APP_SHELL = \[([\s\S]*?)\];/)[1].matchAll(/"\.\/([^"]*)"/g))check(!entry[1]||fs.existsSync(path.join(result.directory,entry[1].split('?')[0])),`Shell existe no artefato: ${entry[1]}`);
  for(const page of ['index.html','auth-preview.html','reset-password.html']){
   const html=fs.readFileSync(path.join(result.directory,page),'utf8');

@@ -2,6 +2,7 @@
 config.js
 dist/
 supabase/.temp/
+.wrangler/
 
 # Links temporários do Cloudflare
 LINK-CLOUDFLARE-ATUAL.txt

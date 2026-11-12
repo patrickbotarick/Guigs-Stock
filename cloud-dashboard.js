@@ -16,6 +16,38 @@ window.visualViewport?.addEventListener('scroll', updateDialogViewport);
 window.addEventListener('resize', updateDialogViewport);
 updateDialogViewport();
 
+// Campos de pesquisa do combobox são provisórios; o select mantém o valor confirmado.
+for (const dialog of document.querySelectorAll('dialog[data-protect-draft]')) {
+  const form = dialog.querySelector('form');
+  const warning = dialog.querySelector('.draft-warning');
+  let edited = false;
+  const markDraft = event => {
+    if (event.target.getAttribute('role') !== 'combobox') edited = true;
+  };
+  form.addEventListener('input', markDraft);
+  form.addEventListener('change', markDraft);
+  form.addEventListener('reset', () => { edited = false; warning.textContent = ''; });
+  dialog.addEventListener('cancel', event => {
+    if (!edited || form.getAttribute('aria-busy') === 'true') return;
+    event.preventDefault();
+    warning.textContent = 'Há alterações neste formulário. Use Cancelar para sair.';
+  });
+  dialog.addEventListener('close', () => { edited = false; warning.textContent = ''; });
+}
+
+for (const tool of document.querySelectorAll('details[data-tool]')) {
+  const summary = tool.querySelector('summary');
+  summary.addEventListener('click', () => {
+    if (!tool.open) requestAnimationFrame(() => { if (tool.open) tool.querySelector('[data-tool-focus]')?.focus(); });
+  });
+  tool.addEventListener('keydown', event => {
+    if (!tool.open || event.key !== 'Escape' || event.defaultPrevented) return;
+    event.preventDefault();
+    tool.open = false;
+    summary.focus();
+  });
+}
+
 // O select continua responsável pelo valor, pelas opções e pela validação.
 // A pesquisa só apresenta essas mesmas opções, sem alterar a ordem (inclusive FEFO).
 const searchableSelects = new Map();

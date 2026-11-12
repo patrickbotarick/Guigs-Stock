@@ -154,7 +154,7 @@ function bridge({role,shop,names}){
     check(await page.isDisabled('#fridgeDetailMove'),'Offline bloqueia nova movimentação');
     await page.reload();
     await page.waitForFunction(()=>document.getElementById('status').textContent.includes('sem conexão'));
-    check(await page.evaluate(async()=> (await caches.keys()).includes('guigs-stock-shell-v20')),'Shell do mapa abre offline no cache v20');
+    check(await page.evaluate(async()=> (await caches.keys()).includes('guigs-stock-shell-v21')),'Shell do mapa abre offline no cache v21');
     check(keys.length===2,'Reload offline não enfileira movimentos');
     check(!attendant.errors.length,'Fluxo do atendente sem erros JavaScript');
     await attendant.context.close();
