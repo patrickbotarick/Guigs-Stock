@@ -45,7 +45,11 @@ function fixture({role, session, searchable = false, readOnly = false, operation
   const calls = [];
   const listeners = [];
   const history = Array.from({length: 45}, (_, i) => ({id:`move-${i}`,lot_id:'lot-b',lot_code:'LOTE-B',product_id:product.id,product_name:product.name,movement_type:i%2?'sale':'receipt',location:'stock',delta:1,actor_id:user.id,actor_email:user.email,note:i===0?'Fornecedor: Distribuidora teste':'',created_at:'2026-10-07T12:00:00Z'}));
-  window.__test = {calls, lots, suppliers, balances, history, products};
+  function expireSession() {
+    session = false;
+    for (const listener of listeners) listener('SIGNED_OUT', null);
+  }
+  window.__test = {calls, lots, suppliers, balances, history, products, expireSession};
   function from(table) {
     const builder = {
       select() {return this;}, eq() {return this;}, range() {return this;},
@@ -314,6 +318,11 @@ if (require.main === module) (async () => {
     await attendant.selectOption('#receiveSupplier','supplier-1',{force:true}); await attendant.fill('#lotCode','ATENDENTE'); await attendant.fill('#expiry','2027-02-10'); await attendant.click('#saveReceipt');
     await attendant.waitForFunction(() => !document.getElementById('receiveDialog').open);
     check(await attendant.evaluate(() => window.__test.calls.some(c=>c.name==='guigs_receive_stock')), 'Recebimento por atendente');
+    await attendant.click('#receiveStock');
+    await attendant.evaluate(() => window.__test.expireSession());
+    await attendant.waitForURL('**/auth-preview.html');
+    check(await attendant.locator('#email').isVisible(),'Sessão expirada redireciona ao login');
+    check(!await attendant.locator('#receiveDialog').count(),'Sessão expirada retira o formulário de operação');
     await attendantContext.close();
     check(errors.length===0, `Console sem erros críticos: ${errors.join('; ')}`);
     console.log(`Navegador: ${checks} verificações passaram (owner, attendant, desktop, mobile, FEFO e PWA).`);

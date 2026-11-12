@@ -63,7 +63,7 @@ async function run() {
   const opts = {cwd:root,env,encoding:'utf8',windowsHide:true,timeout:30000};
   const sql = (input, args=[]) => execFileSync(pg('psql'), [...pgArgs,...args], {...opts,input}).trim();
   const jsonSql = input => JSON.parse(sql(input));
-  const ctl = args => execFileSync(pg('pg_ctl'), ['-D',cluster,'-w','-t','20',...args], {...opts,stdio:'ignore'});
+  const ctl = (args, seconds = 20) => execFileSync(pg('pg_ctl'), ['-D',cluster,'-w','-t',String(seconds),...args], {...opts,timeout:(seconds+5)*1000,stdio:'ignore'});
   const children = [];
   let running = false;
   const serve = (file, name, args, settings) => {
@@ -435,7 +435,7 @@ async function run() {
       if(child.exitCode!==null || !child.pid) return resolve();
       child.once('exit',resolve); child.kill();
     })));
-    if(running) ctl(['-m','fast','stop']);
+    if(running) ctl(['-m','fast','stop'],60);
     fs.writeFileSync(path.join(root,'integration-results.json'),JSON.stringify(evidence,null,2));
     console.log(`Evidência externa: ${path.join(root,'integration-results.json')}`);
   }

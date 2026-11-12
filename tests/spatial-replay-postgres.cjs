@@ -45,7 +45,7 @@ async function run() {
     '[{"lot_id":"${id(30)}","slot_id":"${id(60)}","quantity":1}]')::text;`;
   // O cluster é descartável; omitir apenas o flush inicial evita timeout no Windows.
   execFileSync(tool('initdb'),['-D',cluster,'-U','guigs_test','-A','trust','--locale=C','-E','UTF8','--no-sync'],options);
-  const ctl = command => execFileSync(tool('pg_ctl'),['-D',cluster,'-w','-t','15',...command],{...options,stdio:'ignore'});
+  const ctl = (command, seconds = 15) => execFileSync(tool('pg_ctl'),['-D',cluster,'-w','-t',String(seconds),...command],{...options,timeout:(seconds+5)*1000,stdio:'ignore'});
   ctl(['-l',path.join(root,'server.log'),'-o',`-h 127.0.0.1 -p ${port}`,'start']);
   try {
     sql(`create role anon; create role authenticated; create schema auth;
@@ -112,7 +112,7 @@ async function run() {
       coalesce(sum(delta) filter(where slot_id='${id(60)}'),0) from public.guigs_movements where lot_id='${id(30)}';`),'4:7');
     console.log('Transferência concorrente: 6 verificações passaram entre owner e attendant.');
   } finally {
-    ctl(['-m','fast','stop']);
+    ctl(['-m','fast','stop'],60);
   }
 }
 

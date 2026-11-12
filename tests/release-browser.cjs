@@ -77,10 +77,11 @@ function bridge(shopId){
     await page.click('#newInventory');await page.click('#inventoryCreateSubmit');await page.waitForSelector('#inventoryDetail:not(.hidden)');
     const items=(await db.query('select * from public.guigs_inventory_items order by id')).rows;
     check(Number(items.find(i=>i.lot_id===id(30)&&i.location==='stock').expected_initial)===9,'Snapshot C reflete ajuste da B');
+    await page.click('#inventoryTools summary');
     for(const item of items){
      await page.locator(`[data-item-id="${item.id}"] input`).fill(String(Number(item.basis_quantity)-(item.lot_id===id(30)&&item.location==='stock'?1:0)));
      await page.locator(`[data-item-id="${item.id}"] button[type="submit"]`).click();await page.waitForFunction(id=>!document.getElementById('count-'+id),item.id);
-     await page.waitForFunction(()=>!document.getElementById('inventoryReload').disabled);await page.click('#inventoryTools summary');await page.selectOption('#inventoryFilter','all');
+     await page.waitForFunction(()=>!document.getElementById('inventoryReload').disabled);await page.selectOption('#inventoryFilter','all');
     }
     await page.click('#inventoryReview');await page.waitForFunction(()=>document.getElementById('inventoryDetailTitle').textContent.includes('Em revisão'));await page.check('#inventoryReviewCheck');await page.click('#inventoryComplete');await page.waitForSelector('#operationConfirmDialog[open]');await page.click('#confirmOperation');
     await page.waitForFunction(()=>document.getElementById('inventoryDetailTitle').textContent.includes('Concluído'));await page.waitForFunction(()=>!document.getElementById('inventoryReload').disabled);
