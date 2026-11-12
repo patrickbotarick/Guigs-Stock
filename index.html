@@ -1046,20 +1046,6 @@
           table-layout: auto;
         }
 
-        .history-table {
-          min-width: 820px;
-          table-layout: auto;
-        }
-
-        .history-table th,
-        .history-table td {
-          white-space: nowrap;
-        }
-
-        .history-table td:nth-child(2) {
-          white-space: normal;
-        }
-
         .history-table-wrap {
           overflow-x: auto;
         }
@@ -1567,6 +1553,50 @@
         .main { padding-block-start: .65rem; }
         .top .eyebrow { display: none; }
       }
+
+      .shopping-need-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; }
+      .history-mobile-label { display: none; }
+
+      @media (max-width: 640px) {
+        .history-table-wrap { overflow: visible; }
+        .history-table, .history-table tbody { display: block; width: 100%; min-width: 0; }
+        .history-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+        .history-table .history-entry {
+          display: grid;
+          grid-template-columns: minmax(0,1fr) auto;
+          gap: .35rem .6rem;
+          margin-block-end: .65rem;
+          padding: .65rem;
+          border: 1px solid var(--line);
+          border-radius: .65rem;
+          background: var(--surface);
+        }
+        .history-table .history-entry td {
+          display: block;
+          min-width: 0;
+          padding: 0;
+          border: 0;
+          white-space: normal;
+          overflow-wrap: anywhere;
+        }
+        .history-entry td:nth-child(1) { grid-area: 2 / 1; }
+        .history-entry td:nth-child(2) { grid-area: 1 / 1; font-weight: 700; }
+        .history-entry td:nth-child(3) { grid-area: 2 / 2; text-align: end; }
+        .history-entry td:nth-child(4) { grid-area: 3 / 1 / auto / -1; }
+        .history-entry td:nth-child(5) { grid-area: 4 / 1 / auto / -1; }
+        .history-entry td:nth-child(6) { grid-area: 1 / 2; font-weight: 800; }
+        .history-entry td small { font-weight: 400; }
+        .history-entry .movement-type { font-size: .68rem; }
+        .history-mobile-label { display: inline; font-weight: 700; }
+        .inventory-count-form {
+          grid-template-columns: minmax(0,1fr) auto;
+          gap: .35rem .5rem;
+          margin: .55rem 0 .2rem;
+          align-items: center;
+        }
+        .inventory-count-form label { grid-column: 1 / -1; }
+        .inventory-count-form button { padding-inline: .6rem; }
+      }
     </style>
   </head>
 
@@ -1858,19 +1888,19 @@
                 </details>
               </div>
               <div class="tablewrap history-table-wrap">
-                <table class="table history-table">
-                  <thead>
-                    <tr>
-                      <th>Data</th>
-                      <th>Produto / lote</th>
-                      <th>Tipo</th>
-                      <th>Local</th>
-                      <th>Responsável</th>
-                      <th class="num">Variação</th>
+                <table class="table history-table" role="table" aria-label="Movimentações">
+                  <thead role="rowgroup">
+                    <tr role="row">
+                      <th role="columnheader" scope="col">Data</th>
+                      <th role="columnheader" scope="col">Produto / lote</th>
+                      <th role="columnheader" scope="col">Tipo</th>
+                      <th role="columnheader" scope="col">Local</th>
+                      <th role="columnheader" scope="col">Responsável</th>
+                      <th role="columnheader" scope="col" class="num">Variação</th>
                     </tr>
                   </thead>
 
-                  <tbody id="history"></tbody>
+                  <tbody id="history" role="rowgroup"></tbody>
                 </table>
               </div>
             </div>
@@ -2041,6 +2071,7 @@
                 </details>
               </div>
               <p id="inventoryFilterSummary" class="muted" role="status"></p>
+              <p id="inventoryBlindHint" class="muted hidden">Contagem cega. O saldo esperado fica disponível na revisão.</p>
               <div id="inventoryItems" class="inventory-items"></div>
               <div id="inventoryLotPager" class="inventory-actions hidden">
                 <button type="button" id="inventoryLotPrevious" class="btn">Lotes anteriores</button>
@@ -2054,7 +2085,13 @@
             <div id="shoppingOffline" class="notice hidden" role="status">Sem conexão. As compras exibidas podem estar desatualizadas.</div>
             <p id="shoppingMessage" class="notice hidden" role="status" aria-live="polite"></p>
             <section class="panel">
-              <div class="panelhead"><h2>Necessidades de compra</h2><button id="shoppingReload" class="btn" type="button">Atualizar</button></div>
+              <div class="panelhead">
+                <h2>Necessidades de compra</h2>
+                <div class="shopping-need-actions">
+                  <button id="shoppingNew" class="btn green" type="button" data-shopping-write>Novo rascunho</button>
+                  <button id="shoppingReload" class="btn" type="button">Atualizar</button>
+                </div>
+              </div>
               <div id="shoppingMetrics" class="shopping-metrics" aria-label="Resumo de compras"></div>
               <div class="tools view-tools">
                 <label class="field tool-search-field">Pesquisar produto <input id="shoppingSearch" type="search" autocomplete="off"></label>
@@ -2068,7 +2105,7 @@
               <div id="shoppingNeeds" class="shopping-cards"></div>
             </section>
             <section class="panel">
-              <div class="panelhead"><h2>Listas e pedidos</h2><button id="shoppingNew" class="btn green" type="button" data-shopping-write>Novo rascunho</button></div>
+              <div class="panelhead"><h2>Listas e pedidos</h2></div>
               <div id="shoppingOrders" class="shopping-cards"></div>
               <div class="shopping-actions"><button id="shoppingPrevious" class="btn" type="button">Anteriores</button><span id="shoppingPage"></span><button id="shoppingNext" class="btn" type="button">Próximos</button></div>
             </section>

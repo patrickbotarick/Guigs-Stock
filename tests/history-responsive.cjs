@@ -175,6 +175,16 @@ async function run() {
       await page.screenshot({path: path.join(root, `history-${width}.png`), fullPage: true});
       assert.equal(dimensions.overflow, 0, `Overflow em ${width}×${height}`);
       assert.deepEqual(dimensions.problems, [], `Controles em ${width}×${height}`);
+      if (width <= 640) {
+        const compact = await page.locator('.history-entry').first().evaluate(row => {
+          const product = row.cells[1].getBoundingClientRect(), delta = row.cells[5].getBoundingClientRect();
+          const table = row.closest('.history-table-wrap');
+          return {sameLine: Math.abs(product.top-delta.top)<1, fits: table.scrollWidth<=table.clientWidth,
+            cells: row.cells.length};
+        });
+        assert.deepEqual(compact, {sameLine:true,fits:true,cells:6});
+        evidence.viewports.at(-1).mobileEntries = 'PASS';
+      }
       await filterFlow(page);
       evidence.viewports.at(-1).filtersAndKeyboard = 'PASS';
     }

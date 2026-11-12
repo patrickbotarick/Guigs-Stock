@@ -63,7 +63,9 @@ function inventoryClient({role,shopId}){
    }
    check(await page.locator('.inventory-item').count()===4,'Snapshot UI com dois lotes e duas localizações');
    if(process.env.TEST_ARTIFACTS_DIR){fs.mkdirSync(process.env.TEST_ARTIFACTS_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.TEST_ARTIFACTS_DIR,`inventario-contagem-${role}-${mobile?'mobile':'desktop'}.png`),fullPage:true});}
-   check(await page.locator('.inventory-item').first().textContent().then(text=>text.includes('Contagem cega')&&!text.includes('Esperado inicial')),'Contagem cega antes de registrar');
+   check(await page.locator('#inventoryBlindHint').isVisible()&&
+     await page.locator('.inventory-item').first().textContent().then(text=>!text.includes('Esperado inicial')),
+     'Contagem cega orientada no início da lista, sem saldo por posição');
    await page.fill('#inventorySearch','2103');
    check(await page.locator('.inventory-item').count()===2,'Busca encontra lote nos dois locais');
    check(await page.locator('.inventory-lot').count()===1,'Busca mantém as posições no mesmo lote');
@@ -94,7 +96,8 @@ function inventoryClient({role,shopId}){
    await card().getByRole('button',{name:'Recontar',exact:true}).click();await confirm();
    await page.waitForFunction(()=>document.getElementById('inventoryMessage').textContent.includes('Recontagem preparada'));await ready();
    check((await db.query("select previous_quantity from public.guigs_inventory_audit where action='recount'")).rows[0].previous_quantity===9,'Auditoria guarda contagem anterior');
-   check((await card().textContent()).includes('Contagem cega'),'Recontagem retorna à contagem cega');
+   check(await page.locator('#inventoryBlindHint').isVisible()&&!(await card().textContent()).includes('Esperado inicial'),
+     'Recontagem retorna à contagem cega');
    // Movimento interveniente pelo mecanismo oficial, no banco artificial.
    await asUser(db,'owner',tx=>tx.query('select public.guigs_adjust_stock($1,$2,$3,$4,$5)',[id(10),id(30),'stock',11,'Movimento artificial no inventário UI']));
    await click('#inventoryReload');await page.waitForFunction(()=>!document.getElementById('inventoryMovementWarning').classList.contains('hidden'));

@@ -29,7 +29,7 @@ const normalizeMapText=value=>value.toLocaleLowerCase('pt-BR').normalize('NFD').
 export function fridgeSlotAlerts(slot,today=new Date().toISOString().slice(0,10)){
   const quantity=Number(slot.quantity),capacity=slot.capacity_quantity,minimum=slot.min_quantity;
   const pending=!slot.product_id||minimum==null||slot.target_quantity==null||capacity==null;
-  const low=minimum!=null&&quantity<Number(minimum);
+  const low=Boolean(slot.product_id)&&minimum!=null&&quantity<Number(minimum);
   const expiryLimit=new Date(today+'T00:00:00Z');
   expiryLimit.setUTCDate(expiryLimit.getUTCDate()+30);
   const last=expiryLimit.toISOString().slice(0,10);
@@ -455,8 +455,10 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     el('fridgeDetailLocation').textContent=[f?.name,h?.name,slot.name].filter(Boolean).join(' / ');
     const body=el('fridgeDetailBody');body.replaceChildren();
     const hero=node('div');hero.className='fridge-detail-hero';const text=node('div');
-    text.append(statusBadge(slot),node('p',fridgeSlotConfiguration(slot)==='PRONTO'?'Pronto para abastecer':fridgeSlotConfiguration(slot)==='ATIVO'?'Bloco ativo':'Configuração pendente'));
-    text.append(alertBadges(fridgeSlotAlerts(slot),state.label));
+    const configuration=fridgeSlotConfiguration(slot), flags=fridgeSlotAlerts(slot);
+    text.append(statusBadge(slot));
+    if(configuration!=='PENDENTE')text.append(node('p',configuration==='PRONTO'?'Pronto para abastecer':'Bloco ativo'));
+    text.append(alertBadges({...flags,pending:flags.pending&&Boolean(slot.product_id)},state.label));
     hero.append(photo(slot,true),text);body.append(hero);
     if(pending){
       const guidance=!slot.product_id?'Associe um produto para preparar este bloco.':
@@ -467,7 +469,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     const stat=(label,value)=>{const cell=node('div');cell.append(node('dt',label),node('dd',String(value)));stats.append(cell);};
     stat('No bloco',slot.quantity+' un.');
     const threshold=value=>value==null?'Não configurado':value+' un.';
-    stat('Mínimo',threshold(slot.min_quantity));
+    stat('Mínimo',slot.product_id||slot.min_quantity==null?threshold(slot.min_quantity):threshold(slot.min_quantity)+' · aguarda produto');
     stat('Meta desejada',threshold(slot.target_quantity));
     stat('Capacidade',threshold(slot.capacity_quantity));
     if(slot.capacity_quantity!=null){

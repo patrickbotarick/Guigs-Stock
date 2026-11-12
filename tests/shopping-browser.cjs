@@ -82,6 +82,8 @@ function bridge({role,shop,actor,names}){
     check(await page.getAttribute('#navShopping','aria-current')==='page','Compras tem navegação própria');
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Sem rolagem horizontal em '+width);
     check((await page.textContent('#shoppingMetrics')).includes('Produtos sem configuração'),'Indicadores visíveis');
+    if(width===390)check(await page.locator('#shoppingNew').evaluate(e=>e.getBoundingClientRect().bottom<=innerHeight),
+      'Novo rascunho encontrado na primeira dobra em 390×844');
     check(!(await page.getByRole('button',{name:'Editar mínimo e meta'}).count()),'Atendente não edita parâmetros');
     check(!errors.length,'Sem erro JavaScript em '+width);
     await context.close();

@@ -121,6 +121,21 @@ function installInventory() {
       await page.selectOption('#inventoryFilter','counted');
       check(await lot.locator('.inventory-item').count()===1,'Filtro conferido mostra zero registrado');
       check(!(await lot.textContent()).includes('Diferença:')&&!await page.locator('#inventoryDifferencesPanel').isVisible(),'Contagem cega não revela saldo no resumo');
+      if(width===390){
+        check(await page.locator('#inventoryBlindHint').isVisible()&&
+          !(await lot.textContent()).includes('saldo esperado'),'Uma orientação para a lista de contagem');
+        await page.selectOption('#inventoryFilter','all');
+        await page.click('#inventoryNextItem');
+        for(const done of [2,3]){
+          await page.waitForFunction(()=>document.activeElement.matches('.inventory-count-input'));
+          const focused=page.locator('.inventory-count-input:focus');
+          await focused.fill('1');await focused.press('Enter');
+          await page.waitForFunction(done=>document.querySelector('.inventory-lot summary').textContent.includes(done+' de 4'),done);
+        }
+        check(await page.evaluate(()=>window.__test.calls.filter(c=>c.name==='guigs_count_spatial_inventory_item').length)===3,
+          'Três contagens em sequência por teclado');
+        check(!(await lot.textContent()).includes('Esperado inicial'),'Contagem permanece cega durante a sequência');
+      }
       await page.waitForFunction(()=>document.querySelector('.inventory-photo img')?.naturalWidth>0);
       await page.fill('#inventorySearch','Produto 2');
       await page.selectOption('#inventoryFilter','all');

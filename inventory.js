@@ -170,6 +170,7 @@ export function createInventoryUI({getContext, confirmAction, refreshStock}) {
     const confirmed=items.filter(verified).length;
     const localCount=new Set(items.map(i=>i.slot_id || i.location)).size;
     const productCount=new Set(items.map(i=>i.product_id)).size;
+    el('inventoryBlindHint').classList.toggle('hidden', current.status!=='open');
     const differencesSummary=current.status==='open'?'':` · Divergentes: ${items.filter(divergent).length}`;
     el('inventoryTotals').textContent = `Produtos: ${productCount} · Lotes: ${lots.length} · Locais distintos: ${localCount} · Posições de contagem: ${items.length} · Conferidos: ${confirmed} · Pendentes: ${items.length-confirmed}${differencesSummary}`;
     const active = ['open','review'].includes(current.status);
@@ -250,8 +251,7 @@ export function createInventoryUI({getContext, confirmAction, refreshStock}) {
       positive:'Diferença positiva',negative:'Diferença negativa'};
     row.append(textElement('h4',itemLabel(item)),textElement('strong',conflict?'Requer recontagem':labels[state]));
     if (current.status==='open') {
-      row.append(textElement('p',counted(item) ? 'Quantidade física registrada: '+item.counted_quantity
-        : 'Contagem cega: saldo esperado disponível na revisão.','muted'));
+      if (counted(item)) row.append(textElement('p','Quantidade física registrada: '+item.counted_quantity,'muted'));
     } else if(item.basis_quantity!=null) {
       const difference=counted(item)?Number(item.counted_quantity)-Number(item.basis_quantity):'—';
       row.append(textElement('p','Esperado inicial: '+item.expected_initial+' · Base de conferência: '+item.basis_quantity+

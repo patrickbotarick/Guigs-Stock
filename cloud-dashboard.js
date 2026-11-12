@@ -1960,6 +1960,8 @@ function renderHistory() {
 
     const r =
       ht.insertRow();
+    r.className = 'history-entry';
+    r.setAttribute('role', 'row');
 
 
     cell(
@@ -2076,6 +2078,14 @@ function renderHistory() {
           ? 'num delta-negative'
           : 'num'
     );
+    for (const td of r.cells) td.setAttribute('role', 'cell');
+    for (const [index,label] of [[3,'Local'],[4,'Responsável']]) {
+      const prefix = document.createElement('span');
+      prefix.className = 'history-mobile-label';
+      prefix.setAttribute('aria-hidden','true');
+      prefix.textContent = label + ': ';
+      r.cells[index].prepend(prefix);
+    }
   }
 
 

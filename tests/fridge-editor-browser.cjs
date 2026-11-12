@@ -297,7 +297,10 @@ function bridge({role,shop}){
     await authorized.context.close();
     assert.deepEqual(await ledger(),before);checks++;
     const editorChecks=checks;checks=0;
-    const {fridgeSlotState}=await import('../fridges.js');
+    const {fridgeSlotState,fridgeSlotAlerts}=await import('../fridges.js');
+    const alertFixture={quantity:0,min_quantity:2,target_quantity:4,capacity_quantity:6,lots:[]};
+    check(!fridgeSlotAlerts({...alertFixture,product_id:null}).low&&
+      fridgeSlotAlerts({...alertFixture,product_id:id(20)}).low,'Mínimo só gera alerta operacional com produto associado');
     for(const [quantity,expected] of [[0,'VAZIO'],[1,'CRÍTICO'],[2,'ATENÇÃO'],[4,'OK'],[6,'OK']])
       check(fridgeSlotState({quantity,min_quantity:2,target_quantity:4,capacity_quantity:6})===expected,'Estado no limite '+quantity);
     const create=async(kind,values)=>(await dispatch({role:'owner',name:'guigs_save_fridge_layout',args:{p_shop_id:shop,p_kind:kind,p_values:values,p_id:null,p_revision:null}}));
@@ -668,7 +671,9 @@ function bridge({role,shop}){
     check(await inventory.page.isVisible('#inventoryPosition'),'Filtro de posição exposto');
     await inventory.page.selectOption('#inventoryPosition',x);
     check(await inventory.page.locator('.inventory-item').count()===1,'Filtro deixa apenas o lote da posição');
-    check((await inventory.page.locator('.inventory-item').textContent()).includes('Contagem cega'),'Esperado não exibido antes da contagem');
+    check(await inventory.page.locator('#inventoryBlindHint').isVisible()&&
+      !(await inventory.page.locator('.inventory-item').textContent()).includes('Esperado inicial'),
+      'Esperado não exibido antes da contagem e orientação é compartilhada');
     await inventory.page.locator('.inventory-count-input').fill('6');
     await inventory.page.locator('.inventory-count-form button[type=submit]').click();
     await inventory.page.waitForFunction(()=>document.querySelector('#inventoryTotals').textContent.includes('Conferidos: 1'));
