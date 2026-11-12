@@ -469,10 +469,15 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 10px;
+        gap: var(--gap-2);
         flex-wrap: wrap;
-        margin-bottom: 15px;
+        margin-bottom: var(--gap-2);
       }
+
+      .panelhead h2 { margin: 0; line-height: 1.25; }
+      .panelhead .muted { margin: .25rem 0 0; line-height: 1.45; }
+      .panelhead > * { min-inline-size: 0; }
+      .panel > .view-tools { margin-block-end: var(--gap-2); }
 
       .badge {
         font-size: 10px;
@@ -1395,8 +1400,19 @@
         overscroll-behavior: contain;
         scroll-padding-block-end: 5.5rem;
       }
-      dialog .modalactions { z-index: var(--layer-sticky); }
+      dialog .modalhead { gap: var(--gap-2); }
+      dialog .modal h2 { line-height: 1.25; overflow-wrap: anywhere; }
+      dialog .modalintro .muted { line-height: 1.45; }
+      dialog .modalactions {
+        background: var(--surface);
+        border-block-start: 1px solid var(--line);
+        z-index: var(--layer-sticky);
+      }
       dialog .modalactions .btn { white-space: normal; }
+      @media (max-width: 700px), (max-height: 550px) {
+        dialog .modal { padding: clamp(.75rem, 4vw, 1.125rem); }
+        dialog .modalform { margin-top: var(--gap-2); gap: var(--gap-2); }
+      }
       .draft-warning { color: var(--warning); font-size: .85rem; margin: .5rem 0 0; }
       .draft-warning:empty { display: none; }
       .tools { display: flex; flex-wrap: wrap; gap: var(--gap-1); align-items: flex-start; }
@@ -1673,6 +1689,13 @@
       .shopping-need-metrics .shopping-need-priority { background: #fff0f1; border-color: #eacbd0; }
       .shopping-need-priority dd { color: var(--accent); }
       .shopping-need-details { border-block-start: 1px solid var(--line); }
+      .shopping-cards > .empty {
+        grid-column: 1 / -1;
+        margin: 0;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-field);
+        background: var(--surface-soft);
+      }
       .shopping-need-details > summary { min-height: 44px; align-content: center; font-size: .85rem; font-weight: 700; cursor: pointer; }
       .shopping-need-details p { font-size: .85rem; }
       .shopping-need .shopping-actions { margin: auto 0 0; }
@@ -1900,10 +1923,7 @@
           <section id="historyView" class="hidden" aria-label="Histórico de movimentações">
             <div class="panel">
               <div class="panelhead">
-                <div>
-                  <h2>Histórico de movimentações</h2>
-                  <div class="muted">Movimentações mais recentes.</div>
-                </div>
+                <h2>Movimentações</h2>
 
                 <div class="historypaging">
                   <button id="prev" class="btn" aria-label="Página anterior do histórico">←</button>
@@ -2219,7 +2239,7 @@
           <section id="reportsView" class="hidden" aria-label="Relatórios operacionais">
             <div id="reportsOffline" class="notice danger hidden" role="status">Sem internet: atualização e exportação indisponíveis. Dados já exibidos podem estar desatualizados.</div>
             <div class="panel">
-              <h2>Relatórios operacionais</h2><p class="muted">Gestão de estoque físico · Acesso do proprietário</p>
+              <div class="panelhead"><h2>Período do relatório</h2></div>
               <div class="tools view-tools">
                 <div class="field tool-search-field"><label for="reportsPeriod">Período</label><select id="reportsPeriod"><option value="today">Hoje</option><option value="7">7 dias</option><option value="30" selected>30 dias</option><option value="month">Este mês</option><option value="previous">Mês anterior</option><option value="custom">Personalizado</option></select></div>
                 <button id="reportsReload" class="btn" type="button">Atualizar relatórios</button>

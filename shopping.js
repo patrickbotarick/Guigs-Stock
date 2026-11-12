@@ -158,7 +158,7 @@ export function createShoppingUI({getContext,confirmAction,openReceipt}) {
       if(owner())actions.append(button('Editar mínimo e meta',()=>openLimits(item),true));
       card.append(actions);list.append(card);
     }
-    if(!shown.length)list.textContent='Nenhum produto para estes filtros.';
+    if(!shown.length)list.append(node('p','Nenhum produto para estes filtros.','empty'));
     void updatePhotos(targets);sync();
   }
 
@@ -177,7 +177,7 @@ export function createShoppingUI({getContext,confirmAction,openReceipt}) {
         button('Abrir lista',()=>void changeDetail(()=>openOrder(order.id))));
       orders.append(card);
     }
-    if(!board.orders.length)orders.textContent='Nenhuma lista nesta página.';
+    if(!board.orders.length)orders.append(node('p','Nenhuma lista nesta página.','empty'));
     el('shoppingPage').textContent='Página '+(page+1)+' · '+counts.total+' lista(s)';
     renderNeeds();
   }
