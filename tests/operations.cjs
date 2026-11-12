@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
-const {fixture} = require('./browser.cjs');
+const {fixture,navigate} = require('./browser.cjs');
 let checks = 0;
 const check = (value,message) => {assert.ok(value,message);checks++;};
 const root = path.resolve(__dirname,'..');
@@ -289,7 +289,7 @@ const server = http.createServer((req,res)=>{
       check((await page.textContent('#historyFilterBadge')).includes('1 ativo'),'Histórico mostra filtro recolhido ativo');
       await click('#clearHistoryFilters');
       check(await page.inputValue('#historyProduct')==='','Histórico permite limpar o atalho sem abrir filtros');
-      await click('#navOverview');
+      await navigate(page,'navOverview');
       check(external.length===0,'Zero requisições externas/produção');
       check(errors.length===0,`Sem erros JS: ${errors.join('; ')}`);
       console.log(`${role} / ${mobile?'mobile':'desktop'}: operação validada.`);

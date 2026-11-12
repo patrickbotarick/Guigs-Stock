@@ -6,7 +6,7 @@ const http = require('node:http');
 const {setTimeout: delay} = require('node:timers/promises');
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
 const {build, files} = require('../scripts/build.cjs');
-const {fixture} = require('./browser.cjs');
+const {fixture, navigate, openMobileNavigation} = require('./browser.cjs');
 
 const controls = [
   ['historyProductSearch', 'Produto'], ['historyType', 'Tipo'], ['historyPartition', 'Localização'],
@@ -210,11 +210,12 @@ async function run() {
     await page.waitForSelector('#content:not(.hidden)');
     for (const [link, view] of [['navOverview', 'overviewView'], ['navFridges', 'fridgesView'],
       ['navInventory', 'inventoryView'], ['navShopping', 'shoppingView'], ['navHistory', 'historyView'], ['navOverview', 'overviewView']]) {
-      await page.click('#' + link);
+      await navigate(page, link);
       await page.waitForSelector('#' + view + ':not(.hidden)');
       assert.equal(await page.locator('#' + link).getAttribute('aria-current'), 'page');
       evidence.regressions.push(`Navegação: ${view}`);
     }
+    await openMobileNavigation(page);
     await page.locator('#navHistory').focus();
     await page.keyboard.press('Enter');
     await page.waitForFunction(()=>document.activeElement.id==='viewTitle');
@@ -224,6 +225,7 @@ async function run() {
     assert.equal(await page.getByRole('button',{name:'Página anterior do histórico'}).count(),1);
     assert.equal(await page.getByRole('button',{name:'Próxima página do histórico'}).count(),1);
     evidence.regressions.push('Enter move foco ao título; Tab segue no conteúdo e paginação tem nomes');
+    await openMobileNavigation(page);
     await page.locator('#navOverview').focus();await page.keyboard.press('Enter');
     await page.waitForFunction(()=>document.activeElement.id==='viewTitle'&&document.activeElement.textContent==='Visão geral');
     await page.click('#receiveStock'); await page.waitForSelector('#receiveDialog[open]');
@@ -270,7 +272,7 @@ async function run() {
     assert.ok(standalone, 'Janela instalada do Edge com display-mode standalone não encontrada');
     await standalone.waitForSelector('#content:not(.hidden)');
     assert.ok(await standalone.evaluate(() => matchMedia('(display-mode: standalone)').matches));
-    await standalone.click('#navHistory');
+    await navigate(standalone,'navHistory');
     await standalone.click('#historyTools summary');
     for (const [width, height] of [[1024, 768], [1280, 800]]) {
       await standalone.setViewportSize({width, height});
@@ -280,6 +282,32 @@ async function run() {
       await standalone.screenshot({path: path.join(root, `pwa-${width}.png`), fullPage: true});
       await filterFlow(standalone);
       evidence.standalone.at(-1).filtersAndKeyboard = 'PASS';
+    }
+    evidence.standaloneMobileNavigation = [];
+    for (const [width, height] of [[390,844],[844,390]]) {
+      await standalone.setViewportSize({width, height});
+      const toggle=standalone.getByRole('button',{name:'Menu de navegação'});
+      const navigation=standalone.getByRole('navigation',{name:'Navegação principal'});
+      assert.ok(await toggle.isVisible()&&!await navigation.isVisible());
+      await openMobileNavigation(standalone);
+      assert.equal(await navigation.getByRole('link').count(),6);
+      await standalone.screenshot({path:path.join(root,`pwa-menu-${width}x${height}.png`)});
+      await navigate(standalone,'navFridges');
+      await standalone.locator('#fridgesView').waitFor();
+      assert.ok(!await navigation.isVisible());
+      assert.equal(await standalone.locator('#mobilePage').textContent(),'Geladeiras');
+      await openMobileNavigation(standalone);
+      await standalone.keyboard.press('Escape');
+      assert.ok(await toggle.evaluate(e=>e===document.activeElement));
+      await navigate(standalone,'navHistory');
+      await standalone.locator('#historyView').waitFor();
+      const layout=await standalone.evaluate(()=>{
+        const {scrollWidth,clientWidth}=document.documentElement;
+        return {scrollWidth,clientWidth,innerWidth};
+      });
+      evidence.standaloneMobileNavigation.push({width,height,...layout});
+      assert.ok(layout.scrollWidth<=layout.clientWidth+1,JSON.stringify(layout));
+      evidence.standaloneMobileNavigation.at(-1).status='PASS';
     }
     await standalone.close();
     await context.setOffline(true);
@@ -291,7 +319,7 @@ async function run() {
     assert.deepEqual(errors, []);
     evidence.regressions.push('PWA v21: instalação, standalone, cache, navegação offline e console');
     evidence.status = 'PASS';
-    console.log('Histórico: 6 resoluções, 2 larguras equivalentes a zoom e 2 resoluções em PWA instalada passaram.');
+    console.log('Histórico: 6 resoluções, 2 larguras equivalentes a zoom e 2 resoluções desktop e 2 mobile em PWA instalada passaram.');
   } catch (error) {
     evidence.error = error.message;
     throw error;

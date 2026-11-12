@@ -1474,12 +1474,6 @@
       }
 
       @media (max-width: 700px) {
-        .side { padding: .55rem .75rem; gap: .35rem; }
-        .side .brand { gap: .5rem; }
-        .side .brand img { width: 32px; height: 32px; }
-        .side .brand small { display: none; }
-        .navigation { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); width: 100%; gap: .2rem; }
-        .navigation .menu { display: grid; align-content: center; min-height: 44px; padding: .2rem .35rem; line-height: 1.2; }
         .main { padding-block-start: .7rem; }
         .main:has(#fridgesView:not(.hidden)) .top h1 { font-size: 1.45rem; }
         .main:has(#fridgesView:not(.hidden)) .top { gap: .35rem; }
@@ -1544,12 +1538,6 @@
       }
 
       @media (min-width: 620px) and (max-width: 950px) and (max-height: 550px) {
-        .side { padding: .4rem .7rem; gap: .5rem; flex-wrap: nowrap; }
-        .side .brand { flex: 0 0 auto; }
-        .side .brand img { width: 32px; height: 32px; }
-        .side .brand small { display: none; }
-        .navigation { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); flex: 1; width: auto; gap: .2rem; }
-        .navigation .menu { display: grid; align-content: center; min-height: 44px; padding: .2rem .35rem; line-height: 1.2; }
         .main { padding-block-start: .65rem; }
         .top .eyebrow { display: none; }
       }
@@ -1597,6 +1585,42 @@
         .inventory-count-form label { grid-column: 1 / -1; }
         .inventory-count-form button { padding-inline: .6rem; }
       }
+
+      .mobile-nav-toggle.btn, .brand .mobile-page { display: none; }
+
+      @media (max-width: 700px), (max-width: 950px) and (max-height: 550px) {
+        .side { position: relative; z-index: var(--layer-sticky); flex-wrap: nowrap; padding: .45rem .75rem; gap: .65rem; }
+        .side .brand { gap: .5rem; min-width: 0; }
+        .side .brand img { width: 32px; height: 32px; flex-shrink: 0; }
+        .side .brand strong { font-size: 1.1rem; }
+        .side .brand-caption { display: none; }
+        .brand .mobile-page { display: block; color: #e8bf83; font-size: .75rem; letter-spacing: 0; }
+        .mobile-nav-toggle.btn {
+          display: grid; place-items: center; flex: 0 0 44px; width: 44px; padding: 0;
+          color: white; background: #29292d; border-color: #646167;
+        }
+        .mobile-nav-toggle.btn:hover { background: #713036; border-color: #e8bf83; }
+        .mobile-nav-toggle.btn:focus-visible { outline-color: #e8bf83; }
+        .mobile-nav-icon, .mobile-nav-icon::before, .mobile-nav-icon::after {
+          display: block; width: 20px; height: 2px; border-radius: 1px; background: currentColor;
+        }
+        .mobile-nav-icon { position: relative; }
+        .mobile-nav-icon::before, .mobile-nav-icon::after { content: ""; position: absolute; inset-inline-start: 0; }
+        .mobile-nav-icon::before { translate: 0 -6px; }
+        .mobile-nav-icon::after { translate: 0 6px; }
+        .mobile-nav-toggle[aria-expanded="true"] .mobile-nav-icon { background: transparent; }
+        .mobile-nav-toggle[aria-expanded="true"] .mobile-nav-icon::before { translate: none; rotate: 45deg; }
+        .mobile-nav-toggle[aria-expanded="true"] .mobile-nav-icon::after { translate: none; rotate: -45deg; }
+        .side .navigation {
+          display: none; position: absolute; inset: 100% .75rem auto auto; margin-block-start: .25rem;
+          width: min(24rem,calc(100% - 1.5rem));
+          max-height: calc(100dvh - 5rem); overflow-y: auto; overscroll-behavior: contain;
+          padding: .45rem; gap: .2rem; border: 1px solid #646167;
+          border-radius: var(--radius-panel); background: #19191c; box-shadow: var(--shadow-dialog);
+        }
+        .side .navigation[data-open] { display: grid; }
+        .navigation .menu { display: flex; align-items: center; gap: .45rem; min-height: 44px; line-height: 1.2; }
+      }
     </style>
   </head>
 
@@ -1607,18 +1631,23 @@
           <img src="logo-guigs.png" alt="Logo Guig's" />
           <div>
             <strong>Guig's Stock</strong>
-            <small>CONTROLE DE ESTOQUE</small>
+            <small class="brand-caption">CONTROLE DE ESTOQUE</small>
+            <small id="mobilePage" class="mobile-page" aria-hidden="true">Visão geral</small>
           </div>
         </div>
 
-        <nav class="navigation" aria-label="Navegação principal">
+        <button id="mobileNavToggle" class="btn mobile-nav-toggle" type="button"
+          aria-label="Menu de navegação" aria-controls="mainNavigation" aria-expanded="false">
+          <span class="mobile-nav-icon" aria-hidden="true"></span>
+        </button>
+        <nav id="mainNavigation" class="navigation" aria-label="Navegação principal">
           <span class="nav-label">NAVEGAÇÃO</span>
-          <a id="navOverview" class="menu" href="#visao-geral" aria-current="page">◫ Visão geral</a>
-          <a id="navHistory" class="menu" href="#historico">↻ Histórico</a>
-          <a id="navFridges" class="menu" href="#geladeiras">▥ Geladeiras</a>
-          <a id="navInventory" class="menu" href="#inventario">▤ Inventário</a>
-          <a id="navReports" class="menu hidden" href="#relatorios">▥ Relatórios</a>
-          <a id="navShopping" class="menu" href="#compras">▤ Lista de Compras</a>
+          <a id="navOverview" class="menu" href="#visao-geral" aria-current="page"><span aria-hidden="true">◫</span> <span class="nav-text">Visão geral</span></a>
+          <a id="navHistory" class="menu" href="#historico"><span aria-hidden="true">↻</span> <span class="nav-text">Histórico</span></a>
+          <a id="navFridges" class="menu" href="#geladeiras"><span aria-hidden="true">▥</span> <span class="nav-text">Geladeiras</span></a>
+          <a id="navInventory" class="menu" href="#inventario"><span aria-hidden="true">▤</span> <span class="nav-text">Inventário</span></a>
+          <a id="navReports" class="menu hidden" href="#relatorios"><span aria-hidden="true">▥</span> <span class="nav-text">Relatórios</span></a>
+          <a id="navShopping" class="menu" href="#compras"><span aria-hidden="true">▤</span> <span class="nav-text">Lista de Compras</span></a>
         </nav>
 
         <p>

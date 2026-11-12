@@ -144,7 +144,17 @@ function fixture({role, session, searchable = false, readOnly = false, operation
   };
 }
 
-module.exports = {fixture};
+async function openMobileNavigation(page) {
+  const button = page.locator('#mobileNavToggle');
+  if (await button.isVisible() && await button.getAttribute('aria-expanded') === 'false') await button.click();
+}
+
+async function navigate(page, id) {
+  await openMobileNavigation(page);
+  await page.locator('#' + id).click();
+}
+
+module.exports = {fixture, navigate, openMobileNavigation};
 if (require.main === module) (async () => {
   // Lista explícita; config.js real nunca é lido nem servido.
   const files = ['index.html','auth-preview.html','reset-password.html','cloud-dashboard.js','inventory.js','reports.js','fridges.js','fridge-moves.js','image-library.js','shopping.js','auth-preview.js','reset-password.js','pwa.js','service-worker.js','manifest.webmanifest','logo-guigs.png'];
@@ -280,12 +290,12 @@ if (require.main === module) (async () => {
     await page.click('[data-close="transferDialog"]');
 
     await page.setViewportSize({width:390,height:844});
-    check(await page.evaluate(() => getComputedStyle(document.querySelector('.side')).position==='static'), 'Sidebar mobile não ocupa lateral');
+    check(await page.evaluate(() => getComputedStyle(document.querySelector('.side')).position==='relative'), 'Cabeçalho mobile não ocupa lateral');
     check(await page.evaluate(() => document.documentElement.scrollWidth<=window.innerWidth), 'Sem scroll horizontal na página mobile');
-    await page.click('#navHistory'); await page.waitForSelector('#historyView:not(.hidden)');
-    check(await page.isVisible('#historyView') && await page.isVisible('#navOverview'), 'Histórico acessível no celular');
+    await navigate(page,'navHistory'); await page.waitForSelector('#historyView:not(.hidden)');
+    check(await page.isVisible('#historyView') && !await page.isVisible('#navOverview'), 'Histórico acessível no celular e menu recolhido');
     if (artifacts) await page.screenshot({path:path.join(artifacts,'historico-mobile.png'),fullPage:true});
-    await page.click('#navOverview'); await page.waitForSelector('#overviewView:not(.hidden)');
+    await navigate(page,'navOverview'); await page.waitForSelector('#overviewView:not(.hidden)');
     check(await page.isVisible('#overviewView'), 'Retorno mobile');
     await openB(); await page.fill('#transferQuantity','1'); await page.click('#saveTransfer'); await page.waitForSelector('#fefoDialog[open]');
     check(await page.isVisible('#cancelFefo') && await page.isVisible('#continueFefo'), 'Ações FEFO acessíveis mobile');
@@ -327,6 +337,81 @@ if (require.main === module) (async () => {
     check(await attendant.locator('#email').isVisible(),'Sessão expirada redireciona ao login');
     check(!await attendant.locator('#receiveDialog').count(),'Sessão expirada retira o formulário de operação');
     await attendantContext.close();
+
+    const routeCases = [
+      ['navOverview','overviewView','Visão geral'],
+      ['navFridges','fridgesView','Geladeiras'],
+      ['navInventory','inventoryView','Inventário'],
+      ['navShopping','shoppingView','Lista de Compras'],
+      ['navHistory','historyView','Histórico'],
+      ['navReports','reportsView','Relatórios']
+    ];
+    for (const role of ['owner','attendant']) {
+      const touch = await browser.newContext({viewport:{width:320,height:700},hasTouch:true});
+      await touch.route('**/*',r=>new URL(r.request().url()).origin===base?r.continue():r.abort());
+      await touch.addInitScript(fixture,{role,session:true});
+      const phone = await touch.newPage();
+      phone.on('pageerror',e=>errors.push(e.message));
+      await phone.goto(base+'/index.html#geladeiras');
+      await phone.waitForSelector('#content:not(.hidden)');
+      const toggle=phone.getByRole('button',{name:'Menu de navegação'});
+      const menu=phone.getByRole('navigation',{name:'Navegação principal'});
+      for (const [width,height] of [[320,700],[360,800],[390,844],[430,932],[844,390]]) {
+        await phone.setViewportSize({width,height});
+        check(!await menu.isVisible() && await toggle.isVisible(), role+' fecha menu em '+width);
+        await toggle.tap();
+        check(await menu.getByRole('link').count()===(role==='owner'?6:5),role+' rotas autorizadas em '+width);
+        check(await phone.evaluate(()=>document.documentElement.scrollWidth===innerWidth),'Menu aberto sem overflow em '+width);
+        await toggle.tap();
+        check(await toggle.getAttribute('aria-expanded')==='false','Toque repetido recolhe menu');
+      }
+      for (const [id,view,label] of routeCases.filter(([id])=>role==='owner'||id!=='navReports')) {
+        await toggle.tap();
+        await menu.locator('#'+id).tap();
+        await phone.locator('#'+view).waitFor();
+        check(await phone.locator('#'+id).getAttribute('aria-current')==='page'&&
+          await phone.locator('#mobilePage').textContent()===label&&!await menu.isVisible(),role+' ativa '+label);
+      }
+
+      await toggle.focus();
+      await phone.keyboard.press('Tab');
+      check(await phone.evaluate(()=>!document.activeElement.closest('#mainNavigation')),'Tab ignora menu fechado');
+      await toggle.focus();
+      await phone.keyboard.press('Enter');
+      check(await phone.evaluate(()=>document.activeElement.getAttribute('aria-current')==='page'),'Menu aberto foca rota atual');
+      await phone.keyboard.press('Escape');
+      check(!await menu.isVisible()&&await toggle.evaluate(e=>e===document.activeElement),'Escape fecha e devolve foco');
+      await phone.keyboard.press('Enter');
+      await menu.getByRole('link').last().focus();
+      await phone.keyboard.press('Tab');
+      check(!await menu.isVisible()&&await phone.evaluate(()=>Boolean(document.activeElement.closest('main'))),
+        'Tab depois da última rota fecha o painel e segue para o conteúdo');
+      await toggle.focus();
+      await phone.keyboard.press('Enter');
+      await menu.locator('#navFridges').focus();
+      await phone.keyboard.press('Enter');
+      await phone.locator('#fridgesView').waitFor();
+      check(!await menu.isVisible()&&await phone.locator('#viewTitle').evaluate(e=>e===document.activeElement),
+        'Enter seleciona a rota e foca o título');
+      await toggle.tap();
+      await phone.locator('.side .brand strong').tap();
+      check(!await menu.isVisible(),'Toque fora fecha menu');
+      await toggle.tap();
+      await menu.locator('[aria-current=page]').tap();
+      check(!await menu.isVisible()&&await phone.locator('#viewTitle').evaluate(e=>e===document.activeElement),'Toque na rota atual fecha e foca título');
+      await toggle.tap();
+      const currentHash=new URL(phone.url()).hash;
+      await phone.reload();
+      await phone.waitForSelector('#content:not(.hidden)');
+      check(new URL(phone.url()).hash===currentHash&&!await menu.isVisible()&&
+        await phone.locator('#mainNavigation [aria-current=page]').getAttribute('href')===currentHash,'Reload conserva a rota sem abrir menu');
+      await toggle.tap();
+      await phone.setViewportSize({width:1366,height:768});
+      check(await menu.isVisible()&&!await toggle.isVisible(),'Desktop mantém navegação visível');
+      await phone.setViewportSize({width:390,height:844});
+      check(!await menu.isVisible(),'Voltar a mobile mantém painel fechado');
+      await touch.close();
+    }
     check(errors.length===0, `Console sem erros críticos: ${errors.join('; ')}`);
     console.log(`Navegador: ${checks} verificações passaram (owner, attendant, desktop, mobile, FEFO e PWA).`);
   } finally {

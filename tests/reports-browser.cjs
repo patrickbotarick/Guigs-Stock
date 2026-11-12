@@ -1,7 +1,7 @@
 // SDK simulado e RPC de relatório encaminhada exclusivamente ao PGlite local.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),http=require('node:http');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
-const {fixture}=require('./browser.cjs');const {seed,report,id}=require('./reports-support.cjs');
+const {fixture,navigate,openMobileNavigation}=require('./browser.cjs');const {seed,report,id}=require('./reports-support.cjs');
 let checks=0,db,queue=Promise.resolve();const calls=[];
 const check=(value,message)=>{assert.ok(value,message);checks++;};
 const root=path.resolve(__dirname,'..');
@@ -45,6 +45,7 @@ function reportsClient({role,shopId}) {
    const ready=()=>page.waitForFunction(()=>!document.getElementById('reportsReload').disabled);
    const click=selector=>mobile?page.locator(selector).tap():page.click(selector);
    if(role==='attendant') {
+    await openMobileNavigation(page);
     check(!await page.isVisible('#navReports'),'Atendente sem entrada gerencial');
     await page.evaluate(()=>location.hash='#relatorios');await page.waitForFunction(()=>document.getElementById('reportsMessage').textContent.includes('apenas ao proprietário'));
     check(calls.length===0,'Hash direto de atendente não chama relatório');
@@ -52,7 +53,7 @@ function reportsClient({role,shopId}) {
     await page.evaluate(()=>document.getElementById('reportsExport').dispatchEvent(new Event('click')));
     check(calls.length===0&&await page.locator('#reportsSummary .report-card').count()===0,'Manipulação do DOM não carrega dados');
    }else {
-    await click('#navReports');await page.waitForSelector('#reportsView:not(.hidden)');await ready();
+    await navigate(page,'navReports');await page.waitForSelector('#reportsView:not(.hidden)');await ready();
     check(await page.getAttribute('#navReports','aria-current')==='page','View e navegação por hash');
     check(!await page.isVisible('#overviewView')&&!await page.isVisible('#historyView')&&!await page.isVisible('#inventoryView'),'View de relatórios independente');
     await click('#reportsTools summary');

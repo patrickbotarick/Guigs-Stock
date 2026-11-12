@@ -5,7 +5,7 @@ const path = require('node:path');
 const http = require('node:http');
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
 const {build,files} = require('../scripts/build.cjs');
-const {fixture} = require('./browser.cjs');
+const {fixture, navigate} = require('./browser.cjs');
 
 (async()=>{
   const requested=process.env.GUIGS_ROUND1_WORK;
@@ -52,7 +52,7 @@ const {fixture} = require('./browser.cjs');
     for(const [width,height] of six){
       await page.setViewportSize({width,height});
       for(const [link,view] of [['navOverview','overviewView'],['navHistory','historyView']]){
-        await page.click('#'+link);await page.waitForSelector('#'+view+':not(.hidden)');
+        await navigate(page,link);await page.waitForSelector('#'+view+':not(.hidden)');
         const dimensions=await page.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth,
           outside:[...document.querySelectorAll('main *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1 &&
             !e.closest('.tablewrap')).slice(0,12).map(e=>e.id||e.className||e.tagName)}));
@@ -62,7 +62,7 @@ const {fixture} = require('./browser.cjs');
       await page.screenshot({path:path.join(root,`historico-${width}.png`)});
     }
     await page.setViewportSize({width:1366,height:768});
-    await page.click('#navOverview');
+    await navigate(page,'navOverview');
     await page.reload();await page.waitForSelector('#content:not(.hidden)');
     check('Reload online autenticado com o SDK simulado',await page.isVisible('#overviewView'));
     cdp=await context.newCDPSession(page);

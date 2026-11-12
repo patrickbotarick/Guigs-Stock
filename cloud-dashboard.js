@@ -2964,8 +2964,11 @@ function applyView() {
   document.querySelector('.main').classList.toggle('history-view', history || inventory || reports || fridges || shopping);
   el('viewTitle').textContent = shopping ? 'Lista de Compras' : fridges ? 'Mapa de Geladeiras' : reports ? 'Relatórios operacionais' : inventory ? 'Inventário físico' : history ? 'Histórico de movimentações' : 'Visão geral';
   for (const [id, active] of [['navOverview', !history && !inventory && !reports && !fridges && !shopping], ['navHistory', history], ['navInventory',inventory], ['navReports',reports], ['navFridges',fridges],['navShopping',shopping]]) {
-    if (active) el(id).setAttribute('aria-current', 'page');
-    else el(id).removeAttribute('aria-current');
+    const link = el(id);
+    if (active) {
+      link.setAttribute('aria-current', 'page');
+      el('mobilePage').textContent = link.querySelector('.nav-text').textContent;
+    } else link.removeAttribute('aria-current');
   }
   if (inventory) inventoryUI.activate();
   if (reports) reportsUI.activate();
@@ -2982,7 +2985,52 @@ const shoppingUI = createShoppingUI({getContext:()=>({client,shop}),
 const fridgesUI = createFridgesUI({getContext:()=>({client,shop,products,lots,operator:shop?.operator}),refreshStock:refresh,
   openTransfer:openIntegratedTransfer,
   confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[])});
+const mobileNavigation = matchMedia('(max-width: 700px), (max-width: 950px) and (max-height: 550px)');
+const navigation = el('mainNavigation');
+const navigationToggle = el('mobileNavToggle');
+function closeMobileNavigation(restoreFocus = false) {
+  if (!navigation.hasAttribute('data-open')) return;
+  navigation.removeAttribute('data-open');
+  navigationToggle.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) navigationToggle.focus({preventScroll: true});
+}
+
+navigationToggle.addEventListener('click', () => {
+  if (navigation.hasAttribute('data-open')) {
+    closeMobileNavigation(true);
+    return;
+  }
+  navigation.setAttribute('data-open', '');
+  navigationToggle.setAttribute('aria-expanded', 'true');
+  const active = navigation.querySelector('[aria-current="page"]:not(.hidden)');
+  (active || navigation.querySelector('a:not(.hidden)')).focus();
+});
+
+navigation.addEventListener('click', event => {
+  const link = event.target.closest('a');
+  if (!link || !mobileNavigation.matches || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  closeMobileNavigation(true);
+  if (link.hash === location.hash) el('viewTitle').focus();
+});
+document.addEventListener('click', event => {
+  if (!navigation.contains(event.target) && !navigationToggle.contains(event.target)) {
+    closeMobileNavigation(document.activeElement === document.body || navigation.contains(document.activeElement));
+  }
+});
+document.addEventListener('focusin', event => {
+  if (!navigation.contains(event.target) && event.target !== navigationToggle) closeMobileNavigation();
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || !navigation.hasAttribute('data-open')) return;
+  event.preventDefault();
+  closeMobileNavigation(true);
+});
+mobileNavigation.addEventListener('change', () => {
+  closeMobileNavigation();
+});
+
 window.addEventListener('hashchange', () => {
+  closeMobileNavigation();
   applyView();
   if (!el('content').classList.contains('hidden') && !document.querySelector('dialog[open]')) {
     el('viewTitle').focus();

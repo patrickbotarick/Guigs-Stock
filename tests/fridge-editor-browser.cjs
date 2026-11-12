@@ -1,6 +1,6 @@
 const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
-const {fixture}=require('./browser.cjs');
+const {fixture,navigate}=require('./browser.cjs');
 const {createTestDatabase,asUser,id}=require('./inventory-support.cjs');
 const {files}=require('../scripts/build.cjs');
 const {randomUUID}=require('node:crypto');
@@ -538,7 +538,7 @@ function bridge({role,shop}){
     await worker.page.waitForFunction(()=>!document.querySelector('#fridgeStockDialog').open&&!document.querySelector('#refresh').disabled);
     const debit=(await db.query("select slot_id,lot_id,delta from public.guigs_movements where movement_type='loss' and spatial")).rows;
     check(debit.some(row=>row.slot_id===x&&row.lot_id===selectedLot&&row.delta===-1),'Confirmação debita o bloco e lote selecionados');
-    await worker.page.click('#navHistory');
+    await navigate(worker.page,'navHistory');
     await worker.page.click('#historyTools summary');
     await worker.page.selectOption('#historyPartition','slot');
     await worker.page.waitForFunction(()=>document.querySelector('#history').textContent.includes('Estoque seco → Geladeira A'));
@@ -572,7 +572,7 @@ function bridge({role,shop}){
     await transfer.page.waitForFunction(slot=>!document.querySelector('#transferDialog').open&&document.querySelector('[data-slot-id="'+slot+'"]').textContent.includes('4 un.'),transferSlot);
     check(true,'Mapa mostra saldo atualizado após transferência integrada');
     await transfer.page.setViewportSize({width:390,height:844});
-    await transfer.page.click('#navOverview');
+    await navigate(transfer.page,'navOverview');
     await transfer.page.click('#transferStock');
     await transfer.page.waitForSelector('#transferDialog[open]');
     await transfer.page.selectOption('#transferLot',transferLot,{force:true});
@@ -660,7 +660,7 @@ function bridge({role,shop}){
     const transferChecks=checks;checks=0;
     const countBefore=await ledger();
     const inventory=await open('owner',{width:390,height:844});
-    await inventory.page.click('#navReports');
+    await navigate(inventory.page,'navReports');
     await inventory.page.waitForFunction(()=>document.querySelector('#reportsMessage').textContent.includes('Período aplicado'));
     check((await inventory.page.textContent('#reportsFridgeSummary')).includes('Venda: 4 un.'),'Relatório agrega venda por geladeira');
     const download=inventory.page.waitForEvent('download');
@@ -668,7 +668,7 @@ function bridge({role,shop}){
     const csv=fs.readFileSync(await (await download).path(),'utf8');
     check(csv.includes('"Local"')&&csv.includes('Geladeira A / A1 / Coca A1')&&csv.includes("'=Fórmula"),'CSV inclui posição e neutraliza fórmula');
     const reportingChecks=checks;checks=0;
-    await inventory.page.click('#navInventory');
+    await navigate(inventory.page,'navInventory');
     await inventory.page.click('#newSpatialInventory');
     await inventory.page.click('#inventoryCreateSubmit');
     await inventory.page.waitForSelector('#inventoryDetail:not(.hidden) .inventory-item');

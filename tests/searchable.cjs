@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
-const {fixture} = require('./browser.cjs');
+const {fixture,navigate} = require('./browser.cjs');
 let checks = 0;
 const check = (value, message) => {assert.ok(value, message); checks++;};
 const root = path.resolve(__dirname, '..');
@@ -133,7 +133,7 @@ const server = http.createServer((req, res) => {
       await filter('supplierSelect','inativo');
       check(await rows('supplierSelect').count()===1, 'Gestão mantém fornecedor inativo visível');
       await click(page.locator('[data-close="supplierDialog"]'));
-      await click(page.locator('#navHistory'));
+      await navigate(page,'navHistory');
       await click(page.locator('#historyTools summary'));
       await filter('historyProduct','uva'); await page.keyboard.press('Enter');
       check(await page.inputValue('#historyProduct')==='product-2', 'Histórico usa pesquisa por produto');

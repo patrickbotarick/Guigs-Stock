@@ -1,7 +1,7 @@
 // Navegador com SDK Supabase mockado; RPCs de inventário usam só PGlite em memória.
 const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const http=require('node:http');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
-const {fixture}=require('./browser.cjs');const {createTestDatabase,callRPC,asUser,id}=require('./inventory-support.cjs');
+const {fixture,navigate}=require('./browser.cjs');const {createTestDatabase,callRPC,asUser,id}=require('./inventory-support.cjs');
 let checks=0;const check=(value,message)=>{assert.ok(value,message);checks++;};
 let db;let rpcQueue=Promise.resolve();const calls=[];
 const root=path.resolve(__dirname,'..');
@@ -49,7 +49,7 @@ function inventoryClient({role,shopId}){
    const items=async()=> (await db.query('select * from public.guigs_inventory_items order by product_name,location')).rows;
    const confirm=async()=>{await page.waitForSelector('#operationConfirmDialog[open]');await click('#confirmOperation');};
    check(calls.length===0,'RPCs de inventário não são consultadas fora da view');
-   await click('#navInventory');await page.waitForSelector('#inventoryView:not(.hidden)');await page.waitForFunction(()=>document.getElementById('inventoryPage').textContent.includes('Página'));
+   await navigate(page,'navInventory');await page.waitForSelector('#inventoryView:not(.hidden)');await page.waitForFunction(()=>document.getElementById('inventoryPage').textContent.includes('Página'));
    check(await page.getAttribute('#navInventory','aria-current')==='page','Navegação Inventário ativa');
    check(!await page.isVisible('#overviewView')&&!await page.isVisible('#historyView'),'Inventário em view própria');
    if(role==='owner'){
@@ -155,9 +155,9 @@ function inventoryClient({role,shopId}){
    await page.waitForFunction(()=>document.getElementById('inventoryMessage').textContent.includes('migration 007'));
    check((await page.textContent('#inventoryMessage')).includes('não execute em produção'),'Ambiente sem migration tem erro claro sem aplicar SQL');
    await page.evaluate(()=>window.__test.inventoryMissing=false);
-   await click('#navHistory');await page.waitForSelector('#historyView:not(.hidden)');await click('#navOverview');await page.waitForSelector('#overviewView:not(.hidden)');
+   await navigate(page,'navHistory');await page.waitForSelector('#historyView:not(.hidden)');await navigate(page,'navOverview');await page.waitForSelector('#overviewView:not(.hidden)');
    check(await page.isVisible('#products'),'Retorno às views antigas preservado');
-   if(process.env.TEST_ARTIFACTS_DIR){fs.mkdirSync(process.env.TEST_ARTIFACTS_DIR,{recursive:true});await click('#navInventory');await page.screenshot({path:path.join(process.env.TEST_ARTIFACTS_DIR,`inventario-${role}-${mobile?'mobile':'desktop'}.png`),fullPage:true});}
+   if(process.env.TEST_ARTIFACTS_DIR){fs.mkdirSync(process.env.TEST_ARTIFACTS_DIR,{recursive:true});await navigate(page,'navInventory');await page.screenshot({path:path.join(process.env.TEST_ARTIFACTS_DIR,`inventario-${role}-${mobile?'mobile':'desktop'}.png`),fullPage:true});}
    check(external.length===0,'Zero rede externa/produção');check(errors.length===0,`Sem erros JS: ${errors.join('; ')}`);
    await context.close();await rpcQueue;await db.close();db=null;
    console.log(`Inventário UI: ${role} / ${mobile?'mobile':'desktop'} aprovado.`);
