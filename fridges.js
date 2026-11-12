@@ -95,7 +95,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     el('fridgeEdit').classList.toggle('hidden',!canManageLayout());
     el('fridgeEdit').disabled=locked||!data;
     el('fridgeAllocate').classList.toggle('hidden',!owner());
-    el('fridgeMoreActions').classList.toggle('hidden',!owner());
+    el('fridgeMoreActions').classList.toggle('hidden',!canManageLayout());
     el('fridgeAllocate').disabled=locked||!data?.unallocated.some(l=>l.quantity>0);
     el('fridgeOperateStock').disabled=locked||!data;
     el('fridgeOperate').setAttribute('aria-pressed',String(!editing&&!restocking));
@@ -335,22 +335,36 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     return badges;
   }
   function filterMap(){
+    const chosenFridge=el('fridgePicker').value;
     const words=normalizeMapText(el('fridgeMapSearch').value.trim()).split(/\s+/).filter(Boolean);
     const stock=el('fridgeMapStock').value;
     const alerts=[...el('fridgeMapFilters').querySelectorAll('input[type=checkbox]:checked')].map(input=>input.value);
-    let visible=0;
-    for(const {card,text,flags} of mapCards){
-      const matches=words.every(word=>text.includes(word))&&alerts.every(alert=>flags[alert])&&
+    const filterCount=alerts.length+Number(stock!=='all')+Number(words.length>0);
+    el('fridgeFilterBadge').textContent=filterCount ? filterCount+' ativo(s)' : '';
+    for(const cabinet of el('fridgeMap').querySelectorAll('[data-fridge-id]')) {
+      cabinet.classList.toggle('hidden',!!chosenFridge&&cabinet.dataset.fridgeId!==chosenFridge);
+    }
+    let visible=0,total=0;
+    for(const {card,text,flags,fridgeId} of mapCards){
+      const inFridge=!chosenFridge||chosenFridge===fridgeId;
+      if(inFridge)total++;
+      const matches=inFridge&&words.every(word=>text.includes(word))&&alerts.every(alert=>flags[alert])&&
         (stock==='all'||(stock==='empty'?flags.empty:!flags.empty));
       card.classList.toggle('hidden',!matches);
       if(matches)visible++;
     }
-    el('fridgeMapFilterSummary').textContent=data?visible+' de '+mapCards.length+' blocos exibidos.':'';
+    el('fridgeMapFilterSummary').textContent=data
+      ? visible+' de '+total+' blocos exibidos.'+(total&&!visible?' Nenhum corresponde aos filtros.':'') : '';
   }
   function renderMap(){
     const map=el('fridgeMap'),focused=document.activeElement?.dataset?.openSlot;map.replaceChildren();mapCards=[];
+    const picker=el('fridgePicker'),previous=picker.value;
+    const enabled=data?.fridges.filter(fridge=>fridge.active)||[];
+    picker.replaceChildren(option('','Todas as geladeiras'),...enabled.map(fridge=>option(fridge.id,fridge.name)));
+    if(enabled.some(fridge=>fridge.id===previous))picker.value=previous;
+    picker.disabled=!enabled.length;
     if(!data){filterMap();return;}
-    const enabled=data.fridges.filter(f=>f.active),summary=node('div');summary.className='fridge-map-summary';
+    const summary=node('div');summary.className='fridge-map-summary';
     const fridgeIds=new Set(enabled.map(f=>f.id)), shelfIds=new Set();
     const shelvesByFridge=new Map(), slotsByShelf=new Map();
     for(const shelf of data.shelves)if(shelf.active&&fridgeIds.has(shelf.fridge_id)){
@@ -364,12 +378,12 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
       slotsByShelf.get(slot.shelf_id).push(slot);
     }
     const count=tone=>alerts.filter(s=>fridgeVisualStatus(s).tone===tone).length;
-    summary.append(node('strong','De olho nas bebidas'),node('span',count('critical')+' críticas · '+count('attention')+' em atenção · '+count('pending')+' pendentes'));
+    summary.append(node('strong','Alertas do mapa'),node('span',count('critical')+' críticas · '+count('attention')+' em atenção · '+count('pending')+' pendentes'));
     map.append(summary);
     if(!enabled.length)map.append(node('p','Nenhuma geladeira ativa. O saldo legado permanece não alocado.'));
     const cabinets=node('div');cabinets.className='fridge-cabinets';
     for(const f of enabled){
-      const block=node('section');block.className='fridge-cabinet';block.style.setProperty('--cabinet-width',percent(f.width_ratio)*.48+'%');
+      const block=node('section');block.className='fridge-cabinet';block.dataset.fridgeId=f.id;block.style.setProperty('--cabinet-width',percent(f.width_ratio)*.48+'%');
       const header=node('header'),title=node('h3',f.name);title.id='fridge-cabinet-'+f.id;header.className='fridge-cabinet-header';
       const light=node('span','●');light.className='fridge-cabinet-light';light.setAttribute('aria-hidden','true');
       block.setAttribute('aria-labelledby',title.id);header.append(title,light);block.append(header);
@@ -388,7 +402,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
           let lane=laneEnds.findIndex(e=>e<=start);if(lane<0)lane=laneEnds.length;laneEnds[lane]=end;
           const state=fridgeVisualStatus(x),card=node('article');card.className='fridge-slot';card.dataset.slotId=x.id;card.dataset.tone=state.tone;
           const flags=fridgeSlotAlerts(x);
-          mapCards.push({card,flags,text:normalizeMapText([x.product_name,x.name,f.name,h.name].filter(Boolean).join(' '))});
+          mapCards.push({card,flags,fridgeId:f.id,text:normalizeMapText([x.product_name,x.name,f.name,h.name].filter(Boolean).join(' '))});
           card.style.setProperty('--slot-column',start+' / '+end);card.style.setProperty('--slot-row',String(lane+1));
           const button=node('button');button.type='button';button.className='fridge-slot-open';button.dataset.openSlot=x.id;button.setAttribute('aria-haspopup','dialog');
           const name=x.product_name||x.name;
@@ -919,6 +933,12 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
   el('fridgeRestockMode').addEventListener('click',()=>{editing=false;restocking=true;renderRestock();sync();});
   el('fridgeRestockFilter').addEventListener('change',()=>{renderRestock();sync();});
   el('fridgeMapFilters').addEventListener('input',filterMap);
+  el('fridgeClearFilters').addEventListener('click',()=>{
+    el('fridgeMapSearch').value='';
+    el('fridgeMapStock').value='all';
+    for(const input of el('fridgeMapFilters').querySelectorAll('input[type=checkbox]'))input.checked=false;
+    filterMap();
+  });
   el('fridgeReload').addEventListener('click',()=>void load());
   window.addEventListener('offline',sync);
   window.addEventListener('hashchange',()=>{if(!view()){el('fridgeDetailDialog').close();moves.dismiss();library.reset();}});
@@ -931,6 +951,6 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     },
     transferPhoto:photo,
     activate(){sync();if(view()&&getContext().shop&&navigator.onLine)void load();},
-    reset(){generation++;library.reset();moves.reset();detailSlotId=null;el('fridgeDetailDialog').close();data=null;photoUrls=new Map();allocationRetry=null;replenishRetry=null;replenishQuote=null;replenishSlot=null;stockQuote=null;stockRetry=null;editing=false;restocking=false;busy=false;pendingRefresh=false;el('fridgeStockDialog').close();el('fridgeReplenishDialog').close();el('fridgeAllocationDialog').close();el('fridgeLayoutFields').replaceChildren();el('fridgeMapSearch').value='';el('fridgeMapStock').value='all';for(const input of el('fridgeMapFilters').querySelectorAll('input[type=checkbox]'))input.checked=false;renderMap();renderRestock();msg('');sync();}
+    reset(){generation++;library.reset();moves.reset();detailSlotId=null;el('fridgeDetailDialog').close();data=null;photoUrls=new Map();allocationRetry=null;replenishRetry=null;replenishQuote=null;replenishSlot=null;stockQuote=null;stockRetry=null;editing=false;restocking=false;busy=false;pendingRefresh=false;el('fridgeStockDialog').close();el('fridgeReplenishDialog').close();el('fridgeAllocationDialog').close();el('fridgeLayoutFields').replaceChildren();el('fridgePicker').value='';el('fridgeMapSearch').value='';el('fridgeMapStock').value='all';for(const input of el('fridgeMapFilters').querySelectorAll('input[type=checkbox]'))input.checked=false;renderMap();renderRestock();msg('');sync();}
   };
 }

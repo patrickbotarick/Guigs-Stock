@@ -129,8 +129,16 @@ function bridge({role,shop}){
       page.setDefaultTimeout(10000);await page.goto(url);await page.waitForSelector('#content:not(.hidden) #fridgesView:not(.hidden)');
       return {context,page,errors};
     }
+    async function openActions(page) {
+      const tools=page.locator('#fridgeMoreActions');
+      if (!await tools.evaluate(node=>node.open)) await tools.locator('summary').click();
+    }
+    async function openEditor(page) {
+      await openActions(page);
+      await page.click('#fridgeEdit');
+    }
     const {context,page,errors}=await open('owner',{width:1200,height:850});
-    await page.click('#fridgeEdit');
+    await openEditor(page);
     check(await page.isVisible('#fridgeEditor'),'Owner entra no editor');
     const fill=async(name,value)=>{const input=page.locator('#fridgeField_'+name),advanced=input.locator('xpath=ancestor::details');if(await advanced.count()&&(await advanced.getAttribute('open'))===null)await advanced.locator('summary').click();await input.fill(String(value));};
     const choose=(name,value)=>page.selectOption('#fridgeField_'+name,value);
@@ -161,7 +169,7 @@ function bridge({role,shop}){
     check(await page.isDisabled('#fridgeDetailReplenish'),'Repor bloqueado sem capacidade');
     await page.keyboard.press('Escape');
     check(await pendingCard.locator('button').evaluate(e=>e===document.activeElement),'Escape devolve foco ao bloco');
-    await page.click('#fridgeEdit');await page.selectOption('#fridgeEditItem',x);
+    await openEditor(page);await page.selectOption('#fridgeEditItem',x);
     check(await page.inputValue('#fridgeField_capacity_quantity')==='','Capacidade pendente foi persistida');
     await fill('capacity_quantity',18);await save();
     await fill('target_quantity','');await fill('min_quantity','');await save();
@@ -170,10 +178,10 @@ function bridge({role,shop}){
     await page.click('#fridgeOperate');await pendingCard.locator('button').click();
     check((await page.textContent('#fridgeDetailBody')).includes('Não configurado'),'Modal distingue limites pendentes');
     check(await page.isDisabled('#fridgeDetailReplenish'),'Reposição bloqueada sem meta');
-    await page.keyboard.press('Escape');await page.click('#fridgeEdit');await page.selectOption('#fridgeEditItem',x);
+    await page.keyboard.press('Escape');await openEditor(page);await page.selectOption('#fridgeEditItem',x);
     await fill('target_quantity',12);await fill('min_quantity',4);await save();
     await fill('width_ratio',50);await fill('x_ratio',25);await fill('sort_order',2);await save();
-    await page.reload();await page.click('#fridgeEdit');await page.selectOption('#fridgeEditKind','slot');await page.selectOption('#fridgeEditItem',x);
+    await page.reload();await openEditor(page);await page.selectOption('#fridgeEditKind','slot');await page.selectOption('#fridgeEditItem',x);
     check(await page.inputValue('#fridgeField_width_ratio')==='50','Resize persiste após reload');
     check(await page.inputValue('#fridgeField_x_ratio')==='25','Reposicionamento persiste');
     check(await page.inputValue('#fridgeField_sort_order')==='2','Ordem persiste');
@@ -192,15 +200,16 @@ function bridge({role,shop}){
     check(mobile.errors.length===0,'Sem erro JavaScript mobile');
     await mobile.context.close();
     const delegator=await open('owner',{width:1200,height:850});
-    await delegator.page.click('#fridgeEdit');
+    await openEditor(delegator.page);
     await delegator.page.locator('#fridgeLayoutAccessList input').check();
     await delegator.page.waitForFunction(()=>!document.querySelector('#fridgeLayoutAccessList input').disabled);
     check((await db.query('select manage_fridge_layout from public.guigs_memberships where user_id=$1',[id(2)])).rows[0].manage_fridge_layout,'Owner delega capacidade pelo editor');
     await delegator.context.close();
     const authorized=await open('attendant',{width:820,height:900});
     await authorized.page.waitForFunction(()=>!document.querySelector('#fridgeEdit').disabled);
+    await openActions(authorized.page);
     check(await authorized.page.isVisible('#fridgeEdit'),'Atendente autorizado vê editor');
-    await authorized.page.click('#fridgeEdit');
+    await openEditor(authorized.page);
     check(!(await authorized.page.isVisible('#fridgeLayoutAccess')),'Delegado não administra permissões');
     check(await authorized.page.isDisabled('#fridgeImageUpload'),'Sem bloco selecionado, produto exige escolha explícita');
     await authorized.page.selectOption('#fridgeImageProduct',id(20));
@@ -228,7 +237,7 @@ function bridge({role,shop}){
     await authorized.page.click('#imageLibraryUnlink');try{await authorized.page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent.startsWith('Associação removida'));}catch{throw Error('Desvincular biblioteca: '+await authorized.page.textContent('#imageLibraryMessage'));}
     check((await db.query('select count(*)::int n from storage.objects')).rows[0].n===1,'Desvincular no seletor preserva arquivo compartilhado');
     await authorized.page.click('#imageLibraryClose');
-    await authorized.page.reload();await authorized.page.click('#fridgeEdit');
+    await authorized.page.reload();await openEditor(authorized.page);
     await authorized.page.selectOption('#fridgeImageProduct',id(20));
     check(await authorized.page.isEnabled('#fridgeImageRemove'),'Reload mantém imagem vinculada');
     await authorized.page.click('#fridgeImageRemove');await authorized.page.click('#confirmOperation');
@@ -261,7 +270,7 @@ function bridge({role,shop}){
     await authorized.page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent==='Imagem excluída permanentemente.');
     check((await db.query('select count(*)::int n from storage.objects')).rows[0].n===1,'Delete UI remove somente fixture livre');
     check((await db.query('select count(*)::int n from guigs_private.product_image_deletions')).rows[0].n===0,'Delete UI finaliza fila privada');
-    await authorized.page.click('#imageLibraryClose');await authorized.page.reload();await authorized.page.click('#fridgeEdit');await authorized.page.click('#fridgeImageLibrary');
+    await authorized.page.click('#imageLibraryClose');await authorized.page.reload();await openEditor(authorized.page);await authorized.page.click('#fridgeImageLibrary');
     await authorized.page.waitForSelector('.image-library-item');check((await authorized.page.locator('.image-library-item').textContent()).includes('Foto renomeada'),'Rename persiste após reload');
     await authorized.page.click('#imageLibraryClose');
     await authorized.page.selectOption('#fridgeEditKind','slot');
@@ -353,7 +362,7 @@ function bridge({role,shop}){
       await responsive.page.fill('#imageLibrarySearch','artificial');
       await responsive.page.waitForFunction(()=>document.querySelector('#imageLibraryMessage').textContent==='1 imagens nesta página.');
       check(await responsive.page.locator('.image-library-item').count()===1,'Busca por toque em '+viewport.width);
-      await responsive.page.click('#imageLibraryClose');await responsive.page.click('#fridgeEdit');
+      await responsive.page.click('#imageLibraryClose');await openEditor(responsive.page);
       await responsive.page.locator('#fridgeEditorPreview .fridge-draft-block').first().tap();
       check(await responsive.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Editor sem overflow global em '+viewport.width);
       check(await responsive.page.isEnabled('#fridgeSaveLayout'),'Editor utilizável por owner em '+viewport.width);

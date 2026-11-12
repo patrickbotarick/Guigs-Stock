@@ -84,15 +84,24 @@ function bridge({role,shop,names}){
       await page.goto(base+'/#geladeiras');await page.waitForSelector('.fridge-slot-open');
       return {page,context,errors};
     };
-    for(const [width,height] of [[1920,1080],[1366,768],[1280,800],[1024,768],[390,844],[360,780]]){
+    for(const [width,height] of [[1920,1080],[1366,768],[1280,800],[1024,768],[390,844],[360,800]]){
       const {page,context,errors}=await open('attendant',width,height);
       check(await page.locator('.fridge-slot:visible').count()===52,'Todos mostra 52 blocos');
       check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mapa cabe em '+width);
+      check(await page.locator('#fridgeSearchTool, #fridgeFilterTool').evaluateAll(items=>items.every(item=>!item.open)),'Mapa inicia com ferramentas recolhidas');
+      await page.locator('#fridgePicker').selectOption({index:1});
+      check(await page.locator('.fridge-cabinet:visible').count()===1,'Selecionar geladeira preserva só o gabinete escolhido');
+      await page.selectOption('#fridgePicker','');
+      check(await page.locator('.fridge-slot:visible').count()===52,'Voltar a todas restaura os blocos');
+      await page.locator('#fridgeSearchTool summary').click();
       await page.fill('#fridgeMapSearch','metalfrio prateleira origem');
       check(await page.locator('.fridge-slot:visible').count()===1,'Busca combina geladeira, prateleira e bloco');
       await page.fill('#fridgeMapSearch','coca');
       check(await page.locator('.fridge-slot:visible').count()===4,'Busca encontra o produto');
       await page.fill('#fridgeMapSearch','');
+      await page.keyboard.press('Escape');
+      check(await page.locator('#fridgeSearchTool').evaluate(e=>!e.open),'Escape recolhe a busca do mapa');
+      await page.locator('#fridgeFilterTool summary').click();
       await page.selectOption('#fridgeMapStock','stock');check(await page.locator('.fridge-slot:visible').count()===2,'Filtro com estoque');
       await page.selectOption('#fridgeMapStock','empty');check(await page.locator('.fridge-slot:visible').count()===50,'Filtro vazio');
       await page.selectOption('#fridgeMapStock','all');
@@ -104,6 +113,9 @@ function bridge({role,shop,names}){
       await page.locator('#fridgeMapFilters input[value=expiry]').check();
       check((await page.locator('.fridge-slot:visible').textContent()).includes('Abaixo do mínimo')&&
         (await page.locator('.fridge-slot:visible').textContent()).includes('Atenção à validade'),'Alertas coexistem');
+      check((await page.locator('#fridgeFilterBadge').textContent()).includes('2 ativo'),'Resumo identifica filtros ativos');
+      await page.click('#fridgeClearFilters');
+      check(await page.locator('.fridge-slot:visible').count()===52,'Limpar filtros restaura os blocos');
       check(!errors.length,'Sem erro de navegador em '+width);
       await context.close();
     }
