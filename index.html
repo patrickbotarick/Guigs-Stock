@@ -296,7 +296,7 @@
       }
 
       .quickaction small {
-        color: #858187;
+        color: var(--ink-muted);
         font-size: 11px;
         line-height: 1.4;
       }
@@ -343,7 +343,7 @@
 
       .metric span {
         font-size: 12px;
-        color: #777;
+        color: var(--ink-muted);
       }
 
       .metric b {
@@ -356,7 +356,7 @@
 
       .metric small {
         font-size: 11px;
-        color: #999;
+        color: var(--ink-muted);
       }
 
       .alerts-panel {
@@ -514,7 +514,7 @@
       .table th {
         font-size: 10px;
         letter-spacing: 0.7px;
-        color: #8b8990;
+        color: var(--ink-muted);
         text-transform: uppercase;
       }
 
@@ -730,7 +730,7 @@
       }
 
       .empty {
-        color: #85818a;
+        color: var(--ink-muted);
         font-size: 12px;
         padding: 25px;
         text-align: center;
@@ -738,7 +738,7 @@
 
       .foot {
         font-size: 11px;
-        color: #89858b;
+        color: var(--ink-muted);
         margin-top: 16px;
       }
 
@@ -1371,7 +1371,7 @@
       @media (max-width: 600px) { .report-filters { display: grid; grid-template-columns: minmax(0, 1fr); } }
 
       /* Controles operacionais compartilhados. Dialog e details mantêm semântica nativa. */
-      :where(button, a, summary, input, select, textarea):focus-visible {
+      :where(button, a, summary, input, select, textarea, #viewTitle):focus-visible {
         outline: 3px solid var(--focus);
         outline-offset: 2px;
       }
@@ -1821,11 +1821,11 @@
                 </div>
 
                 <div class="historypaging">
-                  <button id="prev" class="btn">←</button>
+                  <button id="prev" class="btn" aria-label="Página anterior do histórico">←</button>
 
                   <span id="page" class="badge">1/1</span>
 
-                  <button id="next" class="btn">→</button>
+                  <button id="next" class="btn" aria-label="Próxima página do histórico">→</button>
                 </div>
               </div>
               <div class="tools view-tools">

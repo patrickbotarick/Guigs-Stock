@@ -251,6 +251,9 @@ if (require.main === module) (async () => {
     await page.waitForFunction(() => !document.getElementById('transferDialog').open);
     check(!await page.isVisible('#fefoDialog') && await transfers()===2, 'Lote A com seco zero não alerta');
     await page.click('#transferStock'); await page.selectOption('#transferDirection','fridge-stock');
+    check(await page.inputValue('#transferLot')===''&&await page.isDisabled('#saveTransfer'),
+      'Retorno requer escolha de lote após trocar a direção');
+    await page.selectOption('#transferLot','lot-b',{force:true});
     const fefoQueries = await page.evaluate(() => window.__test.calls.filter(c=>c.name==='guigs_get_fefo_candidates').length);
     await page.click('#saveTransfer'); await page.waitForFunction(() => !document.getElementById('transferDialog').open);
     check(await page.evaluate(() => window.__test.calls.filter(c=>c.name==='guigs_get_fefo_candidates').length)===fefoQueries, 'Retorno geladeira não consulta FEFO');

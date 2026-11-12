@@ -36,6 +36,23 @@ const server = http.createServer((req,res)=>{
       page.on('pageerror',error=>errors.push(error.message));
       await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
       await page.waitForSelector('#content:not(.hidden)');
+      const colors=await page.evaluate(()=>{
+        const rgb=value=>(value.match(/[\d.]+/g)||[]).map(Number);
+        const luminance=color=>color.slice(0,3).reduce((sum,channel,i)=>{
+          const value=channel/255;
+          return sum+[.2126,.7152,.0722][i]*(value<=.04045?value/12.92:((value+.055)/1.055)**2.4);
+        },0);
+        return ['.metric span','.metric small','.quickaction:not(.primary) small','.quickaction.primary small',
+          '#navOverview','#status','.product-table th'].map(selector=>{
+          const target=document.querySelector(selector);
+          let background=target;
+          while(background&&rgb(getComputedStyle(background).backgroundColor)[3]===0)background=background.parentElement;
+          const a=luminance(rgb(getComputedStyle(target).color));
+          const b=luminance(rgb(getComputedStyle(background).backgroundColor));
+          return {selector,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
+        });
+      });
+      check(colors.every(({ratio})=>ratio>=4.5),'Contraste de texto operacional e navegação: '+JSON.stringify(colors));
       const click=async selector=>mobile?page.locator(selector).tap():page.click(selector);
       const choose=async (id,value)=>page.selectOption(`#${id}`,value,{force:true});
       const count=async name=>page.evaluate(name=>window.__test.calls.filter(call=>call.name===name).length,name);

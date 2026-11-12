@@ -54,6 +54,7 @@ for (const tool of document.querySelectorAll('details[data-tool]')) {
 const searchableSelects = new Map();
 function enhanceSearchableSelect(id) {
   const select = el(id);
+  const dialog = select.closest('dialog');
   const wrapper = document.createElement('div');
   wrapper.className = 'searchable-select';
   const input = document.createElement('input');
@@ -151,8 +152,13 @@ function enhanceSearchableSelect(id) {
   input.addEventListener('input', () => render(input.value));
   input.addEventListener('keydown', event => {
     if (event.isComposing) return;
-    if (event.key === 'Escape' && opened) {
-      event.preventDefault(); event.stopPropagation(); close();
+    if (event.key === 'Escape' && (opened || dialog?.open)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (opened) close();
+      // No campo de busca fechado, Escape não deve reabrir a lista nativa.
+      else if (typeof dialog.requestClose === 'function') dialog.requestClose();
+      else if (dialog.dispatchEvent(new Event('cancel', {cancelable: true}))) dialog.close();
     } else if (event.key === 'Enter' && opened) {
       event.preventDefault(); choose(active);
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -187,7 +193,6 @@ function enhanceSearchableSelect(id) {
   });
   select.form?.addEventListener('reset', () => setTimeout(close, 0));
   new MutationObserver(close).observe(select, {childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'selected', 'label']});
-  const dialog = select.closest('dialog');
   if (dialog) {
     new MutationObserver(close).observe(dialog, {attributes: true, attributeFilter: ['open']});
     dialog.addEventListener('close', close);
@@ -2975,7 +2980,12 @@ const shoppingUI = createShoppingUI({getContext:()=>({client,shop}),
 const fridgesUI = createFridgesUI({getContext:()=>({client,shop,products,lots,operator:shop?.operator}),refreshStock:refresh,
   openTransfer:openIntegratedTransfer,
   confirmAction:(title,reason)=>confirmOperation({waitForConfirmation:waitForDialogConfirmation},title,reason,[])});
-window.addEventListener('hashchange', applyView);
+window.addEventListener('hashchange', () => {
+  applyView();
+  if (!el('content').classList.contains('hidden') && !document.querySelector('dialog[open]')) {
+    el('viewTitle').focus();
+  }
+});
 applyView();
 
 el('refresh')
