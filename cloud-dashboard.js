@@ -2877,7 +2877,9 @@ function populateAdjustLots() {
     select.append(option);
   }
 
-  el('saveAdjust').disabled = false;
+  select.prepend(new Option('Escolha o lote',''));
+  select.value = '';
+  el('saveAdjust').disabled = true;
 
   updateAdjustBalance();
 }
@@ -2904,7 +2906,7 @@ function updateAdjustBalance() {
       : '';
 
   el('adjustQuantity').value =
-    current;
+    balance ? current : '';
   updateAdjustImpact();
 }
 
@@ -3519,7 +3521,7 @@ el('adjustStock').addEventListener('click', () => void openLotOperation('adjust'
 el('adjustLot')
   .addEventListener(
     'change',
-    updateAdjustBalance
+    () => { updateAdjustBalance(); syncOperationButtons(); }
   );
 
 

@@ -416,9 +416,15 @@ function bridge({role,shop}){
     const owner=await open('owner',{width:390,height:844});await waitMap(owner.page);
     const beforeCancel=await ledger();
     await owner.page.locator('#fridgeMoreActions summary').click();
-    await owner.page.click('#fridgeAllocate');await owner.page.fill('#allocate-'+x,'1');await owner.page.click('#fridgeCancelAllocation');
+    await owner.page.click('#fridgeAllocate');
+    check(await owner.page.inputValue('#fridgeAllocationLot')===''&&await owner.page.isDisabled('#fridgeConfirmAllocation'),
+      'Distribuição não presume lote mesmo quando há somente um disponível');
+    await owner.page.selectOption('#fridgeAllocationLot',id(30));
+    await owner.page.fill('#allocate-'+x,'1');await owner.page.click('#fridgeCancelAllocation');
     assert.deepEqual(await ledger(),beforeCancel);checks++;
-    await owner.page.click('#fridgeAllocate');await owner.page.fill('#allocate-'+x,'1');
+    await owner.page.click('#fridgeAllocate');
+    await owner.page.selectOption('#fridgeAllocationLot',id(30));
+    await owner.page.fill('#allocate-'+x,'1');
     check((await owner.page.textContent('#fridgeAllocationSummary')).includes('Restam não alocadas: 0'),'Resumo antes da confirmação');
     await owner.page.click('#fridgeConfirmAllocation');
     await owner.page.waitForFunction(()=>document.querySelector('.fridge-unallocated').textContent.includes('0 un. sem posição física'));

@@ -863,7 +863,9 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     if(!owner()||busy||!navigator.onLine||!data)return;
     const lots=data.unallocated.filter(l=>l.quantity>0);
     if(!lots.length)return;
-    el('fridgeAllocationLot').replaceChildren(...lots.map(l=>option(l.lot_id,l.product_name+' · '+l.code+' · '+l.quantity+' un.')));
+    el('fridgeAllocationLot').replaceChildren(option('','Escolha o lote'),
+      ...lots.map(l=>option(l.lot_id,l.product_name+' · '+l.code+' · '+l.quantity+' un.')));
+    el('fridgeAllocationLot').value='';
     allocationMessage('');el('fridgeAllocationDialog').showModal();renderAllocationDestinations();sync();
   });
   el('fridgeAllocationLot').addEventListener('change',renderAllocationDestinations);

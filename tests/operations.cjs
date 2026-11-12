@@ -194,7 +194,9 @@ const server = http.createServer((req,res)=>{
 
       if(role==='owner'){
         await click('#overviewManagement summary');
-        await click('#adjustStock');await choose('adjustLot','lot-a');await page.fill('#adjustQuantity','4');await page.fill('#adjustNote','Contagem física artificial');
+        await click('#adjustStock');
+        check(await page.inputValue('#adjustLot')===''&&await page.isDisabled('#saveAdjust'),'Ajuste exige escolha explícita de lote');
+        await choose('adjustLot','lot-a');await page.fill('#adjustQuantity','4');await page.fill('#adjustNote','Contagem física artificial');
         check((await page.textContent('#adjustImpact')).includes('Novo saldo: 4'),'Resumo de ajuste atualiza antes de submeter');
         const adjustments=await count('guigs_adjust_stock');await click('#saveAdjust');await page.waitForSelector('#operationConfirmDialog[open]');
         check((await page.textContent('#operationConfirmSummary')).includes('Diferença'),'Ajuste mostra saldo atual, novo e diferença');
