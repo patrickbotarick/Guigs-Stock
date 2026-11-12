@@ -43,7 +43,8 @@ async function run() {
   const asOwner = statement => asMember(statement);
   const allocate = key => `select public.guigs_allocate_fridge_stock('${id(10)}','${key}',
     '[{"lot_id":"${id(30)}","slot_id":"${id(60)}","quantity":1}]')::text;`;
-  execFileSync(tool('initdb'),['-D',cluster,'-U','guigs_test','-A','trust','--locale=C','-E','UTF8'],options);
+  // O cluster é descartável; omitir apenas o flush inicial evita timeout no Windows.
+  execFileSync(tool('initdb'),['-D',cluster,'-U','guigs_test','-A','trust','--locale=C','-E','UTF8','--no-sync'],options);
   const ctl = command => execFileSync(tool('pg_ctl'),['-D',cluster,'-w','-t','15',...command],{...options,stdio:'ignore'});
   ctl(['-l',path.join(root,'server.log'),'-o',`-h 127.0.0.1 -p ${port}`,'start']);
   try {
