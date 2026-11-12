@@ -1621,6 +1621,42 @@
         .side .navigation[data-open] { display: grid; }
         .navigation .menu { display: flex; align-items: center; gap: .45rem; min-height: 44px; line-height: 1.2; }
       }
+
+      .main:has(#fridgesView:not(.hidden)) #status.good, .fridge-picker > span {
+        position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden;
+        clip-path: inset(50%); white-space: nowrap; padding: 0; margin: 0; border: 0;
+      }
+      .fridge-toolbar { position: relative; }
+      .fridge-workspace { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem .75rem; }
+      .fridge-workspace .fridge-controls { display: flex; justify-content: flex-start; }
+      .fridge-workspace .fridge-controls .inventory-actions:last-child { display: flex; }
+      .fridge-workspace .fridge-map-tools { margin: 0; flex: 1 1 20rem; align-items: center; }
+      .fridge-workspace .fridge-picker { flex: 1 1 9rem; max-inline-size: 20rem; }
+      .fridge-workspace #fridgePicker { min-width: 0; text-overflow: ellipsis; }
+      .fridge-workspace .tool, #fridgeMoreActions { position: static; flex: 0 0 auto; }
+      .fridge-workspace .tool > summary { white-space: nowrap; }
+      .fridge-popover, #fridgeMoreActions .fridge-popover {
+        position: absolute; z-index: var(--layer-sticky); inset: 100% 0 auto auto;
+        width: min(100%, 23rem); margin: .3rem 0 0; padding: .8rem;
+        background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel);
+        box-shadow: var(--shadow-dialog); overflow: auto; max-height: min(66dvh, 25rem);
+      }
+      .fridge-popover fieldset { display: grid; gap: .2rem; margin: 0; min-width: 0; }
+      .fridge-popover fieldset label { display: flex; align-items: center; gap: .45rem; min-height: 32px; }
+      .fridge-popover .inventory-actions { margin: 0; }
+      #fridgeMap .fridge-cabinets { gap: clamp(.75rem, 2vw, 1.4rem); }
+      @media (max-width: 700px) {
+        .main:has(#fridgesView:not(.hidden)) .top { margin-bottom: .55rem; }
+        .fridge-workspace .fridge-controls { width: 100%; gap: .25rem; }
+        .fridge-workspace .fridge-controls .inventory-actions { flex-wrap: nowrap; gap: .25rem; }
+        .fridge-workspace .fridge-controls .btn { padding-inline: .35rem; }
+        .fridge-workspace .fridge-map-tools { display: grid; grid-template-columns: minmax(0,1fr) auto auto; }
+        .fridge-workspace .fridge-map-tools summary { padding-inline: .45rem; }
+        #fridgeFilterTool .fridge-popover {
+          position: fixed; inset: auto .65rem max(.65rem,env(safe-area-inset-bottom));
+          width: auto; max-height: min(72dvh, 28rem);
+        }
+      }
     </style>
   </head>
 
@@ -1937,6 +1973,7 @@
 
           <section id="fridgesView" class="hidden" aria-label="Geladeiras físicas">
             <div class="fridge-toolbar">
+              <div class="fridge-workspace">
               <div class="fridge-controls">
                 <div class="inventory-actions" aria-label="Modo das geladeiras">
                   <button id="fridgeOperate" class="btn" type="button" aria-pressed="true">Mapa</button>
@@ -1944,32 +1981,29 @@
                 </div>
                 <div class="inventory-actions">
                   <button id="fridgeOperateStock" class="btn primary" type="button">Registrar saída</button>
-                  <button id="fridgeReload" class="btn" type="button">Atualizar mapa</button>
-                  <details id="fridgeMoreActions" class="tool hidden" data-tool>
+                  <details id="fridgeMoreActions" class="tool" data-tool>
                     <summary class="btn">Mais ações</summary>
-                    <div class="tool-content">
+                    <div class="tool-content fridge-popover">
+                      <button id="fridgeReload" class="btn" type="button">Atualizar somente o mapa</button>
                       <button id="fridgeEdit" class="btn hidden" type="button" aria-pressed="false">Editar layout</button>
                       <button id="fridgeAllocate" class="btn hidden" type="button">Distribuir estoque existente</button>
                     </div>
                   </details>
                 </div>
               </div>
-              <p id="fridgeOffline" class="notice hidden">Sem conexão. O mapa exibido pode estar desatualizado; edição bloqueada.</p>
-              <p id="fridgeMessage" role="status" aria-live="polite"></p>
-            </div>
             <div id="fridgeMapFilters" class="tools fridge-map-tools">
               <label class="field fridge-picker"><span>Geladeira</span>
                 <select id="fridgePicker"><option value="">Todas as geladeiras</option></select>
               </label>
               <details id="fridgeSearchTool" class="tool tool-search" data-tool>
-                <summary class="btn">Buscar no mapa</summary>
-                <label class="field tool-content">Produto ou posição
+                <summary class="btn">Buscar</summary>
+                <label class="field tool-content fridge-popover">Produto ou posição
                   <input id="fridgeMapSearch" type="search" autocomplete="off" placeholder="Produto, geladeira, prateleira ou bloco" data-tool-focus>
                 </label>
               </details>
               <details id="fridgeFilterTool" class="tool tool-filters" data-tool>
                 <summary class="btn">Filtros <span id="fridgeFilterBadge" class="tool-count"></span></summary>
-                <div class="fridge-map-filters">
+                <div class="fridge-map-filters fridge-popover">
                   <label class="field">Estoque no bloco <select id="fridgeMapStock"><option value="all">Todos</option><option value="stock">Com estoque</option><option value="empty">Vazios</option></select></label>
                   <fieldset><legend>Alertas</legend>
                     <label><input type="checkbox" value="low"> Abaixo do mínimo</label>
@@ -1977,9 +2011,16 @@
                     <label><input type="checkbox" value="pending"> Configuração pendente</label>
                     <label><input type="checkbox" value="expiry"> Atenção à validade</label>
                   </fieldset>
-                  <button id="fridgeClearFilters" class="btn" type="button">Limpar filtros do mapa</button>
+                  <div class="inventory-actions">
+                    <button id="fridgeClearFilters" class="btn" type="button">Limpar filtros do mapa</button>
+                    <button id="fridgeFiltersDone" class="btn primary" type="button">Concluir filtros</button>
+                  </div>
                 </div>
               </details>
+            </div>
+              </div>
+              <p id="fridgeOffline" class="notice hidden">Sem conexão. O mapa exibido pode estar desatualizado; edição bloqueada.</p>
+              <p id="fridgeMessage" role="status" aria-live="polite"></p>
             </div>
             <p id="fridgeMapFilterSummary" role="status"></p>
             <div id="fridgeMap"></div>

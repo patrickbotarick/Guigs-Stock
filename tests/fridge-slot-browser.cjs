@@ -101,7 +101,9 @@ function bridge({role,shop,names}){
       await page.fill('#fridgeMapSearch','');
       await page.keyboard.press('Escape');
       check(await page.locator('#fridgeSearchTool').evaluate(e=>!e.open),'Escape recolhe a busca do mapa');
+      const mapTop=await page.locator('#fridgeMap').evaluate(e=>e.offsetTop);
       await page.locator('#fridgeFilterTool summary').click();
+      check(await page.locator('#fridgeMap').evaluate(e=>e.offsetTop)===mapTop,'Abrir filtros não desloca o mapa');
       await page.selectOption('#fridgeMapStock','stock');check(await page.locator('.fridge-slot:visible').count()===2,'Filtro com estoque');
       await page.selectOption('#fridgeMapStock','empty');check(await page.locator('.fridge-slot:visible').count()===50,'Filtro vazio');
       await page.selectOption('#fridgeMapStock','all');

@@ -291,6 +291,7 @@ function bridge({role,shop}){
     check(await authorized.page.inputValue('#fridgeField_capacity_quantity')==='','Duplicar não inventa capacidade');
     check((await db.query('select count(*)::int n from public.guigs_fridge_slots')).rows[0].n===structureCountBefore,'Duplicar prepara rascunho sem escrita');
     await asUser(db,'owner',tx=>tx.query('select public.guigs_set_fridge_layout_access($1,$2,false)',[shop,id(2)]));
+    await openActions(authorized.page);
     await authorized.page.click('#fridgeReload');
     await authorized.page.waitForFunction(()=>document.querySelector('#fridgeEdit').classList.contains('hidden'));
     check(!(await authorized.page.isVisible('#fridgeEditor')),'Revogação oculta editor na próxima leitura');
@@ -389,6 +390,7 @@ function bridge({role,shop}){
       payload.data.slots=Array.from({length:100},(_,i)=>({...payload.data.slots[0],id:randomUUID(),name:'Bloco artificial '+i,x_ratio:(i%3)/3,width_ratio:1/3,sort_order:i}));
       return route.fulfill({response,json:payload});
     });
+    await openActions(volume.page);
     const began=performance.now();await volume.page.click('#fridgeReload');await volume.page.waitForFunction(()=>document.querySelectorAll('#fridgeMap .fridge-slot').length===100);
     const renderMs=Math.round(performance.now()-began);check(renderMs<3000,'Leitura e render de 100 blocos em menos de 3s');
     console.log('Mapa DOM 100 blocos artificiais: '+renderMs+' ms.');
@@ -422,6 +424,7 @@ function bridge({role,shop}){
     await owner.page.selectOption('#fridgeAllocationLot',id(30));
     await owner.page.fill('#allocate-'+x,'1');await owner.page.click('#fridgeCancelAllocation');
     assert.deepEqual(await ledger(),beforeCancel);checks++;
+    await openActions(owner.page);
     await owner.page.click('#fridgeAllocate');
     await owner.page.selectOption('#fridgeAllocationLot',id(30));
     await owner.page.fill('#allocate-'+x,'1');

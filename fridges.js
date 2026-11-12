@@ -95,7 +95,6 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     el('fridgeEdit').classList.toggle('hidden',!canManageLayout());
     el('fridgeEdit').disabled=locked||!data;
     el('fridgeAllocate').classList.toggle('hidden',!owner());
-    el('fridgeMoreActions').classList.toggle('hidden',!canManageLayout());
     el('fridgeAllocate').disabled=locked||!data?.unallocated.some(l=>l.quantity>0);
     el('fridgeOperateStock').disabled=locked||!data;
     el('fridgeOperate').setAttribute('aria-pressed',String(!editing&&!restocking));
@@ -964,7 +963,26 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     for(const input of el('fridgeMapFilters').querySelectorAll('input[type=checkbox]'))input.checked=false;
     filterMap();
   });
-  el('fridgeReload').addEventListener('click',()=>void load());
+  const mapTools = ['fridgeMoreActions','fridgeSearchTool','fridgeFilterTool'].map(el);
+  function closeMapTool(tool, restoreFocus = false) {
+    if (!tool.open) return;
+    tool.open = false;
+    if (restoreFocus) tool.querySelector('summary').focus({preventScroll:true});
+  }
+  for (const tool of mapTools) {
+    tool.addEventListener('toggle', () => {
+      if (tool.open) for (const other of mapTools) if (other !== tool) closeMapTool(other);
+    });
+  }
+  document.addEventListener('click', event => {
+    for (const tool of mapTools) if (!tool.contains(event.target)) closeMapTool(tool, tool.contains(document.activeElement));
+  });
+  window.addEventListener('hashchange', () => { for (const tool of mapTools) closeMapTool(tool); });
+  el('fridgeFiltersDone').addEventListener('click', () => closeMapTool(el('fridgeFilterTool'), true));
+  el('fridgeReload').addEventListener('click', () => {
+    closeMapTool(el('fridgeMoreActions'), true);
+    void load();
+  });
   window.addEventListener('offline',sync);
   window.addEventListener('hashchange',()=>{if(!view()){el('fridgeDetailDialog').close();moves.dismiss();library.reset();}});
   return {
