@@ -117,22 +117,44 @@ export function createShoppingUI({getContext,confirmAction,openReceipt}) {
     const list=el('shoppingNeeds'), targets=[];
     list.replaceChildren();
     for(const item of shown){
-      const card=node('article',null,'shopping-card');card.dataset.productId=item.product_id;
+      const card=node('article',null,'shopping-card shopping-need');card.dataset.productId=item.product_id;
       const header=node('header'), photo=node('span','▧','shopping-photo');photo.setAttribute('aria-hidden','true');
-      header.append(photo,node('h3',item.product_name));
+      const identity=node('div');identity.append(node('h3',item.product_name));
+      const status=(text,tone)=>{
+        const badge=node('span',text,'shopping-state');
+        badge.dataset.tone=tone;identity.append(badge);
+      };
+      if(item.base_suggested==null)status('Configuração pendente','neutral');
+      else if(item.base_suggested>0)status('Reposição necessária','attention');
+      else status('Estoque adequado','healthy');
+      if(item.on_order>0)status('Pedido em andamento','neutral');
+      if(item.expired>0)status('Lotes vencidos','critical');
+      else if(item.near_expiry>0)status('Atenção à validade','attention');
+      header.append(photo,identity);
       if(item.image_path)targets.push({photo,path:item.image_path});
-      const statuses=[item.base_suggested==null?'Configuração pendente':item.base_suggested>0?'Reposição necessária':'Estoque adequado'];
-      if(item.on_order>0)statuses.push('Pedido em andamento');
-      if(item.near_expiry>0||item.expired>0)statuses.push('Atenção à validade');
-      card.append(header,node('div'));
-      card.lastElementChild.append(...statuses.map(text=>node('span',text,'shopping-state')));
-      card.append(node('p',`Disponível: ${item.available} un. · Seco: ${item.dry} · Geladeira: ${Number(item.unallocated)+Number(item.slots)} (${item.unallocated} não alocadas + ${item.slots} em blocos)`),
-        node('p',`Mínimo: ${display(item.min_total)} · Meta: ${display(item.target_total)}`),
-        node('p',`Necessidade: ${display(item.base_suggested)} · Em pedido: ${item.on_order} · Sugestão adicional: ${display(item.suggested)}`),
-        node('p',`Vencidas: ${item.expired} · Vencem em até 30 dias: ${item.near_expiry}`,'muted'),
-        node('p','Fornecedor a escolher no rascunho.','muted'));
+
+      const metrics=node('dl',null,'shopping-need-metrics');
+      const metric=(label,value,className)=>{
+        const pair=node('div',null,className);
+        pair.append(node('dt',label),node('dd',String(display(value))));metrics.append(pair);
+      };
+      metric('Disponível',item.available+' un.');
+      metric('Sugestão adicional',item.suggested,item.suggested>0?'shopping-need-priority':null);
+      metric('Mínimo',item.min_total);
+      metric('Meta',item.target_total);
+      metric('Necessidade',item.base_suggested);
+      if(item.on_order>0)metric('Em pedido',item.on_order);
+
+      const details=node('details',null,'shopping-need-details');
+      details.append(node('summary','Estoque por local, validade e fornecedor'),
+        node('p',`Estoque seco: ${item.dry} · Geladeira: ${Number(item.unallocated)+Number(item.slots)} (${item.unallocated} não alocadas + ${item.slots} em blocos)`),
+        node('p',`Vencidas: ${item.expired} · Vencem em até 30 dias: ${item.near_expiry}`),
+        node('p','Fornecedor a escolher no rascunho.'));
+      card.append(header,metrics,details);
       const actions=node('div',null,'shopping-actions');
-      actions.append(button(item.suggested>0?'Adicionar sugestão':'Adicionar manualmente',()=>addItem(item,item.suggested>0?'suggestion':'manual'),true));
+      const add=button(item.suggested>0?'Adicionar sugestão':'Adicionar manualmente',()=>addItem(item,item.suggested>0?'suggestion':'manual'),true);
+      if(item.suggested>0)add.classList.add('primary');
+      actions.append(add);
       if(owner())actions.append(button('Editar mínimo e meta',()=>openLimits(item),true));
       card.append(actions);list.append(card);
     }

@@ -94,7 +94,11 @@ function bridge({role,shop,actor,names}){
   await card.scrollIntoViewIfNeeded();
   await p.waitForFunction(id=>document.querySelector('[data-product-id="'+id+'"] img')?.naturalWidth>0,product);
   check((await p.locator('[data-product-id="'+manual+'"] .shopping-photo').textContent())==='▧','Imagem assinada e fallback coexistem');
-  check((await card.textContent()).includes('Sugestão adicional: 27'),'Memória de cálculo visível');
+  check(await card.locator('.shopping-need-priority dd').textContent()==='27','Sugestão visível na área prioritária');
+  const details=card.locator('.shopping-need-details');
+  check(!await details.evaluate(e=>e.open),'Dados complementares começam recolhidos');
+  await details.locator('summary').click();
+  check(await details.getByText('Fornecedor a escolher no rascunho.').isVisible(),'Fornecedor e saldos por local continuam acessíveis');
   await p.click('#shoppingTools summary');
   await p.selectOption('#shoppingFilter','unconfigured');
   check(await p.locator('#shoppingNeeds article').count()===1&&(await p.textContent('#shoppingNeeds')).includes('Não configurado'),'Filtro de parâmetros pendentes');
@@ -147,7 +151,8 @@ function bridge({role,shop,actor,names}){
   await p.getByRole('button',{name:'Preparar pedido'}).click();
   await p.click('#confirmOperation');
   await p.waitForFunction(()=>document.querySelector('#shoppingDetailTitle').textContent.includes('Pendente'));
-  check((await card.textContent()).includes('Em pedido: 24')&&(await card.textContent()).includes('Sugestão adicional: 3'),'Pedido aberto reduz apenas a sugestão adicional');
+  check(await card.locator('dl div').filter({hasText:'Em pedido'}).locator('dd').textContent()==='24'&&
+    await card.locator('.shopping-need-priority dd').textContent()==='3','Pedido aberto reduz apenas a sugestão adicional');
   check(!await p.getByRole('button',{name:'Marcar pedido realizado'}).count(),'Atendente não finaliza pedido');
   await p.waitForFunction(()=>!!navigator.serviceWorker.controller);
   await attendant.context.setOffline(true);
@@ -179,6 +184,24 @@ function bridge({role,shop,actor,names}){
   check(await q.isVisible('#receiveDialog'),'Atalho abre recebimento físico sem confirmar');
   check(!owner.errors.length,'Fluxo tablet sem erro JavaScript');
   await owner.context.close();
+
+  const longName='Refrigerante artesanal de teste com nome extenso para validar a leitura em telas estreitas';
+  const additional=Array.from({length:12},(_,index)=>[id(200+index),index===0?longName:'Produto fictício '+index]);
+  for(const [productId,name] of additional)await db.query(
+    'insert into public.guigs_products(id,shop_id,name,min_total,target_total) values($1,$2,$3,0,0)',[productId,shop,name]);
+  await db.query('update public.guigs_lots set expiry=current_date-1 where id=$1',[id(30)]);
+  for(const [role,width,height] of [['owner',1366,768],['attendant',320,700]]){
+    const sample=await view(role,width,height);
+    const cards=sample.page.locator('#shoppingNeeds .shopping-need');
+    check(await cards.count()>=14,'Catálogo longo renderizado');
+    const long=cards.filter({hasText:longName});
+    check(await long.getByText('Estoque adequado').isVisible(),'Nome longo e estoque adequado legíveis');
+    const expired=cards.filter({has:sample.page.getByText('Lotes vencidos',{exact:true})});
+    check(await expired.count()===1&&await expired.locator('[data-tone=critical]').isVisible(),'Validade crítica tem rótulo e estado distintos');
+    check(await sample.page.evaluate(()=>document.documentElement.scrollWidth===document.documentElement.clientWidth),'Cards sem overflow');
+    if(process.env.TEST_ARTIFACTS_DIR)await long.screenshot({path:path.join(process.env.TEST_ARTIFACTS_DIR,'r5c-card-longo-'+width+'.png')});
+    await sample.context.close();
+  }
   console.log('Compras navegador: '+checks+' verificações passaram em seis viewports com dados artificiais.');
  }finally{
   if(browser)await browser.close();
