@@ -49,6 +49,14 @@ for (const tool of document.querySelectorAll('details[data-tool]')) {
   });
 }
 
+document.addEventListener('click', event => {
+  const button = event.target.closest('[data-section-target]');
+  if (!button) return;
+  const heading = el(button.dataset.sectionTarget);
+  heading.focus({preventScroll:true});
+  heading.scrollIntoView({block:'start'});
+});
+
 // O select continua responsável pelo valor, pelas opções e pela validação.
 // A pesquisa só apresenta essas mesmas opções, sem alterar a ordem (inclusive FEFO).
 const searchableSelects = new Map();
@@ -219,6 +227,7 @@ let lotBalances = new Map();
 
 let historyPage = 0;
 let historyRequest = 0;
+let historyPaging = false;
 let historyTotal = 0;
 const historyPageSize = 20;
 
@@ -1840,7 +1849,7 @@ function populateHistoryFilters() {
     historyActor;
 }
 
-async function loadHistory() {
+async function loadHistory(page = historyPage) {
 
   if (!shop || !client) {
     return;
@@ -1849,7 +1858,7 @@ async function loadHistory() {
 
   const request = ++historyRequest;
   const offset =
-    historyPage * historyPageSize;
+    page * historyPageSize;
 
 
   const args = {
@@ -1927,13 +1936,8 @@ p_date_to:
     );
 
 
-  if (historyPage > pages - 1) {
-
-    historyPage =
-      pages - 1;
-
-    return loadHistory();
-  }
+  if (page > pages - 1) return loadHistory(pages - 1);
+  historyPage = page;
 
 
   if (historyPage === 0 && !historyProduct && !historyType && !historyActor && !historyDateFrom && !historyDateTo && !historyPartition && !query.trim()) {
@@ -1950,6 +1954,7 @@ p_date_to:
     el('overviewRecent').replaceChildren(...items);
   }
   renderHistory();
+  return true;
 }
 
 function renderHistory() {
@@ -2113,17 +2118,11 @@ function renderHistory() {
     );
 
 
-  el('page').textContent =
-    `${historyPage + 1}/${pages}`
-    + ` · ${historyTotal} lançamentos`;
-
-
-  el('prev').disabled =
-    historyPage === 0;
-
-
-  el('next').disabled =
-    historyPage >= pages - 1;
+  const label = `${historyPage + 1}/${pages} · ${historyTotal} lançamentos`;
+  el('page').textContent = label;
+  el('pageBottom').textContent = label;
+  el('historyEndPaging').classList.toggle('hidden', pages === 1);
+  syncHistoryPaging();
 }
 
 
@@ -3260,73 +3259,32 @@ el('search')
   );
 
 
-el('prev')
-  .addEventListener(
-    'click',
-    async () => {
+function syncHistoryPaging() {
+  const last = Math.max(0, Math.ceil(historyTotal / historyPageSize) - 1);
+  for (const id of ['prev','prevBottom']) el(id).disabled = historyPaging || historyPage === 0;
+  for (const id of ['next','nextBottom']) el(id).disabled = historyPaging || historyPage >= last;
+}
 
-      if (historyPage <= 0) {
-        return;
-      }
-
-
-      historyPage--;
-
-
-      try {
-        await loadHistory();
-      }
-      catch (e) {
-
-        historyPage++;
-
-        say(
-          'Não foi possível carregar o histórico: '
-          + (e.message || e),
-          'danger'
-        );
-      }
+async function changeHistoryPage(delta) {
+  const target = historyPage + delta;
+  if (historyPaging || target < 0 || target >= Math.ceil(historyTotal / historyPageSize)) return;
+  historyPaging = true;
+  syncHistoryPaging();
+  try {
+    if (await loadHistory(target) && !el('historyView').classList.contains('hidden')) {
+      el('historyResultsTitle').focus();
     }
-  );
+  } catch (error) {
+    say('Não foi possível carregar o histórico: ' + (error.message || error), 'danger');
+  } finally {
+    historyPaging = false;
+    syncHistoryPaging();
+  }
+}
 
-
-el('next')
-  .addEventListener(
-    'click',
-    async () => {
-
-      const pages =
-        Math.max(
-          1,
-          Math.ceil(
-            historyTotal / historyPageSize
-          )
-        );
-
-
-      if (historyPage >= pages - 1) {
-        return;
-      }
-
-
-      historyPage++;
-
-
-      try {
-        await loadHistory();
-      }
-      catch (e) {
-
-        historyPage--;
-
-        say(
-          'Não foi possível carregar o histórico: '
-          + (e.message || e),
-          'danger'
-        );
-      }
-    }
-  );
+for (const [id,delta] of [['prev',-1],['prevBottom',-1],['next',1],['nextBottom',1]]) {
+  el(id).addEventListener('click', () => void changeHistoryPage(delta));
+}
 
 
 el('newProduct')

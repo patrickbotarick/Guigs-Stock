@@ -14,9 +14,13 @@ export function createReportsUI({getContext, dayDifference, replenishmentFor}) {
   let busy = false, data = null, applied = null, lossOffset = 0, inventoryOffset = 0, generation = 0, filterRevision = 0;
   const limit = 50;
   const owner = () => getContext().shop?.role === 'owner';
-  function message(text) { el('reportsMessage').textContent = text; }
+  function message(text, success=false) {
+    el('reportsMessage').textContent = text;
+    el('reportsMessage').toggleAttribute('data-success',success);
+  }
   function controls() {
     el('reportsOffline').classList.toggle('hidden',navigator.onLine);
+    el('reportsSectionNav').classList.toggle('hidden',!data||!owner());
     for (const id of ['reportsPeriod','reportsFrom','reportsTo']) el(id).disabled = !navigator.onLine || !owner();
     el('reportsReload').disabled = busy || !navigator.onLine || !owner();
     el('reportsExport').disabled = busy || !navigator.onLine || !owner() || !data || !applied || !data.losses.length;
@@ -113,6 +117,12 @@ export function createReportsUI({getContext, dayDifference, replenishmentFor}) {
       const fridgeLow = product.min_fridge != null && balance.fridge<product.min_fridge;
       if (totalLow || fridgeLow || advice.deficit>0) rows.push({product,balance,advice,totalLow,fridgeLow});
     }
+    const restockDetails=el('reportsRestockDetails');
+    restockDetails.open=rows.length<=6||restockDetails.open&&Number(restockDetails.dataset.count)>6;
+    restockDetails.dataset.count=rows.length;
+    el('reportsRestockToggle').textContent=rows.length===0
+      ? 'Nenhum produto abaixo do mínimo ou com reposição pendente'
+      : quantity(rows.length,'produto abaixo do mínimo ou com reposição pendente','produtos abaixo do mínimo ou com reposição pendente');
     list('reportsRestock',rows,'Nenhum produto ativo abaixo do mínimo ou com reposição pendente.',r=>card(r.product.name,[
       `Total: ${r.balance.stock+r.balance.fridge} · Mínimo total: ${r.product.min_total ?? 'Não configurado'}${r.totalLow?' · Abaixo do mínimo total':''}`,
       `Geladeira: ${r.balance.fridge} · Mínimo: ${r.product.min_fridge ?? 'Não configurado'} · Meta: ${r.product.target_fridge ?? 'Não configurado'}${r.fridgeLow?' · Abaixo do mínimo da geladeira':''}`,
@@ -140,7 +150,7 @@ export function createReportsUI({getContext, dayDifference, replenishmentFor}) {
       data=response.data;applied=selected;render(new Date().toLocaleString('pt-BR'));
       el('reportsDisplayedPeriod').textContent=`Dados exibidos: ${selected.from} a ${selected.to} (dias locais completos).`;
       el('reportsDisplayedPeriod').hidden=false;
-      message(`Período aplicado: ${selected.from} a ${selected.to} (dias locais completos).`);
+      message(`Período aplicado: ${selected.from} a ${selected.to} (dias locais completos).`,true);
     } catch(error) {
       if (!current()) return;
       message(['PGRST202','42883','42P01'].includes(error.code)?'Relatórios indisponíveis neste ambiente. A preparação da v1.6 precisa estar homologada e instalada pelo responsável.':`Não foi possível atualizar os relatórios. Os dados exibidos podem estar desatualizados. ${error.message || ''}`);
@@ -150,6 +160,8 @@ export function createReportsUI({getContext, dayDifference, replenishmentFor}) {
     generation++;busy=false;data=null;applied=null;lossOffset=0;inventoryOffset=0;
     el('reportsDisplayedPeriod').hidden=true;
     el('reportsDisplayedPeriod').textContent='';
+    el('reportsRestockDetails').open=false;
+    delete el('reportsRestockDetails').dataset.count;
     for (const target of el('reportsView').querySelectorAll('[data-report-content]')) target.replaceChildren();
     controls();
   }

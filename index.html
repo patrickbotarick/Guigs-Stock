@@ -947,8 +947,8 @@
       .inventory-item h4, .inventory-item p { margin:.25rem 0; }
       .shopping-layout { display:grid; gap:1rem; }
       .shopping-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr)); gap:.55rem; }
-      .shopping-metrics p { margin:0; padding:.7rem; border:1px solid #e7e3df; border-radius:.7rem; }
-      .shopping-metrics strong { display:block; font-size:1.35rem; }
+      .shopping-metrics p { margin:0; padding:.35rem .5rem; border:1px solid var(--line); border-radius:.55rem; font-size:.82rem; line-height:1.2; }
+      .shopping-metrics strong { display:inline-block; margin-inline-end:.35rem; font-size:1rem; }
       .shopping-filters { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr)); gap:.7rem; }
       .shopping-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr)); gap:.65rem; }
       .shopping-card { border:1px solid #e7e3df; border-radius:.7rem; padding:.75rem; min-width:0; overflow-wrap:anywhere; }
@@ -1638,7 +1638,8 @@
         .navigation .menu { display: flex; align-items: center; gap: .45rem; min-height: 44px; line-height: 1.2; }
       }
 
-      .main:has(#fridgesView:not(.hidden)) #status.good, .fridge-picker > span {
+      .main:has(:is(#fridgesView,#shoppingView):not(.hidden)) #status.good,
+      #reportsMessage[data-success], .fridge-picker > span {
         position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden;
         clip-path: inset(50%); white-space: nowrap; padding: 0; margin: 0; border: 0;
       }
@@ -1674,7 +1675,20 @@
         }
       }
 
-      .shopping-need { display: flex; flex-direction: column; gap: .65rem; background: var(--surface); }
+      .shopping-need { display: flex; flex-direction: column; gap: .4rem; background: var(--surface); }
+      .shopping-need .shopping-actions .btn { padding-inline:.65rem; }
+      .shopping-need-details .shopping-need-metrics { margin-bottom:.5rem; }
+      .report-section-nav { display:flex; flex-wrap:wrap; gap:var(--gap-1); }
+      @media (max-width: 600px) {
+        .report-section-nav { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .shopping-need-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+        .shopping-need-actions .btn { padding-inline:.35rem; white-space:normal; }
+        .shopping-need .shopping-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+      }
+      .report-long-list > summary { min-height:var(--touch); align-content:center; font-weight:700; cursor:pointer; }
+      .report-long-list[open] > summary { margin-bottom:var(--gap-2); }
+      .historypaging-end { margin-top:var(--gap-2); }
+      [data-section-target] { align-content:center; }
       .shopping-need header { align-items: flex-start; }
       .shopping-need h3 { margin: 0 0 .25rem; font-size: 1rem; }
       .shopping-need .shopping-photo { flex-shrink: 0; }
@@ -1923,15 +1937,15 @@
           <section id="historyView" class="hidden" aria-label="Histórico de movimentações">
             <div class="panel">
               <div class="panelhead">
-                <h2>Movimentações</h2>
+                <h2 id="historyResultsTitle" tabindex="-1" aria-describedby="page">Movimentações</h2>
 
-                <div class="historypaging">
+                <nav class="historypaging" aria-label="Paginação no início do histórico">
                   <button id="prev" class="btn" aria-label="Página anterior do histórico">←</button>
 
-                  <span id="page" class="badge">1/1</span>
+                  <span id="page" class="badge" role="status">1/1</span>
 
                   <button id="next" class="btn" aria-label="Próxima página do histórico">→</button>
-                </div>
+                </nav>
               </div>
               <div class="tools view-tools">
                 <label class="field tool-search-field" for="search">Busca
@@ -2008,6 +2022,11 @@
                   <tbody id="history" role="rowgroup"></tbody>
                 </table>
               </div>
+              <nav id="historyEndPaging" class="historypaging historypaging-end hidden" aria-label="Paginação no fim do histórico">
+                <button id="prevBottom" class="btn" type="button">Anterior</button>
+                <span id="pageBottom" class="badge"></span>
+                <button id="nextBottom" class="btn" type="button">Próxima</button>
+              </nav>
             </div>
           </section>
 
@@ -2196,9 +2215,10 @@
             <p id="shoppingMessage" class="notice hidden" role="status" aria-live="polite"></p>
             <section class="panel">
               <div class="panelhead">
-                <h2>Necessidades de compra</h2>
+                <h2 id="shoppingNeedsTitle" tabindex="-1">Necessidades de compra</h2>
                 <div class="shopping-need-actions">
                   <button id="shoppingNew" class="btn green" type="button" data-shopping-write>Novo rascunho</button>
+                  <button class="btn" type="button" data-section-target="shoppingOrdersTitle">Listas e pedidos</button>
                   <button id="shoppingReload" class="btn" type="button">Atualizar</button>
                 </div>
               </div>
@@ -2215,7 +2235,7 @@
               <div id="shoppingNeeds" class="shopping-cards"></div>
             </section>
             <section class="panel">
-              <div class="panelhead"><h2>Listas e pedidos</h2></div>
+              <div class="panelhead"><h2 id="shoppingOrdersTitle" tabindex="-1">Listas e pedidos</h2><button class="btn" type="button" data-section-target="shoppingNeedsTitle">Voltar às sugestões</button></div>
               <div id="shoppingOrders" class="shopping-cards"></div>
               <div class="shopping-actions"><button id="shoppingPrevious" class="btn" type="button">Anteriores</button><span id="shoppingPage"></span><button id="shoppingNext" class="btn" type="button">Próximos</button></div>
             </section>
@@ -2252,16 +2272,22 @@
                 </details>
               </div>
               <p id="reportsMessage" role="status" aria-live="polite"></p>
+              <nav id="reportsSectionNav" class="report-section-nav hidden" aria-label="Seções do relatório">
+                <button class="btn" type="button" data-section-target="reportsSalesTitle">Vendas e perdas</button>
+                <button class="btn" type="button" data-section-target="reportsSuppliersTitle">Fornecedores</button>
+                <button class="btn" type="button" data-section-target="reportsInventoriesTitle">Inventários</button>
+                <button class="btn" type="button" data-section-target="reportsStockTitle">Estoque atual</button>
+              </nav>
             </div>
-            <section class="panel"><h2>Resumo do período</h2><p id="reportsDisplayedPeriod" hidden></p><p class="muted">Operações são eventos distintos. Transferências contam uma vez, somando somente a entrada no destino.</p><div id="reportsSummary" class="report-grid" data-report-content></div></section>
-            <section class="panel"><h2>Mais saídos por venda</h2><div id="reportsSales" class="report-grid" data-report-content></div></section>
+            <section class="panel"><h2 id="reportsSummaryTitle" tabindex="-1">Resumo do período</h2><p id="reportsDisplayedPeriod" hidden></p><p class="muted">Operações são eventos distintos. Transferências contam uma vez, somando somente a entrada no destino.</p><div id="reportsSummary" class="report-grid" data-report-content></div></section>
+            <section class="panel"><h2 id="reportsSalesTitle" tabindex="-1">Mais saídos por venda</h2><div id="reportsSales" class="report-grid" data-report-content></div></section>
             <section class="panel"><h2>Produtos com maior perda</h2><div id="reportsLossRanking" class="report-grid" data-report-content></div></section>
             <section class="panel"><h2>Perdas do período</h2><button id="reportsExport" type="button" class="btn">Exportar CSV das perdas desta página</button><p class="muted">Exporta somente os até 50 registros da página exibida, no período aplicado.</p><div id="reportsLosses" class="report-grid" data-report-content></div><div class="inventory-actions"><button id="reportsLossPrevious" class="btn" type="button">Anterior</button><span id="reportsLossPage" data-report-content></span><button id="reportsLossNext" class="btn" type="button">Próxima</button></div></section>
-            <section class="panel"><h2>Recebimentos por fornecedor</h2><p class="muted">Nome registrado no recebimento. Registros antigos sem fornecedor: Não informado. Nomes iguais são agrupados; renomeações preservam o nome histórico.</p><div id="reportsSuppliers" class="report-grid" data-report-content></div></section>
+            <section class="panel"><h2 id="reportsSuppliersTitle" tabindex="-1">Recebimentos por fornecedor</h2><p class="muted">Nome registrado no recebimento. Registros antigos sem fornecedor: Não informado. Nomes iguais são agrupados; renomeações preservam o nome histórico.</p><div id="reportsSuppliers" class="report-grid" data-report-content></div></section>
             <section class="panel"><h2>Atividade por responsável</h2><p class="muted">Contagem de operações para rastreabilidade. Ordem alfabética; sem pontuação de produtividade.</p><div id="reportsActivity" class="report-grid" data-report-content></div></section>
-            <section class="panel"><h2>Inventários</h2><h3>Último iniciado, independente do período</h3><div id="reportsLatestInventory" data-report-content></div><h3>Concluídos / cancelados no período</h3><p class="muted">Filtro pela data de encerramento. Responsável é quem iniciou. Divergências comparam a última contagem com a base de conferência.</p><div id="reportsInventories" class="report-grid" data-report-content></div><div class="inventory-actions"><button id="reportsInventoryPrevious" class="btn" type="button">Anterior</button><span id="reportsInventoryPage" data-report-content></span><button id="reportsInventoryNext" class="btn" type="button">Próxima</button></div></section>
+            <section class="panel"><h2 id="reportsInventoriesTitle" tabindex="-1">Inventários</h2><h3>Último iniciado, independente do período</h3><div id="reportsLatestInventory" data-report-content></div><h3>Concluídos / cancelados no período</h3><p class="muted">Filtro pela data de encerramento. Responsável é quem iniciou. Divergências comparam a última contagem com a base de conferência.</p><div id="reportsInventories" class="report-grid" data-report-content></div><div class="inventory-actions"><button id="reportsInventoryPrevious" class="btn" type="button">Anterior</button><span id="reportsInventoryPage" data-report-content></span><button id="reportsInventoryNext" class="btn" type="button">Próxima</button></div></section>
             <section class="panel"><h2>Operações por geladeira</h2><p class="muted">Somente posições físicas identificadas. Distribuição interna não conta como reposição.</p><div id="reportsFridgeSummary" class="report-grid" data-report-content></div></section>
-            <section class="panel"><h2>Estoque atual · fora do filtro de período</h2><p id="reportsStockDate" class="muted" data-report-content></p><h3>Validades</h3><div id="reportsExpiry" class="report-grid" data-report-content></div><p id="reportsExpiryNote" class="muted" data-report-content></p><h3>Mínimos e reposição da geladeira</h3><div id="reportsRestock" class="report-grid" data-report-content></div></section>
+            <section class="panel"><div class="panelhead"><h2 id="reportsStockTitle" tabindex="-1">Estoque atual · fora do filtro de período</h2><button class="btn" type="button" data-section-target="reportsSummaryTitle">Voltar ao resumo</button></div><p id="reportsStockDate" class="muted" data-report-content></p><h3>Validades</h3><div id="reportsExpiry" class="report-grid" data-report-content></div><p id="reportsExpiryNote" class="muted" data-report-content></p><h3>Mínimos e reposição da geladeira</h3><details id="reportsRestockDetails" class="report-long-list"><summary id="reportsRestockToggle">Produtos abaixo do mínimo ou com reposição pendente</summary><div id="reportsRestock" class="report-grid" data-report-content></div></details></section>
           </section>
           <div class="foot" id="updated"></div>
         </section>
