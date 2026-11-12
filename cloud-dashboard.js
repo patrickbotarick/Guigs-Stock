@@ -333,7 +333,7 @@ function setOnlineDashboardState() {
     }
   }
   populateReceiveSuppliers();
-  if (el('transferDialog').open && !operationPending('transferForm') && !transferRetry) populateTransferLots();
+  if (el('transferDialog').open && !operationPending('transferForm') && !transferRetry) populateTransferLots({preserve:true});
   syncOperationButtons();
 }
 
@@ -2428,20 +2428,16 @@ function transferReady() {
   return transferOnlyUnallocated() || transferSources().reduce((sum,row)=>sum+row.quantity,0)===transferQuantity();
 }
 
-function populateTransferLots() {
-  const select=el('transferLot'), previous=select.value;
+function populateTransferLots({preserve=false}={}) {
+  const select=el('transferLot'), previous=preserve?select.value:'';
   const source=transferOutbound()?'stock':'fridge';
   const selectedProduct=transferShortcut?.product_id || operationProducts.get('transfer');
   const available=lots.filter(lot=>(!selectedProduct || lot.product_id===selectedProduct) &&
     lotBalances.get(lot.id)?.[source]>0).sort((a,b)=>a.expiry.localeCompare(b.expiry)||a.created_at.localeCompare(b.created_at));
   select.replaceChildren(...available.map(lot=>new Option(
     lotLabel(lot)+' · Validade: '+dateBR(lot.expiry)+' · '+lotBalances.get(lot.id)[source]+' un.',lot.id)));
-  if (!available.length) select.append(new Option('Nenhum lote disponível',''));
-  else if (operationProducts.has('transfer')) {
-    select.prepend(new Option('Escolha o lote',''));
-    select.value = '';
-  }
-  if (available.some(lot=>lot.id===previous)) select.value=previous;
+  select.prepend(new Option(available.length?'Escolha o lote':'Nenhum lote disponível',''));
+  select.value=available.some(lot=>lot.id===previous)?previous:'';
   updateTransferBalance();
 }
 
@@ -2460,7 +2456,8 @@ function renderTransferPositions() {
   delete container.dataset.onlyUnallocated;
   el('transferSendMode').classList.toggle('hidden',!transferOutbound());
   container.classList.toggle('hidden',!transferNeedsMap());
-  if (!transferNeedsMap() || !transferMap || !lot) {syncOperationButtons();return;}
+  const destinationProduct=transferOutbound()&&(lot?.product_id||transferShortcut?.product_id);
+  if (!transferNeedsMap() || !transferMap || (!lot&&!destinationProduct)) {syncOperationButtons();return;}
   const positions=transferMap.fridges.filter(fridge=>fridge.active).flatMap(fridge=>
     transferMap.shelves.filter(shelf=>shelf.active&&shelf.fridge_id===fridge.id).flatMap(shelf=>
       transferMap.slots.filter(slot=>slot.active&&slot.fridge_id===fridge.id&&slot.shelf_id===shelf.id)
@@ -2471,7 +2468,7 @@ function renderTransferPositions() {
     instruction.textContent=positions.length?'Escolha a geladeira, a prateleira e o bloco.':'Nenhum bloco ativo disponível.';
     for (const {slot,label} of positions) {
       const space=slot.capacity_quantity==null ? null : Math.max(0,slot.capacity_quantity-slot.quantity);
-      const compatible=slot.product_id===lot.product_id && slot.product_active;
+      const compatible=slot.product_id===destinationProduct && slot.product_active;
       const choice=document.createElement('input');
       choice.type='radio'; choice.name='transferSlot'; choice.value=slot.id;
       choice.disabled=!compatible || space===null || space<transferQuantity();
@@ -2545,8 +2542,7 @@ async function openIntegratedTransfer(slot = null, productId = '') {
         showOperationFeedback('Não foi possível confirmar que este produto ainda está disponível.', true);
         return;
       }
-      setOperationProduct('transfer', contextProduct(productId));
-      if (productId) el('transferLot').value = '';
+      setOperationProduct('transfer', contextProduct(slot?.product_id||productId));
       populateTransferLots();
     }
     dialog.showModal();
@@ -2693,10 +2689,8 @@ function populateSaleLots() {
     select.append(option);
   }
 
-  if (operationProducts.has('sale')) {
-    select.prepend(new Option('Escolha o lote',''));
-    select.value = '';
-  }
+  select.prepend(new Option('Escolha o lote',''));
+  select.value = '';
   el('saveSale').disabled = !select.value;
   updateSaleBalance();
 }
@@ -2777,10 +2771,8 @@ function populateLossLots() {
     select.append(option);
   }
 
-  if (productId) {
-    select.prepend(new Option(select.options.length ? 'Escolha o lote' : 'Nenhum lote com saldo',''));
-    select.value = '';
-  }
+  select.prepend(new Option(select.options.length ? 'Escolha o lote' : 'Nenhum lote com saldo',''));
+  select.value = '';
   el('saveLoss').disabled =
     !select.value;
 
@@ -3463,14 +3455,14 @@ el('transferPositions').addEventListener('input',syncOperationButtons);
 el('saleLot')
   .addEventListener(
     'change',
-    updateSaleBalance
+    () => { updateSaleBalance(); syncOperationButtons(); }
   );
 
 
 el('lossLot')
   .addEventListener(
     'change',
-    updateLossBalance
+    () => { updateLossBalance(); syncOperationButtons(); }
   );
 
 

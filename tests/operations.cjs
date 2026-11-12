@@ -97,7 +97,9 @@ const server = http.createServer((req,res)=>{
       if(process.env.TEST_ARTIFACTS_DIR){fs.mkdirSync(process.env.TEST_ARTIFACTS_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.TEST_ARTIFACTS_DIR,`operacao-${role}-${mobile?'mobile':'desktop'}.png`),fullPage:true});}
 
       // Perda sempre confirma; cancelar não escreve nem perde os campos.
-      await click('#registerLoss');await choose('lossLot','lot-a');
+      await click('#registerLoss');
+      check(await page.inputValue('#lossLot')===''&&await page.isDisabled('#saveLoss'),'Perda geral exige seleção de lote');
+      await choose('lossLot','lot-a');
       await page.fill('#lossQuantity','2');await page.fill('#lossNote','Garrafa danificada');
       const losses=await count('guigs_register_loss');
       await click('#saveLoss');await page.waitForSelector('#operationConfirmDialog[open]');
@@ -134,7 +136,9 @@ const server = http.createServer((req,res)=>{
       await context.setOffline(false);await page.waitForFunction(()=>!document.getElementById('registerLoss').disabled);await close('lossDialog');
 
       // Venda cotidiana não pede confirmação; zerar a geladeira pede.
-      await click('#registerSale');await choose('saleLot','lot-a');await page.fill('#saleQuantity','1');
+      await click('#registerSale');
+      check(await page.inputValue('#saleLot')===''&&await page.isDisabled('#saveSale'),'Venda geral exige seleção de lote');
+      await choose('saleLot','lot-a');await page.fill('#saleQuantity','1');
       const sales=await count('guigs_register_sale');await click('#saveSale');
       await repeatDuringWrite('saleForm','saveSale','guigs_register_sale',sales);await closed('saleDialog');await settled('saleForm');
       check((await page.textContent('#operationFeedback')).includes('Venda registrada: 1'),'Venda simples com feedback sem confirmação extra');
@@ -144,7 +148,9 @@ const server = http.createServer((req,res)=>{
       await click('#cancelOperation');await settled('saleForm');await close('saleDialog');
 
       // Movimentação fora de FEFO conserva o aviso existente e inclui quantidade.
-      await click('#transferStock');await choose('transferLot','lot-b');await page.fill('#transferQuantity','2');await click('#saveTransfer');
+      await click('#transferStock');
+      check(await page.inputValue('#transferLot')===''&&await page.isDisabled('#saveTransfer'),'Movimentação geral exige seleção de lote');
+      await choose('transferLot','lot-b');await page.fill('#transferQuantity','2');await click('#saveTransfer');
       await page.waitForSelector('#fefoDialog[open]');
       check((await page.textContent('#fefoSelected')).includes('2 unidade(s)'),'FEFO mostra quantidade e origem/destino');
       await click('#cancelFefo');await settled('transferForm');await close('transferDialog');

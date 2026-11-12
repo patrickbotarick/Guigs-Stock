@@ -462,6 +462,19 @@ function bridge({role,shop}){
     check((await db.query("select count(*)::int as n from public.guigs_movements where movement_type='transfer' and spatial")).rows[0].n===2,'Retry não duplica o débito/crédito');
     check(worker.errors.length===0,'Reposição sem erro JavaScript');
     const replenishChecks=checks;checks=0;
+    const beforeContext=await ledger();
+    await worker.page.locator('[data-open-slot="'+x+'"]').click();
+    await worker.page.click('#fridgeDetailStock');
+    check(await worker.page.inputValue('#fridgeStockOrigin')===x,'Venda contextual mantém o bloco de entrada');
+    await worker.page.selectOption('#fridgeStockKind','loss');
+    check(await worker.page.inputValue('#fridgeStockOrigin')===x,'Venda para perda preserva o mesmo bloco');
+    check(await worker.page.inputValue('#fridgeStockLot')==='','Perda contextual inicia sem lote');
+    check(await worker.page.isDisabled('#fridgeStockQuote'),'Sem lote, perda não calcula previsão');
+    await worker.page.selectOption('#fridgeStockKind','sale');
+    check(await worker.page.inputValue('#fridgeStockOrigin')===x,'Perda para venda preserva o mesmo bloco');
+    await snapshot(worker.page,'r1-venda-origem');
+    await worker.page.click('#fridgeStockCancel');
+    assert.deepEqual(await ledger(),beforeContext);checks++;
     await worker.page.click('#fridgeOperateStock');
     check(await worker.page.locator('#fridgeStockKind option[value="adjust"]').count()===0,'Atendente não vê ajuste');
     check(await worker.page.inputValue('#fridgeStockOrigin')==='auto','Origem automática FEFO por padrão');
@@ -492,13 +505,30 @@ function bridge({role,shop}){
     const restockChecks=checks;checks=0;
     await worker.page.click('#fridgeOperateStock');
     await worker.page.selectOption('#fridgeStockKind','loss');
+    check(await worker.page.inputValue('#fridgeStockOrigin')==='','Trocar de FEFO global para perda não escolhe origem');
     await worker.page.selectOption('#fridgeStockOrigin',x);
+    check(await worker.page.inputValue('#fridgeStockLot')===''&&await worker.page.isDisabled('#fridgeStockQuote'),
+      'A previsão exige lote escolhido mesmo com uma única opção');
+    await worker.page.selectOption('#fridgeStockLot',{index:1});
     await worker.page.fill('#fridgeStockQuantity','1');
     await worker.page.fill('#fridgeStockNote','=Fórmula artificial');
     await worker.page.click('#fridgeStockQuote');
     await worker.page.waitForFunction(()=>!document.querySelector('#fridgeStockConfirm').disabled);
+    const selectedLot=await worker.page.inputValue('#fridgeStockLot'), concurrent=randomUUID();
+    await db.query("insert into public.guigs_movements(shop_id,lot_id,event_id,movement_type,location,delta,actor_id,slot_id,spatial) values($1,$2,$3,'adjust','fridge',1,$4,$5,true)",
+      [shop,selectedLot,concurrent,id(1),x]);
+    const afterConcurrent=await ledger();
+    await worker.page.click('#fridgeStockConfirm');
+    await worker.page.waitForFunction(()=>document.querySelector('#fridgeStockMessage').textContent.includes('mudou'));
+    check(await worker.page.isDisabled('#fridgeStockConfirm'),'Mudança de saldo invalida a confirmação anterior');
+    assert.deepEqual(await ledger(),afterConcurrent);checks++;
+    await db.query('delete from public.guigs_movements where event_id=$1',[concurrent]);
+    await worker.page.click('#fridgeStockQuote');
+    await worker.page.waitForFunction(()=>!document.querySelector('#fridgeStockConfirm').disabled);
     await worker.page.click('#fridgeStockConfirm');
     await worker.page.waitForFunction(()=>!document.querySelector('#fridgeStockDialog').open&&!document.querySelector('#refresh').disabled);
+    const debit=(await db.query("select slot_id,lot_id,delta from public.guigs_movements where movement_type='loss' and spatial")).rows;
+    check(debit.some(row=>row.slot_id===x&&row.lot_id===selectedLot&&row.delta===-1),'Confirmação debita o bloco e lote selecionados');
     await worker.page.click('#navHistory');
     await worker.page.click('#historyTools summary');
     await worker.page.selectOption('#historyPartition','slot');
@@ -519,6 +549,8 @@ function bridge({role,shop}){
     await transfer.page.click('#fridgeDetailTransfer');
     await transfer.page.waitForSelector('#transferPositions [name=transferSlot]:checked');
     check(await transfer.page.locator('#transferPositions [name=transferSlot]:checked').inputValue()===transferSlot,'Mapa abre transferência com posição selecionada');
+    check(await transfer.page.inputValue('#transferLot')===''&&await transfer.page.isDisabled('#saveTransfer'),
+      'Atalho de transferência conserva destino e exige escolha explícita de lote');
     await transfer.page.selectOption('#transferLot',transferLot,{force:true});
     await transfer.page.fill('#transferQuantity','4');
     await transfer.page.click('#saveTransfer');
@@ -533,12 +565,18 @@ function bridge({role,shop}){
     await transfer.page.setViewportSize({width:390,height:844});
     await transfer.page.click('#navOverview');
     await transfer.page.click('#transferStock');
+    await transfer.page.waitForSelector('#transferDialog[open]');
     await transfer.page.selectOption('#transferLot',transferLot,{force:true});
     await transfer.page.fill('#transferQuantity','2');
+    check(await transfer.page.isEnabled('#saveTransfer'),JSON.stringify(await transfer.page.evaluate(()=>{
+      const form=document.getElementById('transferForm');
+      return {lot:form.elements.transferLot.value,mode:form.elements.transferMode.value,direction:form.elements.transferDirection.value,quantity:form.elements.transferQuantity.value};
+    })));
     await transfer.page.click('#saveTransfer');
     await transfer.page.waitForSelector('#transferDialog',{state:'hidden'});
     check((await db.query("select sum(delta)::int n from public.guigs_movements where lot_id=$1 and location='fridge' and slot_id is null",[transferLot])).rows[0].n===2,'Modo padrão envia ao não alocado');
     await transfer.page.click('#transferStock');
+    await transfer.page.waitForSelector('#transferDialog[open]');
     await transfer.page.selectOption('#transferDirection','fridge-stock');
     await transfer.page.selectOption('#transferLot',transferLot,{force:true});
     const source=transfer.page.locator('#transferPositions input[data-source="'+transferSlot+'"]');
@@ -575,6 +613,41 @@ function bridge({role,shop}){
     check((await db.query("select sum(delta)::int n from public.guigs_movements where lot_id=$1 and location='fridge' and slot_id is null",[transferLot])).rows[0].n===1,'Retorno também debita o não alocado uma única vez');
     check(transfer.errors.length===0,'Transferência integrada sem erro JavaScript');
     await transfer.context.close();
+
+    const secondLot=id(97);
+    await db.query("insert into public.guigs_lots(id,shop_id,product_id,code,expiry) values($1,$2,$3,'LOTE-EXTRA',current_date+10)",
+      [secondLot,shop,id(21)]);
+    await db.query("insert into public.guigs_movements(shop_id,lot_id,event_id,movement_type,location,delta,actor_id,slot_id,spatial) values($1,$2,gen_random_uuid(),'adjust','fridge',1,$3,$4,true)",
+      [shop,secondLot,id(1),transferSlot]);
+    const contextLedger=await ledger();
+    const contextual=await open('owner',{width:1366,height:768});await waitMap(contextual.page);
+    const p=contextual.page;
+    const openBlock=slot=>p.locator('[data-open-slot="'+slot+'"]').click();
+    await openBlock(x);await p.click('#fridgeDetailStock');
+    check(await p.inputValue('#fridgeStockOrigin')===x,'Owner abre venda na posição indicada');
+    await p.click('#fridgeStockCancel');
+    await openBlock(x);await p.click('#fridgeDetailTransfer');
+    await p.waitForSelector('#transferDialog[open]');
+    check(await p.inputValue('#transferLot')==='','Venda seguida de transferência não reaproveita lote');
+    await p.click('[data-close=transferDialog]');
+    await openBlock(x);await p.click('#fridgeDetailStock');
+    await p.selectOption('#fridgeStockKind','loss');
+    check(await p.inputValue('#fridgeStockOrigin')===x&&await p.inputValue('#fridgeStockLot')==='',
+      'Transferência cancelada seguida de perda preserva a origem e pede o lote');
+    await p.selectOption('#fridgeStockProduct',id(21));
+    check(await p.inputValue('#fridgeStockOrigin')===''&&await p.isDisabled('#fridgeStockQuote')&&
+      (await p.textContent('#fridgeStockMessage')).includes('Escolha uma origem'),'Produto diferente invalida origem com aviso');
+    await p.selectOption('#fridgeStockOrigin',transferSlot);
+    check(await p.locator('#fridgeStockLot option').count()===3&&await p.inputValue('#fridgeStockLot')==='',
+      'Dois lotes elegíveis, nenhum implícito');
+    await p.selectOption('#fridgeStockLot',secondLot);
+    await p.selectOption('#fridgeStockOrigin','unallocated');
+    check(await p.inputValue('#fridgeStockLot')===''&&await p.isDisabled('#fridgeStockQuote'),
+      'Escolha explícita de outra origem limpa o lote');
+    await snapshot(p,'r1-perda-lote-explicito');
+    await p.click('#fridgeStockCancel');
+    assert.deepEqual(await ledger(),contextLedger);checks++;
+    await contextual.context.close();
     const transferChecks=checks;checks=0;
     const countBefore=await ledger();
     const inventory=await open('owner',{width:390,height:844});

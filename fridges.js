@@ -513,11 +513,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
   });
   el('fridgeDetailStock').addEventListener('click',()=>{
     const slot=detailSlot();if(!slot||el('fridgeDetailStock').disabled)return;
-    el('fridgeDetailDialog').close();el('fridgeOperateStock').click();
-    if([...el('fridgeStockProduct').options].some(o=>o.value===slot.product_id)){
-      el('fridgeStockProduct').value=slot.product_id;stockOrigins();
-      if([...el('fridgeStockOrigin').options].some(o=>o.value===slot.id)){el('fridgeStockOrigin').value=slot.id;stockLots();}
-    }
+    el('fridgeDetailDialog').close();openStock(slot);
   });
   async function loadPhotos(next,client,stamp){
     const paths=[...new Set(next.slots.flatMap(x=>[x.image_path,...x.lots.map(l=>l.image_path)]).filter(Boolean))];
@@ -643,7 +639,8 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     const locked=busy||!navigator.onLine, permitted=stockKind()!=='adjust'||owner();
     el('fridgeStockFields').disabled=locked;
     el('fridgeStockCancel').disabled=busy;
-    el('fridgeStockQuote').disabled=locked||!permitted;
+    el('fridgeStockQuote').disabled=locked||!permitted||!el('fridgeStockProduct').value||!stockSource()||
+      (stockKind()!=='sale'&&!el('fridgeStockLot').value);
     el('fridgeStockConfirm').disabled=locked||!permitted||!stockQuote||
       stockQuote.signature!==stockPayload()||!el('fridgeStockForm').checkValidity();
   }
@@ -654,20 +651,27 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     if(stockKind()==='adjust'){
       for(const l of getContext().lots||[])if(l.product_id===product&&!labels.has(l.id))labels.set(l.id,l.code+' · 0 un.');
     }
-    el('fridgeStockLot').replaceChildren(...[...labels].map(([id,label])=>option(id,label)));
+    el('fridgeStockLot').replaceChildren(option('',labels.size?'Escolha o lote':'Nenhum lote disponível'),
+      ...[...labels].map(([id,label])=>option(id,label)));
+    el('fridgeStockLot').value='';
     invalidateStock();
   }
-  function stockOrigins(){
+  function stockOrigins(previous=stockSource()){
     const product=el('fridgeStockProduct').value, op=stockKind();
     const slots=data.slots.filter(s=>s.active&&s.product_id&&s.capacity_quantity!==null&&data.fridges.some(f=>f.active&&f.id===s.fridge_id)&&data.shelves.some(h=>h.active&&h.id===s.shelf_id))
       .filter(s=>op==='adjust'?(!s.product_id||s.product_id===product):s.lots.some(l=>l.product_id===product&&l.quantity>0));
     const choices=slots.map(s=>[s.id,[data.fridges.find(f=>f.id===s.fridge_id)?.name,data.shelves.find(h=>h.id===s.shelf_id)?.name,s.name].filter(Boolean).join(' / ')]);
     if(op==='adjust'||data.unallocated.some(l=>l.product_id===product&&l.quantity>0))choices.push(['unallocated','Geladeira — não alocado']);
     if(op==='sale')choices.unshift(['auto','Automática (FEFO; pode dividir entre posições)']);
-    el('fridgeStockOrigin').replaceChildren(...choices.map(([id,label])=>option(id,label)));
+    const origin=el('fridgeStockOrigin');
+    origin.replaceChildren(option('',choices.length?'Escolha a origem':'Nenhuma origem disponível'),
+      ...choices.map(([id,label])=>option(id,label)));
+    const available=choices.some(([id])=>id===previous);
+    origin.value=available?previous:'';
     stockLots();
+    if(previous&&!available)stockMessage('A origem anterior não está disponível para esta operação. Escolha uma origem.');
   }
-  function stockFields(){
+  function stockFields({product=el('fridgeStockProduct').value,origin=stockSource(),initial=false}={}){
     const op=stockKind();
     el('fridgeStockLotField').classList.toggle('hidden',op==='sale');
     el('fridgeStockLot').required=op!=='sale';
@@ -679,21 +683,27 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
       :op==='return'?'O retorno credita o estoque seco e debita exatamente a origem escolhida.':'O saldo será alterado somente na origem escolhida.';
     const present=new Set([...data.unallocated,...data.slots.flatMap(s=>s.lots)].filter(l=>l.quantity>0).map(l=>l.product_id));
     const products=(getContext().products||[]).filter(p=>op==='adjust'||(present.has(p.id)&&(op!=='sale'||p.active)));
-    el('fridgeStockProduct').replaceChildren(...products.map(p=>option(p.id,p.name)));
-    stockOrigins();
+    const select=el('fridgeStockProduct');
+    select.replaceChildren(option('',products.length?'Escolha o produto':'Nenhum produto disponível'),
+      ...products.map(p=>option(p.id,p.name)));
+    select.value=products.some(p=>p.id===product)?product:initial&&!product?(products[0]?.id||''):'';
+    stockOrigins(origin);
+    if(product&&!select.value)stockMessage('O produto anterior não está disponível para esta operação. Escolha um produto e a origem.');
   }
   function invalidateStock(){
     stockQuote=null;el('fridgeStockPlan').replaceChildren();stockMessage('');syncStock();
   }
-  el('fridgeOperateStock').addEventListener('click',()=>{
+  function openStock(slot){
     if(!data||busy||!navigator.onLine)return;
     el('fridgeStockKind').replaceChildren(option('sale','Venda'),option('loss','Perda'),option('return','Retorno ao estoque seco'));
     if(owner())el('fridgeStockKind').append(option('adjust','Ajuste de saldo'));
     el('fridgeStockQuantity').value='';el('fridgeStockNote').value='';
-    stockFields();el('fridgeStockDialog').showModal();syncStock();
-  });
-  el('fridgeStockKind').addEventListener('change',stockFields);
-  el('fridgeStockProduct').addEventListener('change',stockOrigins);
+    stockFields({product:slot?.product_id||'',origin:slot?.id||'auto',initial:true});
+    el('fridgeStockDialog').showModal();syncStock();
+  }
+  el('fridgeOperateStock').addEventListener('click',()=>openStock());
+  el('fridgeStockKind').addEventListener('change',()=>stockFields());
+  el('fridgeStockProduct').addEventListener('change',()=>stockOrigins());
   el('fridgeStockOrigin').addEventListener('change',stockLots);
   el('fridgeStockLot').addEventListener('change',invalidateStock);
   el('fridgeStockQuantity').addEventListener('input',invalidateStock);
@@ -701,7 +711,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
   el('fridgeStockCancel').addEventListener('click',()=>{if(!busy)el('fridgeStockDialog').close();});
   el('fridgeStockDialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();});
   el('fridgeStockQuote').addEventListener('click',async()=>{
-    if(busy||!navigator.onLine||!el('fridgeStockForm').reportValidity())return;
+    if(el('fridgeStockQuote').disabled||!el('fridgeStockForm').reportValidity())return;
     const {client,shop}=getContext(),spec=stockSpec(),signature=stockPayload(),stamp=generation;
     if(!client||!shop)return;
     invalidateStock();busy=true;sync();stockMessage('Conferindo saldo e origem…');
@@ -710,6 +720,10 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
       if(stamp!==generation)return;
       if(error)throw error;
       if(!quote?.plan?.length)throw Error('Plano indisponível.');
+      if(signature!==stockPayload()||quote.plan.some(row=>
+        (spec.origin!=='auto'&&row.slot_id!==spec.slot_id)||(spec.lot_id&&row.lot_id!==spec.lot_id))){
+        throw Error('O plano não corresponde à origem ou ao lote selecionado. Confira novamente.');
+      }
       stockQuote={signature,quote};
       el('fridgeStockPlan').replaceChildren(...quote.plan.map(l=>node('li',l.slot_label+' · '+l.code+' · '+l.current+' → '+(l.current+l.delta)+' un.')));
       stockMessage(quote.plan.length>1?'Confira a divisão entre origens antes de confirmar.':'Confira a origem e o novo saldo antes de confirmar.');
@@ -718,7 +732,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
   });
   el('fridgeStockForm').addEventListener('submit',async e=>{
     e.preventDefault();
-    if(!stockQuote||busy||!navigator.onLine||el('fridgeStockConfirm').disabled)return;
+    if(!stockQuote||busy||!navigator.onLine||el('fridgeStockConfirm').disabled||stockQuote.signature!==stockPayload())return;
     const {client,shop}=getContext(),stamp=generation;
     const args={p_shop_id:shop.shop_id,p_spec:stockSpec(),p_expected:stockQuote.quote,p_note:el('fridgeStockNote').value.trim()};
     const signature=JSON.stringify(args);
@@ -732,7 +746,14 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
       if(stamp!==generation)return;
       saved=true;stockRetry=null;stockQuote=null;el('fridgeStockDialog').close();
       msg('Movimentação registrada no histórico.');
-    }catch(error){if(stamp===generation)stockMessage(safeError(error));}
+    }catch(error){
+      if(stamp===generation){
+        if(error?.code==='P0001'||/Origem ou saldo mudou|Saldo insuficiente/i.test(error?.message||'')){
+          invalidateStock();stockRetry=null;
+        }
+        stockMessage(safeError(error));
+      }
+    }
     finally{if(stamp===generation){busy=false;sync();}}
     if(saved&&stamp===generation){await load({announce:false});if(refreshStock&&stamp===generation)await refreshStock();}
   });
