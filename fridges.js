@@ -81,7 +81,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
   const library=createImageLibrary({getContext,canManage:canManageLayout,onApplied:async(id,path)=>{const p=(getContext().products||[]).find(p=>p.id===id);if(p)p.image_path=path;await load({announce:false});}});
   let detailSlotId=null,dragging=false;
   let allocationRetry=null;
-  let replenishSlot=null, replenishQuote=null, replenishRetry=null;
+  let replenishSlot=null, replenishQuote=null, replenishRetry=null, replenishRequest=null;
   let stockQuote=null, stockRetry=null;
   let mapCards=[];
   const moves=createFridgeMovesUI({getContext,getMap:()=>data,openDetail:(...args)=>{if(view())openDetail(...args);},
@@ -760,9 +760,9 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
   });
   const replenishMessage=text=>{el('fridgeReplenishMessage').textContent=text;};
   function syncReplenish(){
-    const locked=busy||!navigator.onLine;
+    const locked=busy||!!replenishRequest||!navigator.onLine;
     const quantity=el('fridgeReplenishQuantity');
-    quantity.disabled=locked;
+    quantity.readOnly=locked;
     el('fridgeReplenishQuote').disabled=locked;
     el('fridgeReplenishCancel').disabled=busy;
     el('fridgeReplenishConfirm').disabled=locked||!replenishQuote?.quantity||Number(quantity.value)!==replenishQuote.quantity;
@@ -773,17 +773,28 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     el('fridgeReplenishPosition').textContent=[fridge.name,shelf.name,slot.name].join(' / ');
     el('fridgeReplenishStats').textContent='';el('fridgeReplenishPlan').replaceChildren();
     el('fridgeReplenishQuantity').value='';
-    el('fridgeReplenishDialog').showModal();void quoteReplenishment(preferred);
+    el('fridgeReplenishDialog').showModal();
+    el('fridgeReplenishQuantity').focus();
+    void quoteReplenishment(preferred);
   }
   async function quoteReplenishment(quantity){
-    if(busy||!navigator.onLine||!replenishSlot)return;
-    const {client,shop}=getContext(),stamp=generation;
+    if(busy||replenishRequest||!navigator.onLine||!replenishSlot)return;
+    const {client,shop}=getContext();
     if(!client||!shop)return;
-    busy=true;replenishQuote=null;sync();replenishMessage('Calculando lotes…');
+    const request = {timer: null, cancel: null};
+    const interrupted = new Promise((_, reject) => {
+      request.cancel = () => reject(Error('Consulta cancelada.'));
+      request.timer = setTimeout(() => reject(Error('A consulta demorou demais. Calcule a sugestão novamente.')), 15000);
+    });
+    replenishRequest=request;
+    replenishQuote=null;
+    el('fridgeReplenishQuantity').focus();
+    syncReplenish();replenishMessage('Calculando lotes…');
+    const current = () => replenishRequest===request && el('fridgeReplenishDialog').open;
     try{
-      const {data:quote,error}=await client.rpc('guigs_get_fridge_replenishment',{
-        p_shop_id:shop.shop_id,p_slot_id:replenishSlot.id,p_quantity:quantity});
-      if(stamp!==generation)return;
+      const {data:quote,error}=await Promise.race([interrupted,client.rpc('guigs_get_fridge_replenishment',{
+        p_shop_id:shop.shop_id,p_slot_id:replenishSlot.id,p_quantity:quantity})]);
+      if(!current())return;
       if(error)throw error;
       if(!quote||!Array.isArray(quote.plan))throw Error('Sugestão indisponível.');
       replenishQuote=quote;
@@ -791,8 +802,17 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
       el('fridgeReplenishStats').textContent=quote.product_name+' · Atual: '+quote.current+' / '+quote.capacity+' · Mínimo: '+(quote.min??'Não configurado')+' · Meta: '+quote.target+' · Seco elegível: '+quote.dry_available;
       el('fridgeReplenishPlan').replaceChildren(...quote.plan.map(l=>node('li',l.code+' · '+l.quantity+' un. · '+l.expiry.split('-').reverse().join('/'))));
       replenishMessage(quote.deficit===0?'Posição já atingiu a meta.':quote.dry_available<quote.deficit?'Estoque seco insuficiente para atingir a meta.':quote.expired_dry>0?'Lotes vencidos não foram incluídos.':'Confira os lotes antes de confirmar.');
-    }catch(error){if(stamp===generation)replenishMessage(safeError(error));}
-    finally{if(stamp===generation){busy=false;sync();}}
+    }catch(error){if(current())replenishMessage(safeError(error));}
+    finally{
+      clearTimeout(request.timer);
+      if(replenishRequest===request){replenishRequest=null;syncReplenish();}
+    }
+  }
+  function cancelReplenishQuote(){
+    const request=replenishRequest;
+    replenishRequest=null;
+    request?.cancel();
+    syncReplenish();
   }
   el('fridgeReplenishQuantity').addEventListener('input',syncReplenish);
   el('fridgeReplenishQuote').addEventListener('click',()=>{
@@ -800,8 +820,15 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     if(input.value&&!input.checkValidity()){input.reportValidity();return;}
     void quoteReplenishment(input.value?Number(input.value):null);
   });
-  el('fridgeReplenishCancel').addEventListener('click',()=>{if(!busy)el('fridgeReplenishDialog').close();});
-  el('fridgeReplenishDialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();});
+  el('fridgeReplenishCancel').addEventListener('click',()=>{if(!busy){cancelReplenishQuote();el('fridgeReplenishDialog').close();}});
+  el('fridgeReplenishDialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();else cancelReplenishQuote();});
+  el('fridgeReplenishDialog').addEventListener('close',()=>{
+    if(el('fridgeReplenishDialog').open)return;
+    cancelReplenishQuote();
+    if(view()&&!restocking&&replenishSlot&&!document.querySelector('dialog[open]')){
+      el('fridgeMap').querySelector('[data-open-slot="'+replenishSlot.id+'"]')?.focus({preventScroll:true});
+    }
+  });
   el('fridgeReplenishForm').addEventListener('submit',async e=>{
     e.preventDefault();
     if(!replenishQuote||!replenishSlot||busy||!navigator.onLine||el('fridgeReplenishConfirm').disabled)return;
@@ -809,6 +836,7 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     const args={p_shop_id:shop.shop_id,p_slot_id:replenishSlot.id,p_quantity:replenishQuote.quantity,p_plan:replenishQuote.plan};
     const signature=JSON.stringify(args);
     if(replenishRetry?.signature!==signature)replenishRetry={signature,request:crypto.randomUUID()};
+    el('fridgeReplenishQuantity').focus();
     busy=true;sync();replenishMessage('Confirmando reposição…');
     let saved=false;
     try{
@@ -963,7 +991,8 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     for(const input of el('fridgeMapFilters').querySelectorAll('input[type=checkbox]'))input.checked=false;
     filterMap();
   });
-  const mapTools = ['fridgeMoreActions','fridgeSearchTool','fridgeFilterTool'].map(el);
+  const filterTool = el('fridgeFilterTool');
+  const mapTools = [el('fridgeMoreActions'),el('fridgeSearchTool'),filterTool];
   function closeMapTool(tool, restoreFocus = false) {
     if (!tool.open) return;
     tool.open = false;
@@ -978,7 +1007,11 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     for (const tool of mapTools) if (!tool.contains(event.target)) closeMapTool(tool, tool.contains(document.activeElement));
   });
   window.addEventListener('hashchange', () => { for (const tool of mapTools) closeMapTool(tool); });
-  el('fridgeFiltersDone').addEventListener('click', () => closeMapTool(el('fridgeFilterTool'), true));
+  // O painel é não modal. Ao tabular para fora, revele o próximo alvo imediatamente.
+  document.addEventListener('focusin', event => {
+    if (!filterTool.contains(event.target)) closeMapTool(filterTool);
+  });
+  el('fridgeFiltersDone').addEventListener('click', () => closeMapTool(filterTool, true));
   el('fridgeReload').addEventListener('click', () => {
     closeMapTool(el('fridgeMoreActions'), true);
     void load();
@@ -994,6 +1027,6 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
     },
     transferPhoto:photo,
     activate(){sync();if(view()&&getContext().shop&&navigator.onLine)void load();},
-    reset(){generation++;library.reset();moves.reset();detailSlotId=null;el('fridgeDetailDialog').close();data=null;photoUrls=new Map();allocationRetry=null;replenishRetry=null;replenishQuote=null;replenishSlot=null;stockQuote=null;stockRetry=null;editing=false;restocking=false;busy=false;pendingRefresh=false;el('fridgeStockDialog').close();el('fridgeReplenishDialog').close();el('fridgeAllocationDialog').close();el('fridgeLayoutFields').replaceChildren();el('fridgePicker').value='';el('fridgeMapSearch').value='';el('fridgeMapStock').value='all';for(const input of el('fridgeMapFilters').querySelectorAll('input[type=checkbox]'))input.checked=false;renderMap();renderRestock();msg('');sync();}
+    reset(){generation++;cancelReplenishQuote();library.reset();moves.reset();detailSlotId=null;el('fridgeDetailDialog').close();data=null;photoUrls=new Map();allocationRetry=null;replenishRetry=null;replenishQuote=null;replenishSlot=null;stockQuote=null;stockRetry=null;editing=false;restocking=false;busy=false;pendingRefresh=false;el('fridgeStockDialog').close();el('fridgeReplenishDialog').close();el('fridgeAllocationDialog').close();el('fridgeLayoutFields').replaceChildren();el('fridgePicker').value='';el('fridgeMapSearch').value='';el('fridgeMapStock').value='all';for(const input of el('fridgeMapFilters').querySelectorAll('input[type=checkbox]'))input.checked=false;renderMap();renderRestock();msg('');sync();}
   };
 }

@@ -120,8 +120,11 @@ function reportsClient({role,shopId}) {
     check((await page.textContent('#reportsLosses')).includes('Nenhuma perda registrada')&&(await page.textContent('#reportsSuppliers')).includes('Nenhum recebimento registrado'),'Empty states por seção');
     check(await page.isDisabled('#reportsExport'),'Sem CSV vazio');
     check((await page.textContent('#reportsExpiry')).includes('Vencidos'),'Fotografia atual preservada no período vazio');
+    const validPeriod=await page.textContent('#reportsDisplayedPeriod');
+    check(validPeriod.includes('2025-01-01 a 2025-01-02'),'Período exibido acompanha os dados carregados');
     const count=calls.length;await page.fill('#reportsFrom','2026-10-20');await page.fill('#reportsTo','2026-10-01');await click('#reportsReload');
     check(calls.length===count&&(await page.textContent('#reportsMessage')).includes('posterior'),'Intervalo invertido bloqueado');
+    check(await page.textContent('#reportsDisplayedPeriod')===validPeriod,'Filtro inválido preserva o período dos dados anteriores');
     await page.fill('#reportsFrom','2026-10-01');await page.fill('#reportsTo','2026-10-31');await click('#reportsReload');await ready();
     await page.evaluate(()=>window.__test.reportMissing=true);await click('#reportsReload');await ready();
     check((await page.textContent('#reportsMessage')).includes('indisponíveis neste ambiente')&&await page.isDisabled('#reportsExport'),'Migration ausente com erro claro e sem exportar dados antigos');

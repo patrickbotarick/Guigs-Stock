@@ -460,6 +460,7 @@ function bridge({role,shop}){
     });
     await worker.page.locator('[data-open-slot="'+x+'"]').click();await worker.page.click('#fridgeDetailReplenish');
     await worker.page.waitForFunction(()=>!document.querySelector('#fridgeReplenishConfirm').disabled);
+    check(await worker.page.locator('#fridgeReplenishQuantity').evaluate(input=>input===document.activeElement),'Cotação preserva o foco na quantidade');
     check(await worker.page.inputValue('#fridgeReplenishQuantity')==='7','Sugestão até a meta no modal');
     await worker.page.fill('#fridgeReplenishQuantity','3');
     check(await worker.page.isDisabled('#fridgeReplenishConfirm'),'Mudança de quantidade exige recalcular FEFO');

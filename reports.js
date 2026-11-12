@@ -11,13 +11,14 @@ export function createReportsUI({getContext, dayDifference, replenishmentFor}) {
   const dateInput = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
   const statusLabel = status => ({open:'Aberto',review:'Em revisão',completed:'Concluído',cancelled:'Cancelado'}[status] || status);
   const quantity = (value, singular, plural) => `${value} ${Number(value)===1?singular:plural}`;
-  let busy = false, data = null, applied = null, lossOffset = 0, inventoryOffset = 0, generation = 0;
+  let busy = false, data = null, applied = null, lossOffset = 0, inventoryOffset = 0, generation = 0, filterRevision = 0;
   const limit = 50;
   const owner = () => getContext().shop?.role === 'owner';
   function message(text) { el('reportsMessage').textContent = text; }
   function controls() {
     el('reportsOffline').classList.toggle('hidden',navigator.onLine);
-    for (const id of ['reportsReload','reportsPeriod','reportsFrom','reportsTo']) el(id).disabled = busy || !navigator.onLine || !owner();
+    for (const id of ['reportsPeriod','reportsFrom','reportsTo']) el(id).disabled = !navigator.onLine || !owner();
+    el('reportsReload').disabled = busy || !navigator.onLine || !owner();
     el('reportsExport').disabled = busy || !navigator.onLine || !owner() || !data || !applied || !data.losses.length;
     el('reportsLossPrevious').disabled = busy || !navigator.onLine || !owner() || !applied || lossOffset === 0;
     el('reportsLossNext').disabled = busy || !navigator.onLine || !owner() || !applied || lossOffset+limit >= (data?.loss_count || 0);
@@ -129,24 +130,30 @@ export function createReportsUI({getContext, dayDifference, replenishmentFor}) {
     let selected;
     try { selected=range(); } catch(error) { applied=null; message(error.message);controls();return; }
     busy=true;applied=null;controls(); message('Consultando relatórios…');
-    const ticket=++generation;
+    const ticket=++generation, revision=filterRevision;
+    const current=()=>ticket===generation && revision===filterRevision && owner();
     try {
       const response = await client.rpc('guigs_get_reports',{p_shop_id:shop.shop_id,p_from:selected.p_from,p_to:selected.p_to,p_limit:limit,p_loss_offset:lossOffset,p_inventory_offset:inventoryOffset});
-      if (ticket!==generation || !owner()) return;
+      if (!current()) return;
       if (response.error) throw response.error;
       if (!navigator.onLine) throw Error('Conexão indisponível. Atualize quando estiver online.');
       data=response.data;applied=selected;render(new Date().toLocaleString('pt-BR'));
+      el('reportsDisplayedPeriod').textContent=`Dados exibidos: ${selected.from} a ${selected.to} (dias locais completos).`;
+      el('reportsDisplayedPeriod').hidden=false;
       message(`Período aplicado: ${selected.from} a ${selected.to} (dias locais completos).`);
     } catch(error) {
+      if (!current()) return;
       message(['PGRST202','42883','42P01'].includes(error.code)?'Relatórios indisponíveis neste ambiente. A preparação da v1.6 precisa estar homologada e instalada pelo responsável.':`Não foi possível atualizar os relatórios. Os dados exibidos podem estar desatualizados. ${error.message || ''}`);
-    } finally { busy=false;controls(); }
+    } finally { if(ticket===generation){busy=false;controls();} }
   }
   function reset() {
-    generation++;data=null;applied=null;lossOffset=0;inventoryOffset=0;
+    generation++;busy=false;data=null;applied=null;lossOffset=0;inventoryOffset=0;
+    el('reportsDisplayedPeriod').hidden=true;
+    el('reportsDisplayedPeriod').textContent='';
     for (const target of el('reportsView').querySelectorAll('[data-report-content]')) target.replaceChildren();
     controls();
   }
-  function dirty() { applied=null;lossOffset=0;inventoryOffset=0;message('Filtros alterados. Atualize para aplicar o período.');controls(); }
+  function dirty() { filterRevision++;applied=null;lossOffset=0;inventoryOffset=0;message('Filtros alterados. Atualize para aplicar o período.');controls(); }
   el('reportsPeriod').addEventListener('change',()=>{
     const custom = el('reportsPeriod').value === 'custom';
     el('reportsTools').open = custom;
