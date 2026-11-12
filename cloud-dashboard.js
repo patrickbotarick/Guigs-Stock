@@ -23,7 +23,7 @@ for (const dialog of document.querySelectorAll('dialog[data-protect-draft]')) {
   const warning = dialog.querySelector('.draft-warning');
   let edited = false;
   const markDraft = event => {
-    if (event.target.getAttribute('role') !== 'combobox') edited = true;
+    if (dialog.open && event.target.getAttribute('role') !== 'combobox') edited = true;
   };
   form.addEventListener('input', markDraft);
   form.addEventListener('change', markDraft);
@@ -213,6 +213,7 @@ let moves = [];
 let lotBalances = new Map();
 
 let historyPage = 0;
+let historyRequest = 0;
 let historyTotal = 0;
 const historyPageSize = 20;
 
@@ -230,6 +231,7 @@ let historyActors = [];
 
 let historySearchTimer = null;
 const pendingOperations = new Map();
+const operationProducts = new Map();
 const HIGH_QUANTITY = 48; // Confirmação de UX; não é limite de estoque/RPC.
 let attentionFilter = 'all';
 let feedbackVersion = 0;
@@ -966,6 +968,53 @@ function renderReplenishment(productBalances, visibleIds) {
   if (!ordered.length) list.textContent = 'Nenhuma reposição sugerida para este filtro.';
 }
 
+function productActions(product) {
+  const menu = document.createElement('details');
+  menu.className = 'tool product-context';
+  menu.dataset.productMenu = product.id;
+  const summary = document.createElement('summary');
+  summary.textContent = 'Ações';
+  summary.setAttribute('aria-label', 'Ações de ' + product.name);
+  const actions = document.createElement('div');
+  actions.className = 'tool-content';
+  const entries = [['history','Histórico']];
+  if (product.active) entries.unshift(['receive','Receber'], ['sale','Vender'], ['transfer','Movimentar'], ['loss','Registrar perda']);
+  if (shop?.role === 'owner') entries.push(['edit','Editar']);
+  for (const [action, label] of entries) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn';
+    button.textContent = label;
+    button.dataset.productAction = action;
+    button.disabled = action !== 'history' && !navigator.onLine;
+    actions.append(button);
+  }
+  menu.append(summary, actions);
+  return menu;
+}
+
+function contextProduct(id) {
+  return products.find(product => product.id === id && product.active);
+}
+
+function setOperationProduct(id, product) {
+  if (product) operationProducts.set(id, product.id);
+  else operationProducts.delete(id);
+  const context = el(id + 'ProductContext');
+  context.hidden = !product;
+  context.querySelector('strong').textContent = product?.name || '';
+}
+
+function returnToProduct(dialog, productId) {
+  if (!productId) return;
+  dialog.addEventListener('close', () => {
+    const menu = [...el('products').querySelectorAll('[data-product-menu]')]
+      .find(item => item.dataset.productMenu === productId);
+    const target = menu?.querySelector('summary') || el('overviewSearch').closest('details').querySelector('summary');
+    if (location.hash === '#visao-geral' || !location.hash) target.focus({preventScroll:true});
+  }, {once:true});
+}
+
 function render() {
 
   const productMap =
@@ -1435,7 +1484,7 @@ function render() {
     const thresholds = document.createElement('small');
     thresholds.className = 'muted stock-thresholds';
     thresholds.textContent = `Total: mínimo ${thresholdLabel(p.min_total)} / meta ${thresholdLabel(p.target_total)} · Geladeira: mínimo ${thresholdLabel(p.min_fridge)} / meta ${thresholdLabel(p.target_fridge)}`;
-    r.cells[0].append(thresholds);
+    r.cells[0].append(thresholds, productActions(p));
 
 
     cell(
@@ -1793,6 +1842,7 @@ async function loadHistory() {
   }
 
 
+  const request = ++historyRequest;
   const offset =
     historyPage * historyPageSize;
 
@@ -1831,6 +1881,7 @@ p_date_to:
   let response;
   if(spatialHistorySupported!==false){
     response=await client.rpc('guigs_get_spatial_history',{...args,p_partition:historyPartition||null});
+    if (request !== historyRequest) return;
     if(response.error?.code==='PGRST202'||(!response.error&&response.data==null))spatialHistorySupported=false;
     else if(!response.error)spatialHistorySupported=true;
   }
@@ -1839,6 +1890,7 @@ p_date_to:
     el('historyType').querySelector('[value="relocate"]').disabled=true;
     response=await client.rpc('guigs_get_history',args);
   }
+  if (request !== historyRequest) return;
   const {data,error}=response;
 
 
@@ -2066,10 +2118,8 @@ function renderHistory() {
 
 function populateReceiveProducts() {
 
-  const select =
-    el('receiveProduct');
-
-
+  const select = el('receiveProduct');
+  const previous = el('receiveDialog').open ? select.value : '';
   select.replaceChildren();
 
 
@@ -2127,6 +2177,7 @@ function populateReceiveProducts() {
 
   el('saveReceipt').disabled =
     false;
+  if (active.some(product => product.id === previous)) select.value = previous;
 }
 
 
@@ -2380,11 +2431,16 @@ function transferReady() {
 function populateTransferLots() {
   const select=el('transferLot'), previous=select.value;
   const source=transferOutbound()?'stock':'fridge';
-  const available=lots.filter(lot=>(!transferShortcut || lot.product_id===transferShortcut.product_id) &&
+  const selectedProduct=transferShortcut?.product_id || operationProducts.get('transfer');
+  const available=lots.filter(lot=>(!selectedProduct || lot.product_id===selectedProduct) &&
     lotBalances.get(lot.id)?.[source]>0).sort((a,b)=>a.expiry.localeCompare(b.expiry)||a.created_at.localeCompare(b.created_at));
   select.replaceChildren(...available.map(lot=>new Option(
     lotLabel(lot)+' · Validade: '+dateBR(lot.expiry)+' · '+lotBalances.get(lot.id)[source]+' un.',lot.id)));
   if (!available.length) select.append(new Option('Nenhum lote disponível',''));
+  else if (operationProducts.has('transfer')) {
+    select.prepend(new Option('Escolha o lote',''));
+    select.value = '';
+  }
   if (available.some(lot=>lot.id===previous)) select.value=previous;
   updateTransferBalance();
 }
@@ -2463,23 +2519,42 @@ async function loadTransferPositions() {
   if (!map && transferNeedsMap()) el('transferPositions').textContent='Mapa indisponível. Feche a movimentação e tente novamente.';
 }
 
-async function openIntegratedTransfer(slot=null) {
-  if (el('transferDialog').open || operationPending('transferForm') || !navigator.onLine) return;
-  formMessage('transferMessage');
-  if (!transferRetry) {
-    transferShortcut=slot;
-    transferMap=null;
-    transferMapVersion++;
-    el('transferPositions').replaceChildren();
-    if (slot) {
-      el('transferDirection').value='stock-fridge';
-      el('transferForm').elements.transferMode.value='position';
-    }
-    await refresh();
-    populateTransferLots();
+async function openIntegratedTransfer(slot = null, productId = '') {
+  const dialog = el('transferDialog');
+  if (dialog.open || openingOperations.has('transfer') || operationPending('transferForm') || !navigator.onLine) return;
+  if (productId && transferRetry) {
+    showOperationFeedback('Confira a movimentação pendente antes de iniciar outra.', true);
+    return;
   }
-  if (!el('transferDialog').open) el('transferDialog').showModal();
-  if (!transferRetry) await loadTransferPositions();
+  openingOperations.add('transfer');
+  const shopId = shop?.shop_id;
+  try {
+    formMessage('transferMessage');
+    if (!transferRetry) {
+      transferShortcut = slot;
+      transferMap = null;
+      transferMapVersion++;
+      el('transferPositions').replaceChildren();
+      if (slot) {
+        el('transferDirection').value = 'stock-fridge';
+        el('transferForm').elements.transferMode.value = 'position';
+      }
+      const updated = await refresh();
+      if (shop?.shop_id !== shopId || !navigator.onLine) return;
+      if (productId && (updated !== true || !contextProduct(productId))) {
+        showOperationFeedback('Não foi possível confirmar que este produto ainda está disponível.', true);
+        return;
+      }
+      setOperationProduct('transfer', contextProduct(productId));
+      if (productId) el('transferLot').value = '';
+      populateTransferLots();
+    }
+    dialog.showModal();
+    returnToProduct(dialog, productId);
+    if (!transferRetry) await loadTransferPositions();
+  } finally {
+    openingOperations.delete('transfer');
+  }
 }
 
 function confirmFefo(context, selected, candidates, args, risk, destination) {
@@ -2573,7 +2648,8 @@ function populateSaleLots() {
         const balance =
           lotBalances.get(lot.id);
 
-        return balance
+        const productId = operationProducts.get('sale');
+        return (!productId || lot.product_id === productId) && balance
           && balance.fridge > 0
           && dayDifference(lot.expiry) >= 0;
       })
@@ -2617,8 +2693,11 @@ function populateSaleLots() {
     select.append(option);
   }
 
-  el('saveSale').disabled = false;
-
+  if (operationProducts.has('sale')) {
+    select.prepend(new Option('Escolha o lote',''));
+    select.value = '';
+  }
+  el('saveSale').disabled = !select.value;
   updateSaleBalance();
 }
 
@@ -2660,6 +2739,7 @@ function populateLossLots() {
     el('lossLot');
 
   select.replaceChildren();
+  const productId = operationProducts.get('loss');
 
   for (
     const lot
@@ -2670,6 +2750,7 @@ function populateLossLots() {
       )
   ) {
 
+    if (productId && lot.product_id !== productId) continue;
     const balance =
       lotBalances.get(lot.id);
 
@@ -2696,6 +2777,10 @@ function populateLossLots() {
     select.append(option);
   }
 
+  if (productId) {
+    select.prepend(new Option(select.options.length ? 'Escolha o lote' : 'Nenhum lote com saldo',''));
+    select.value = '';
+  }
   el('saveLoss').disabled =
     !select.value;
 
@@ -2944,7 +3029,15 @@ el('signout')
     }
   );
 
+function syncHistoryFilterBadge() {
+  const count = [historyProduct,historyType,historyPartition,historyActor,historyDateFrom,historyDateTo].filter(Boolean).length;
+  const product = products.find(item => item.id === historyProduct);
+  el('historyFilterBadge').textContent = count
+    ? count + ' ativo(s)' + (product ? ' · ' + product.name : '') : '';
+}
+
 async function applyHistoryFilters() {
+  syncHistoryFilterBadge();
 
   historyPage = 0;
 
@@ -3188,22 +3281,7 @@ el('newProduct')
     }
   );
 
-el('editProduct')
-  .addEventListener(
-    'click',
-    () => {
-
-      formMessage(
-        'editProductMessage'
-      );
-
-      populateEditProducts();
-
-      el('editProductDialog')
-        .showModal();
-    }
-  );
-
+el('editProduct').addEventListener('click', () => void openProductForm('edit'));
 
 el('editProductSelect')
   .addEventListener(
@@ -3218,23 +3296,7 @@ el('editProductForm')
     updateProductOperation
   );
 
-el('receiveStock')
-  .addEventListener(
-    'click',
-    () => {
-
-      formMessage(
-        'receiveMessage'
-      );
-
-      populateReceiveProducts();
-      populateReceiveSuppliers();
-
-      el('receiveDialog')
-        .showModal();
-    }
-  );
-
+el('receiveStock').addEventListener('click', () => void openProductForm('receive'));
 
 document
   .querySelectorAll(
@@ -3281,16 +3343,97 @@ el('transferStock').addEventListener('click',()=>void openIntegratedTransfer());
 
 const openingOperations = new Set();
 
-async function openLotOperation(id, populate) {
+async function openProductForm(id, productId = '') {
+  const dialog = el((id === 'edit' ? 'editProduct' : id) + 'Dialog');
+  if (dialog.open || openingOperations.has(id) || !navigator.onLine || (id === 'edit' && shop?.role !== 'owner')) return;
+  const shopId = shop?.shop_id;
+  openingOperations.add(id);
+  try {
+    if (productId && await refresh() !== true) return;
+    if (shop?.shop_id !== shopId || !navigator.onLine) return;
+    const populate = id === 'edit' ? populateEditProducts : populateReceiveProducts;
+    const field = id === 'edit' ? 'editProductSelect' : 'receiveProduct';
+    formMessage(id === 'edit' ? 'editProductMessage' : 'receiveMessage');
+    populate();
+    if (id === 'receive') populateReceiveSuppliers();
+    if (productId) {
+      if (![...el(field).options].some(option => option.value === productId && !option.disabled)) {
+        showOperationFeedback('Este produto não está disponível para a operação.', true);
+        return;
+      }
+      el(field).value = productId;
+      el(field).dispatchEvent(new Event('change', {bubbles:true}));
+      searchableSelects.get(field)();
+    }
+    dialog.showModal();
+    returnToProduct(dialog, productId);
+  } finally {
+    openingOperations.delete(id);
+  }
+}
+
+el('products').addEventListener('click', event => {
+  const button = event.target.closest('[data-product-action]');
+  if (!button || button.disabled || !shop) return;
+  const menu = button.closest('[data-product-menu]');
+  const productId = menu.dataset.productMenu;
+  const action = button.dataset.productAction;
+  menu.open = false;
+  menu.querySelector('summary').focus({preventScroll:true});
+  if (action === 'history') {
+    historyProduct = productId;
+    populateHistoryFilters();
+    location.hash = '#historico';
+    applyView();
+    void applyHistoryFilters();
+    el('viewTitle').focus({preventScroll:true});
+  } else if (action === 'receive' || action === 'edit') void openProductForm(action, productId);
+  else if (action === 'transfer') void openIntegratedTransfer(null, productId);
+  else void openLotOperation(action, action === 'sale' ? populateSaleLots : populateLossLots, productId);
+});
+
+el('products').addEventListener('keydown', event => {
+  const menu = event.target.closest('[data-product-menu][open]');
+  if (!menu || event.key !== 'Escape') return;
+  event.preventDefault();
+  menu.open = false;
+  menu.querySelector('summary').focus();
+});
+
+for (const clear of document.querySelectorAll('[data-clear-product-context]')) {
+  clear.addEventListener('click', () => {
+    const id = clear.dataset.clearProductContext;
+    if (id === 'transfer' && transferRetry) {
+      formMessage('transferMessage', 'Confira o histórico antes de alterar uma operação cujo resultado está pendente.');
+      return;
+    }
+    setOperationProduct(id, null);
+    const populate = {sale:populateSaleLots, loss:populateLossLots, transfer:populateTransferLots}[id];
+    populate();
+    if (id === 'transfer') void loadTransferPositions();
+    searchableSelects.get(id + 'Lot')();
+    el(id + 'LotSearch')?.focus();
+  });
+}
+
+
+async function openLotOperation(id, populate, productId = '') {
   const dialog = el(id + 'Dialog');
   if (dialog.open || openingOperations.has(id) || !navigator.onLine) return;
   openingOperations.add(id);
   try {
     formMessage(id + 'Message');
-    await refresh();
-    if (!shop || !navigator.onLine || dialog.open) return;
+    const shopId = shop?.shop_id;
+    const updated = await refresh();
+    if (!shop || shop.shop_id !== shopId || !navigator.onLine || dialog.open) return;
+    if (productId && (updated !== true || !contextProduct(productId))) {
+      showOperationFeedback('Não foi possível confirmar que este produto ainda está disponível.', true);
+      return;
+    }
+    if (id !== 'adjust') setOperationProduct(id, contextProduct(productId));
     populate();
     dialog.showModal();
+    returnToProduct(dialog, productId);
   } finally {
     openingOperations.delete(id);
   }
@@ -3389,6 +3532,7 @@ window.addEventListener(
   () => {
 
     setOfflineDashboardState();
+    for (const action of el('products').querySelectorAll('[data-product-action]:not([data-product-action=history])')) action.disabled = true;
   }
 );
 

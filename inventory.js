@@ -376,6 +376,8 @@ export function createInventoryUI({getContext, confirmAction, refreshStock}) {
     const matching=entries.reduce((sum,entry)=>sum+entry.visible.length,0);
     const hidden=data.items.length-matching;
     const paged=matching-shown.reduce((sum,entry)=>sum+entry.visible.length,0);
+    const activeFilters = [el('inventoryLocation').value, el('inventoryFridge').value, el('inventoryPosition').value, el('inventoryFilter').value !== 'all'].filter(Boolean).length;
+    el('inventoryFilterBadge').textContent = activeFilters ? activeFilters + ' ativo(s)' : '';
     el('inventoryFilterSummary').textContent=matching+' de '+data.items.length+' posições correspondem aos filtros. '+
       (hidden?hidden+' ocultas pelos filtros. ':'')+(paged?paged+' em outras páginas.':'');
     const pages=Math.max(1,Math.ceil(entries.length/LOTS_PER_PAGE));

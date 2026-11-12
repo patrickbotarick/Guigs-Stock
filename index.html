@@ -1443,7 +1443,7 @@
       #status.good { width: fit-content; max-width: 100%; padding: .4rem .7rem; margin-block: .65rem 1rem; }
       .overview-alerts summary { cursor: pointer; list-style-position: inside; }
       .overview-alerts summary > strong { font-size: 1rem; }
-      #overviewFirstAlert { margin: .35rem 0 0; color: var(--danger); }
+      #overviewFirstAlert { display: block; margin: .35rem 0 0; color: var(--danger); font-size: .85rem; }
       @media (max-width: 500px) {
         .operationbar .quickactions { grid-template-columns: repeat(2,minmax(0,1fr)); }
         .operationbar .quickaction { min-height: 4.1rem; }
@@ -1465,6 +1465,26 @@
         .fridge-picker { flex-basis: 100%; }
         .fridge-controls .inventory-actions { gap: .35rem; }
         .fridge-controls .btn, .fridge-map-tools summary { padding-inline: .65rem; }
+      }
+
+      .view-tools { align-items: end; margin-block: .6rem .9rem; }
+      .tool-search-field { flex: 1 1 13rem; max-inline-size: 29rem; }
+      .view-tools .tool-filters .historyfilters,
+      .view-tools .tool-filters .inventory-filters { margin-block: .6rem 0; }
+      .view-tools #inventoryNextItem { align-self: end; }
+      .product-context { margin-block: .25rem 0; }
+      .product-context > summary { width: fit-content; color: var(--accent); cursor: pointer; min-height: var(--touch); align-content: center; }
+      .product-context .tool-content { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .product-context .btn { padding-inline: .4rem; white-space: normal; overflow-wrap: anywhere; }
+      .operation-context { display: flex; flex-wrap: wrap; gap: .35rem .65rem; align-items: center; justify-content: space-between; }
+      .operation-context[hidden] { display: none; }
+      @media (max-width: 500px) {
+        .tool-search-field { max-inline-size: 100%; }
+        .top { gap: .5rem; }
+        .top .eyebrow { display: none; }
+        .top .actions { width: auto; }
+        .top .actions .btn { flex: 0 0 auto; }
+        .view-tools { gap: .4rem; }
       }
     </style>
   </head>
@@ -1502,7 +1522,7 @@
         <header class="top">
           <div>
             <p class="eyebrow">Pizzaria Guig's • Estoque em nuvem</p>
-            <h1 id="viewTitle">Painel do estoque</h1>
+            <h1 id="viewTitle" tabindex="-1">Painel do estoque</h1>
             <div id="identity" class="muted">Verificando autenticação…</div>
           </div>
 
@@ -1586,8 +1606,7 @@
             </section>
 
             <details id="alertsPanel" class="alerts-panel overview-alerts hidden" data-tool>
-              <summary><strong>Atenção operacional</strong> <span id="alertCount" class="alerts-count">0 alertas</span></summary>
-              <p id="overviewFirstAlert"></p>
+              <summary><strong>Atenção operacional</strong> <span id="alertCount" class="alerts-count">0 alertas</span><span id="overviewFirstAlert"></span></summary>
               <div id="operationalAlerts" class="alerts-list"></div>
             </details>
 
@@ -1610,13 +1629,7 @@
               </details>
             </div>
             <p id="attentionFilterStatus" class="muted" role="status">Exibindo todos os produtos e lotes.</p>
-            <section class="panel replenishment-panel" aria-labelledby="replenishmentTitle">
-              <div class="panelhead">
-                <div><h2 id="replenishmentTitle">Reposição da geladeira</h2>
-                <div class="muted">Sugestões até a meta, limitadas ao estoque seco não vencido. Nenhuma movimentação automática.</div></div>
-              </div>
-              <div id="replenishmentList" class="replenishment-list"></div>
-            </section>
+
 
 
             <div class="section">
@@ -1674,6 +1687,13 @@
               </div>
             </div>
 
+            <section class="panel replenishment-panel" aria-labelledby="replenishmentTitle">
+              <div class="panelhead">
+                <div><h2 id="replenishmentTitle">Reposição da geladeira</h2>
+                <div class="muted">Sugestões até a meta, limitadas ao estoque seco não vencido. Nenhuma movimentação automática.</div></div>
+              </div>
+              <div id="replenishmentList" class="replenishment-list"></div>
+            </section>
             <details class="tool panel overview-recent" data-tool>
               <summary class="btn">Movimentações recentes</summary>
               <ul id="overviewRecent" class="recent-movements"></ul>
@@ -1697,6 +1717,13 @@
                   <button id="next" class="btn">→</button>
                 </div>
               </div>
+              <div class="tools view-tools">
+                <label class="field tool-search-field" for="search">Busca
+                  <input id="search" type="search" placeholder="Produto, lote ou observação" title="Buscar produto, lote, posição ou observação">
+                </label>
+                <button id="clearHistoryFilters" class="btn" type="button">Limpar filtros</button>
+                <details id="historyTools" class="tool tool-filters" data-tool>
+                  <summary class="btn">Filtros <span id="historyFilterBadge" class="tool-count"></span></summary>
               <div class="historyfilters">
                 <div class="history-filter">
                   <label for="historyProduct">Produto</label>
@@ -1746,19 +1773,8 @@
                   </select>
                 </div>
 
-                <div class="history-filter">
-                  <label for="search">Busca</label>
-                  <input
-                    id="search"
-                    type="search"
-                    placeholder="Ex.: produto ou lote"
-                    title="Buscar produto, lote, posição ou observação"
-                  />
-                </div>
-
-                <button id="clearHistoryFilters" class="btn" type="button">
-                  Limpar filtros
-                </button>
+              </div>
+                </details>
               </div>
               <div class="tablewrap history-table-wrap">
                 <table class="table history-table">
@@ -1930,13 +1946,18 @@
               <section id="inventoryDifferencesPanel" class="balancebox hidden"><h3>Divergências para revisão</h3><div id="inventoryDifferences"></div></section>
               <div id="inventoryReviewGate" class="balancebox hidden"><label><input id="inventoryReviewCheck" type="checkbox" /> Revisei cada divergência e os avisos de movimentação.</label></div>
               <button type="button" id="inventoryComplete" class="btn red hidden" data-inventory-write>Fechar inventário e aplicar ajustes</button>
+              <div class="tools view-tools">
+                <div class="field tool-search-field"><label for="inventorySearch">Pesquisar produto ou lote</label><input id="inventorySearch" type="search" autocomplete="off"></div>
+                <button type="button" id="inventoryNextItem" class="btn">Próxima contagem pendente</button>
+                <details id="inventoryTools" class="tool tool-filters" data-tool>
+                  <summary class="btn">Filtros <span id="inventoryFilterBadge" class="tool-count"></span></summary>
               <div class="inventory-filters">
-                <div class="field"><label for="inventorySearch">Pesquisar produto ou lote</label><input id="inventorySearch" type="search" autocomplete="off"></div>
                 <div class="field"><label for="inventoryLocation">Localização</label><select id="inventoryLocation"><option value="">Todas</option><option value="stock">Estoque seco</option><option value="fridge">Geladeira</option><option value="unallocated">Geladeira — não alocado</option></select></div>
                 <div class="field"><label for="inventoryFilter">Conferência</label><select id="inventoryFilter"><option value="all">Todos</option><option value="divergent">Divergentes</option><option value="pending">Pendentes</option><option value="counted">Conferidos</option><option value="recount">Requer recontagem</option></select></div>
                 <div id="inventoryFridgeField" class="field hidden"><label for="inventoryFridge">Geladeira física</label><select id="inventoryFridge"></select></div>
                 <div id="inventoryPositionField" class="field hidden"><label for="inventoryPosition">Posição física</label><select id="inventoryPosition"></select></div>
-                <button type="button" id="inventoryNextItem" class="btn">Próxima contagem pendente</button>
+              </div>
+                </details>
               </div>
               <p id="inventoryFilterSummary" class="muted" role="status"></p>
               <div id="inventoryItems" class="inventory-items"></div>
@@ -1954,9 +1975,14 @@
             <section class="panel">
               <div class="panelhead"><h2>Necessidades de compra</h2><button id="shoppingReload" class="btn" type="button">Atualizar</button></div>
               <div id="shoppingMetrics" class="shopping-metrics" aria-label="Resumo de compras"></div>
-              <div class="shopping-filters">
-                <label class="field">Pesquisar produto <input id="shoppingSearch" type="search" autocomplete="off"></label>
+              <div class="tools view-tools">
+                <label class="field tool-search-field">Pesquisar produto <input id="shoppingSearch" type="search" autocomplete="off"></label>
+                <details id="shoppingTools" class="tool tool-filters" data-tool>
+                  <summary class="btn">Filtros <span id="shoppingFilterBadge" class="tool-count"></span></summary>
+                  <div class="tool-content">
                 <label class="field">Exibir <select id="shoppingFilter"><option value="all">Todos</option><option value="need">Para comprar</option><option value="unconfigured">Sem configuração</option><option value="expiry">Atenção à validade</option></select></label>
+                  </div>
+                </details>
               </div>
               <div id="shoppingNeeds" class="shopping-cards"></div>
             </section>
@@ -1986,11 +2012,16 @@
             <div id="reportsOffline" class="notice danger hidden" role="status">Sem internet: atualização e exportação indisponíveis. Dados já exibidos podem estar desatualizados.</div>
             <div class="panel">
               <h2>Relatórios operacionais</h2><p class="muted">Gestão de estoque físico · Acesso do proprietário</p>
-              <div class="report-filters">
-                <div class="field"><label for="reportsPeriod">Período</label><select id="reportsPeriod"><option value="today">Hoje</option><option value="7">7 dias</option><option value="30" selected>30 dias</option><option value="month">Este mês</option><option value="previous">Mês anterior</option><option value="custom">Personalizado</option></select></div>
+              <div class="tools view-tools">
+                <div class="field tool-search-field"><label for="reportsPeriod">Período</label><select id="reportsPeriod"><option value="today">Hoje</option><option value="7">7 dias</option><option value="30" selected>30 dias</option><option value="month">Este mês</option><option value="previous">Mês anterior</option><option value="custom">Personalizado</option></select></div>
+                <button id="reportsReload" class="btn" type="button">Atualizar relatórios</button>
+                <details id="reportsTools" class="tool tool-filters" data-tool>
+                  <summary class="btn">Datas <span id="reportsDateBadge" class="tool-count"></span></summary>
+                  <div class="report-filters tool-content">
                 <div class="field"><label for="reportsFrom">Data inicial</label><input id="reportsFrom" type="date" required></div>
                 <div class="field"><label for="reportsTo">Data final</label><input id="reportsTo" type="date" required></div>
-                <button id="reportsReload" class="btn" type="button">Atualizar relatórios</button>
+                  </div>
+                </details>
               </div>
               <p id="reportsMessage" role="status" aria-live="polite"></p>
             </div>
@@ -2432,6 +2463,10 @@
         </div>
 
         <form id="transferForm" class="modalform">
+          <div class="operation-context balancebox" id="transferProductContext" hidden>
+            <strong></strong>
+            <button class="btn" type="button" data-clear-product-context="transfer">Trocar produto</button>
+          </div>
           <div class="field">
             <label for="transferLot">Produto / lote</label>
             <select id="transferLot" required></select>
@@ -2539,6 +2574,10 @@
         </div>
 
         <form id="saleForm" class="modalform">
+          <div class="operation-context balancebox" id="saleProductContext" hidden>
+            <strong></strong>
+            <button class="btn" type="button" data-clear-product-context="sale">Trocar produto</button>
+          </div>
           <div class="field">
             <label for="saleLot">Produto / lote</label>
             <select id="saleLot" required></select>
@@ -2595,6 +2634,10 @@
         </div>
 
         <form id="lossForm" class="modalform">
+          <div class="operation-context balancebox" id="lossProductContext" hidden>
+            <strong></strong>
+            <button class="btn" type="button" data-clear-product-context="loss">Trocar produto</button>
+          </div>
           <div class="field">
             <label for="lossLot">Produto / lote</label>
             <select id="lossLot" required></select>

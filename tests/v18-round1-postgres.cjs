@@ -69,7 +69,7 @@ async function run() {
   const serve = (file, name, args, settings) => {
     const log = fs.openSync(path.join(root, `${name}.log`), 'wx');
     try {
-      const child = spawn(file, args, {...opts,env:{...env,...settings},stdio:['ignore',log,log]});
+      const child = spawn(file, args, {...opts,timeout:0,env:{...env,...settings},stdio:['ignore',log,log]});
       child.on('error', e => { child.launchError = e; });
       children.push(child);
       return child;
@@ -90,7 +90,7 @@ async function run() {
     const target = new URL(url, base);
     assert.ok(target.origin === base && target.hostname === '127.0.0.1');
     const response = await fetch(target, {method,redirect:'error',signal:AbortSignal.timeout(12000),
-      headers:{'Content-Type':'application/json', ...(token ? {Authorization:`Bearer ${token}`} : {})},
+      headers:{'Content-Type':'application/json', Connection:'close', ...(token ? {Authorization:`Bearer ${token}`} : {})},
       ...(body === undefined ? {} : {body:JSON.stringify(body)})});
     const data = await response.json().catch(()=>null);
     return {ok:response.ok, status:response.status, data};
@@ -295,6 +295,14 @@ async function run() {
     const moveArgs=async(source,destination,quantity)=>{const p=relocateArgs(source,destination,quantity);
       return {...p,p_request_id:id(),p_expected:await rpc(owner,'guigs_quote_fridge_slot_move',p)};};
     const move=(source,destination,quantity)=>moveArgs(source,destination,quantity).then(p=>rpc(attendant,'guigs_apply_fridge_slot_move',p));
+    if (process.argv.includes('--demo')) {
+      await transfer(out(5,a));
+      await transfer(out(3,c));
+      const {startDemo}=require('../scripts/demo-v19.cjs');
+      await startDemo({repo,root,actors:{owner,attendant},rest,request});
+      evidence.status='DEMO';
+      return;
+    }
     const snapshot = (label) => {
       const rows=jsonSql(`select coalesce(jsonb_agg(to_jsonb(x) order by x.lot_id),'[]') from (
         select lot_id,coalesce(sum(delta) filter(where location='stock'),0)::int dry,

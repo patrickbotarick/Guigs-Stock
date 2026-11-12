@@ -500,6 +500,7 @@ function bridge({role,shop}){
     await worker.page.click('#fridgeStockConfirm');
     await worker.page.waitForFunction(()=>!document.querySelector('#fridgeStockDialog').open&&!document.querySelector('#refresh').disabled);
     await worker.page.click('#navHistory');
+    await worker.page.click('#historyTools summary');
     await worker.page.selectOption('#historyPartition','slot');
     await worker.page.waitForFunction(()=>document.querySelector('#history').textContent.includes('Estoque seco → Geladeira A'));
     check(await worker.page.locator('#history tr').filter({hasText:'Venda'}).count()===1,'Venda split agrupada no histórico');
@@ -590,6 +591,7 @@ function bridge({role,shop}){
     await inventory.page.click('#inventoryCreateSubmit');
     await inventory.page.waitForSelector('#inventoryDetail:not(.hidden) .inventory-item');
     check((await inventory.page.textContent('#inventoryDetailInfo')).includes('Por posição'),'Novo inventário espacial identificado');
+    await inventory.page.click('#inventoryTools summary');
     check(await inventory.page.isVisible('#inventoryPosition'),'Filtro de posição exposto');
     await inventory.page.selectOption('#inventoryPosition',x);
     check(await inventory.page.locator('.inventory-item').count()===1,'Filtro deixa apenas o lote da posição');

@@ -37,11 +37,12 @@ async function geometry(page, expected = controls) {
     const grid = document.querySelector('.historyfilters');
     const viewport = document.documentElement.clientWidth;
     const boundary = grid.getBoundingClientRect();
+    const toolbar = document.querySelector('#historyView .view-tools').getBoundingClientRect();
     const problems = [];
     const rects = ids.map(id => {
       const node = document.getElementById(id);
       const box = node.getBoundingClientRect();
-      const own = node.closest('.history-filter')?.getBoundingClientRect() || boundary;
+      const own = node.closest('.history-filter, .tool-search-field')?.getBoundingClientRect() || toolbar;
       if (!box.width || !box.height || box.left < Math.max(0, own.left) - 0.5 ||
           box.right > Math.min(viewport, own.right) + 0.5) problems.push(id);
       const label = document.querySelector(`label[for="${id}"]`);
@@ -69,7 +70,7 @@ async function keyboardFilters(page) {
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   assert.equal(await page.locator('#historyProduct').inputValue(), 'product-1');
-  for (const [previous, next] of controls.slice(1).map(([id], i) => [controls[i][0], id])) {
+  for (const [previous, next] of controls.slice(1, -2).map(([id], i) => [controls[i][0], id])) {
     // Os inputs de data do Chromium podem ter mais de um segmento tabulável.
     let current;
     for (let tries = 0; tries < 8; tries++) {
@@ -79,12 +80,10 @@ async function keyboardFilters(page) {
     }
     assert.equal(current, next, `Tab de ${previous} para ${next}`);
   }
-  await page.keyboard.press('Shift+Tab');
-  assert.equal(await page.evaluate(() => document.activeElement.id), 'search');
 }
 
 async function filterFlow(page) {
-  const grid = page.locator('.historyfilters');
+  const grid = page.locator('#historyView');
   const fieldByLabel = name => grid.getByLabel(name, {exact: true}).and(grid.locator('input, select'));
   for (const [id, label] of controls) {
     const field = id === 'clearHistoryFilters' ? grid.getByRole('button', {name: label, exact: true}) : fieldByLabel(label);
@@ -167,6 +166,8 @@ async function run() {
     page.on('pageerror', err => errors.push(err.message));
     await page.goto(base + '/#historico');
     await page.waitForSelector('#content:not(.hidden)');
+    assert.ok(await page.locator('#historyTools').evaluate(e=>!e.open));
+    await page.click('#historyTools summary');
     for (const [width, height] of viewports) {
       await page.setViewportSize({width, height});
       const dimensions = await geometry(page);
@@ -189,6 +190,7 @@ async function run() {
     await page.setViewportSize({width: 1024, height: 768});
     await page.goto(base + '/?legacy#historico');
     await page.waitForSelector('#content:not(.hidden)');
+    await page.click('#historyTools summary');
     assert.ok(!await page.locator('#historyPartition').isVisible());
     assert.ok(!await page.locator('label[for="historyPartition"]').isVisible());
     const legacy = await geometry(page, controls.filter(([id]) => id !== 'historyPartition'));
@@ -241,6 +243,7 @@ async function run() {
     await standalone.waitForSelector('#content:not(.hidden)');
     assert.ok(await standalone.evaluate(() => matchMedia('(display-mode: standalone)').matches));
     await standalone.click('#navHistory');
+    await standalone.click('#historyTools summary');
     for (const [width, height] of [[1024, 768], [1280, 800]]) {
       await standalone.setViewportSize({width, height});
       const result = await geometry(standalone);

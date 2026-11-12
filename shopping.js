@@ -110,6 +110,7 @@ export function createShoppingUI({getContext,confirmAction,openReceipt}) {
   function renderNeeds() {
     if(!board)return;
     const query=searchText(el('shoppingSearch').value.trim()), filter=el('shoppingFilter').value;
+    el('shoppingFilterBadge').textContent=filter==='all'?'':el('shoppingFilter').selectedOptions[0].textContent;
     const shown=board.needs.filter(item=>searchText(item.product_name).includes(query)&&
       (filter==='all'||(filter==='need'&&item.suggested>0)||(filter==='unconfigured'&&item.base_suggested==null)||
       (filter==='expiry'&&(item.near_expiry>0||item.expired>0))));

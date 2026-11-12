@@ -224,6 +224,47 @@ const server = http.createServer((req,res)=>{
       await page.evaluate(()=>window.__test.balances.find(balance=>balance.lot_id==='lot-juice').stock=0);
       await click('#refresh');await page.waitForFunction(()=>document.getElementById('replenishmentList').textContent.includes('Sem estoque seco não vencido'));
       check((await page.locator('[data-product-id="product-juice"]').textContent()).includes('Sugestão de reposição: 0'),'Ausência de estoque gera sugestão zero explícita');
+      await page.evaluate(() => window.__test.products.push({
+        ...window.__test.products[0],id:'product-no-lot',name:'Bebida sem lote'
+      }));
+      await click('#refresh');
+      const noLotMenu = page.locator('[data-product-menu="product-no-lot"]');
+      await noLotMenu.locator('summary').click();
+      await noLotMenu.locator('[data-product-action="sale"]').click();
+      await page.waitForSelector('#saleDialog[open]');
+      check(await page.isDisabled('#saveSale') && await page.inputValue('#saleLot')==='','Produto sem lote mantém a venda bloqueada');
+      await close('saleDialog');await closed('saleDialog');
+      await noLotMenu.locator('summary').click();
+      await page.evaluate(() => window.__test.products.find(item=>item.id==='product-no-lot').active=false);
+      await noLotMenu.locator('[data-product-action="sale"]').click();
+      await page.waitForFunction(()=>document.getElementById('operationFeedback').textContent.includes('ainda está disponível'));
+      check(!await page.locator('#saleDialog').evaluate(e=>e.open),'Produto desativado após a última leitura invalida o atalho');
+      const productMenu = page.locator('[data-product-menu="product-1"]');
+      const act = async action => {
+        await productMenu.locator('summary').click();
+        await productMenu.locator('[data-product-action="'+action+'"]').click();
+      };
+      check(await productMenu.locator('[data-product-action="edit"]').count()===(role==='owner'?1:0),'Atalho Editar segue a permissão');
+      await act('receive');
+      await page.waitForSelector('#receiveDialog[open]');
+      check(await page.inputValue('#receiveProduct')==='product-1','Recebimento mantém produto do catálogo');
+      await close('receiveDialog');await closed('receiveDialog');
+      await act('sale');await page.waitForSelector('#saleDialog[open]');
+      check(await page.inputValue('#saleLot')===''&&await page.isDisabled('#saveSale'),'Venda contextual exige escolha explícita de lote');
+      check(await page.locator('#saleLot option').evaluateAll(options=>options.filter(option=>option.value).every(option=>['lot-a','lot-b'].includes(option.value))),'Venda contextual limita lotes ao produto e saldo válido');
+      await click('[data-clear-product-context="sale"]');
+      check(!await page.isVisible('#saleProductContext'),'Produto pode ser trocado na venda');
+      await close('saleDialog');await closed('saleDialog');
+      await act('transfer');await page.waitForSelector('#transferDialog[open]');
+      check(await page.isVisible('#transferProductContext')&&await page.inputValue('#transferLot')==='','Transferência mantém produto sem inferir lote');
+      await close('transferDialog');await closed('transferDialog');
+      await act('history');
+      await page.waitForSelector('#historyView:not(.hidden)');
+      check(await page.inputValue('#historyProduct')==='product-1','Histórico recebe o produto correto');
+      check((await page.textContent('#historyFilterBadge')).includes('1 ativo'),'Histórico mostra filtro recolhido ativo');
+      await click('#clearHistoryFilters');
+      check(await page.inputValue('#historyProduct')==='','Histórico permite limpar o atalho sem abrir filtros');
+      await click('#navOverview');
       check(external.length===0,'Zero requisições externas/produção');
       check(errors.length===0,`Sem erros JS: ${errors.join('; ')}`);
       console.log(`${role} / ${mobile?'mobile':'desktop'}: operação validada.`);

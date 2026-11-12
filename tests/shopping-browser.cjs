@@ -93,6 +93,7 @@ function bridge({role,shop,actor,names}){
   await p.waitForFunction(id=>document.querySelector('[data-product-id="'+id+'"] img')?.naturalWidth>0,product);
   check((await p.locator('[data-product-id="'+manual+'"] .shopping-photo').textContent())==='▧','Imagem assinada e fallback coexistem');
   check((await card.textContent()).includes('Sugestão adicional: 27'),'Memória de cálculo visível');
+  await p.click('#shoppingTools summary');
   await p.selectOption('#shoppingFilter','unconfigured');
   check(await p.locator('#shoppingNeeds article').count()===1&&(await p.textContent('#shoppingNeeds')).includes('Não configurado'),'Filtro de parâmetros pendentes');
   await p.selectOption('#shoppingFilter','all');

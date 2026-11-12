@@ -147,8 +147,14 @@ export function createReportsUI({getContext, dayDifference, replenishmentFor}) {
     controls();
   }
   function dirty() { applied=null;lossOffset=0;inventoryOffset=0;message('Filtros alterados. Atualize para aplicar o período.');controls(); }
-  el('reportsPeriod').addEventListener('change',()=>{quickPeriod();dirty();});
-  for (const id of ['reportsFrom','reportsTo']) el(id).addEventListener('input',()=>{el('reportsPeriod').value='custom';dirty();});
+  el('reportsPeriod').addEventListener('change',()=>{
+    const custom = el('reportsPeriod').value === 'custom';
+    el('reportsTools').open = custom;
+    el('reportsDateBadge').textContent = custom ? 'personalizadas' : '';
+    quickPeriod();
+    dirty();
+  });
+  for (const id of ['reportsFrom','reportsTo']) el(id).addEventListener('input',()=>{el('reportsPeriod').value='custom';el('reportsDateBadge').textContent='personalizadas';dirty();});
   el('reportsReload').addEventListener('click',()=>void load());
   for (const [id,kind,delta] of [['reportsLossPrevious','loss',-limit],['reportsLossNext','loss',limit],['reportsInventoryPrevious','inventory',-limit],['reportsInventoryNext','inventory',limit]]) {
     el(id).addEventListener('click',()=>{if (busy || !owner() || !navigator.onLine || !applied) return;if(kind==='loss')lossOffset=Math.max(0,lossOffset+delta);else inventoryOffset=Math.max(0,inventoryOffset+delta);void load();});

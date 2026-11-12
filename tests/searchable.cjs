@@ -134,6 +134,7 @@ const server = http.createServer((req, res) => {
       check(await rows('supplierSelect').count()===1, 'Gestão mantém fornecedor inativo visível');
       await click(page.locator('[data-close="supplierDialog"]'));
       await click(page.locator('#navHistory'));
+      await click(page.locator('#historyTools summary'));
       await filter('historyProduct','uva'); await page.keyboard.press('Enter');
       check(await page.inputValue('#historyProduct')==='product-2', 'Histórico usa pesquisa por produto');
       await click(page.locator('#clearHistoryFilters'));

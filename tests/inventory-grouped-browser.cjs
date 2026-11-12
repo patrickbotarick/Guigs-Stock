@@ -99,6 +99,7 @@ function installInventory() {
       check(await lot.count()===1&&await lot.locator('.inventory-item').count()===4,'Um lote contém quatro localizações');
       check((await lot.locator('h4').allTextContents()).join('|')==='Estoque seco|Geladeira — não alocado|Imbera / Prateleira 1 / Bebidas|Metalfrio / Prateleira 1 / Bebidas','Ordem e rótulos das posições');
       check((await page.textContent('#inventoryFilterSummary')).includes('296 ocultas'),'Filtro informa itens ocultos');
+      await page.click('#inventoryTools summary');
       await page.selectOption('#inventoryFridge','fridge-b');
       check(await lot.locator('.inventory-item').count()===1&&(await lot.locator('h4').textContent()).includes('Metalfrio'),'Filtro por geladeira física');
       check((await lot.locator('summary').textContent()).includes('0 de 4'),'Filtro conserva o denominador do lote');

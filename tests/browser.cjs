@@ -187,6 +187,7 @@ if (require.main === module) (async () => {
     await page.click('#next');
     await page.waitForFunction(() => document.getElementById('page').textContent.startsWith('2/3'));
     check(await page.evaluate(() => window.__test.calls.filter(c=>c.name==='guigs_get_history').at(-1).args.p_offset)===20, 'Paginação envia offset ao servidor');
+    await page.click('#historyTools summary');
     await page.selectOption('#historyType','sale');
     await page.waitForFunction(() => document.getElementById('page').textContent.includes('22 lançamentos'));
     check(await page.locator('#history .movement-type.sale').count()===20, 'Filtro tipo preservado');

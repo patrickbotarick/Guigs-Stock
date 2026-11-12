@@ -55,6 +55,7 @@ function reportsClient({role,shopId}) {
     await click('#navReports');await page.waitForSelector('#reportsView:not(.hidden)');await ready();
     check(await page.getAttribute('#navReports','aria-current')==='page','View e navegação por hash');
     check(!await page.isVisible('#overviewView')&&!await page.isVisible('#historyView')&&!await page.isVisible('#inventoryView'),'View de relatórios independente');
+    await click('#reportsTools summary');
     await page.fill('#reportsFrom','2026-10-01');await page.fill('#reportsTo','2026-10-31');await click('#reportsReload');await ready();
     check((await page.textContent('#reportsSummary')).includes('125 unidades · 3 operações'),'Resumo distingue unidades e operações');
     check((await page.textContent('#reportsSummary')).includes('7 unidades · 2 operações'),'Transferência não dobra unidades/contagens');
@@ -111,6 +112,8 @@ function reportsClient({role,shopId}) {
      check(new Date(request.p_to)>new Date(request.p_from),`Intervalo rápido ${period}`);
      check(request.p_from.endsWith('03:00:00.000Z')&&request.p_to.endsWith('03:00:00.000Z'),'Dias completos no fuso local');
     }
+    await page.selectOption('#reportsPeriod','custom');
+    check(await page.locator('#reportsTools').evaluate(e=>e.open),'Período personalizado abre as datas');
     await page.fill('#reportsFrom','2025-01-01');await page.fill('#reportsTo','2025-01-02');await click('#reportsReload');await ready();
     check((await page.textContent('#reportsSummary')).includes('Nenhuma operação registrada'),'Resumo vazio com contexto');
     check((await page.textContent('#reportsLosses')).includes('Nenhuma perda registrada')&&(await page.textContent('#reportsSuppliers')).includes('Nenhum recebimento registrado'),'Empty states por seção');

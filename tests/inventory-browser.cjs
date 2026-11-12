@@ -68,6 +68,7 @@ function inventoryClient({role,shopId}){
    check(await page.locator('.inventory-item').count()===2,'Busca encontra lote nos dois locais');
    check(await page.locator('.inventory-lot').count()===1,'Busca mantém as posições no mesmo lote');
    await page.fill('#inventorySearch','');
+   await page.click('#inventoryTools summary');
    await page.selectOption('#inventoryLocation','stock');check(await page.locator('.inventory-item').count()===2,'Filtro estoque seco');
    await page.selectOption('#inventoryLocation','fridge');check(await page.locator('.inventory-item').count()===2,'Filtro geladeira');
    await page.selectOption('#inventoryLocation','');
