@@ -217,6 +217,7 @@ if (require.main === module) (async () => {
     await page.waitForFunction(() => !document.getElementById('receiveDialog').open);
     check((await page.textContent('#lots')).includes('Fornecedor: Fornecedor novo'), 'Receber e visualizar fornecedor');
     check(await page.evaluate(() => window.__test.calls.find(c=>c.name==='guigs_receive_stock').args.p_supplier_id)==='supplier-3', 'Recebimento envia supplier_id');
+    await page.click('#overviewManagement summary');
     await page.click('#manageSuppliers'); await page.selectOption('#supplierSelect','supplier-3',{force:true});
     await page.selectOption('#supplierActive','false'); await page.click('#saveSupplier');
     await page.waitForFunction(() => !document.getElementById('supplierDialog').open);

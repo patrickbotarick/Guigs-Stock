@@ -75,6 +75,15 @@ const server = http.createServer((req,res)=>{
       check(await page.locator('[data-product-id="product-off"]').count()===0,'Produto inativo sem sugestão');
       check((await page.textContent('#products')).includes('Total: mínimo 30 / meta 60'),'Mínimo e meta diferenciados');
       const initialStock=await page.textContent('#stock');
+      check(await page.locator('#overviewFilters').evaluate(e=>!e.open),'Filtros começam recolhidos');
+      await click('.overview-tools .tool-search summary');
+      await page.locator('#overviewSearch').fill('suco');
+      check(await page.locator('#products tr').count()===1,'Busca reduz a lista sem alterar os dados');
+      check(await page.textContent('#stock')===initialStock,'Busca mantém o total global');
+      await page.locator('#overviewSearch').fill('');
+      await page.keyboard.press('Escape');
+      check(await page.locator('.overview-tools .tool-search').evaluate(e=>!e.open),'Escape recolhe a busca');
+      await click('#overviewFilters summary');
       for(const filter of ['minimum','replenish','near','expired']){
         const writesBefore=await page.evaluate(()=>window.__test.calls.filter(c=>!c.name.startsWith('guigs_get_')).length);
         await click(`[data-attention="${filter}"]`);
@@ -161,6 +170,7 @@ const server = http.createServer((req,res)=>{
       if(mobile)await page.setViewportSize({width:390,height:700});
 
       if(role==='owner'){
+        await click('#overviewManagement summary');
         await click('#adjustStock');await choose('adjustLot','lot-a');await page.fill('#adjustQuantity','4');await page.fill('#adjustNote','Contagem física artificial');
         check((await page.textContent('#adjustImpact')).includes('Novo saldo: 4'),'Resumo de ajuste atualiza antes de submeter');
         const adjustments=await count('guigs_adjust_stock');await click('#saveAdjust');await page.waitForSelector('#operationConfirmDialog[open]');

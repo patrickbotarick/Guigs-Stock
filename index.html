@@ -1429,6 +1429,25 @@
       @media (prefers-reduced-motion: reduce) {
         .btn, .quickaction { transition: none; }
       }
+
+      .operationhead { align-items: center; flex-wrap: wrap; margin-bottom: .85rem; }
+      .operationhead h2 { margin: 0; }
+      #overviewManagement .managementactions { display: flex; flex-wrap: wrap; margin: 0; }
+      .overview-recent { margin-top: 1rem; }
+      .recent-movements { padding-inline-start: 1.25rem; line-height: 1.7; }
+      .operationbar .quickactions { grid-template-columns: repeat(auto-fit,minmax(min(100%,10rem),1fr)); }
+      .operationbar .quickaction { min-height: 4.4rem; gap: .2rem; padding: .8rem; justify-content: center; }
+      .overview-tools { margin: .75rem 0 .25rem; }
+      .overview-tools .attention-filters { margin-top: .5rem; }
+      #attentionFilterStatus { margin: .2rem 0 .75rem; }
+      #status.good { width: fit-content; max-width: 100%; padding: .4rem .7rem; margin-block: .65rem 1rem; }
+      .overview-alerts summary { cursor: pointer; list-style-position: inside; }
+      .overview-alerts summary > strong { font-size: 1rem; }
+      #overviewFirstAlert { margin: .35rem 0 0; color: var(--danger); }
+      @media (max-width: 500px) {
+        .operationbar .quickactions { grid-template-columns: repeat(2,minmax(0,1fr)); }
+        .operationbar .quickaction { min-height: 4.1rem; }
+      }
     </style>
   </head>
 
@@ -1484,12 +1503,15 @@
             <div id="operationFeedback" class="notice hidden" role="status" aria-live="polite" aria-atomic="true"></div>
             <div class="operationbar">
               <div class="operationhead">
-                <div>
-                  <h2>O que você precisa fazer?</h2>
-                  <div class="muted">
-                    Acesse rapidamente as operações mais usadas no dia a dia.
+                <h2>Operações de estoque</h2>
+                <details id="overviewManagement" class="tool" data-tool>
+                  <summary class="btn">Gerenciar</summary>
+                  <div class="managementactions tool-content">
+                    <button id="editProduct" class="btn" type="button">Editar produto</button>
+                    <button id="adjustStock" class="btn" type="button">Ajustar inventário</button>
+                    <button id="manageSuppliers" class="btn" type="button">Fornecedores</button>
                   </div>
-                </div>
+                </details>
               </div>
 
               <div class="quickactions">
@@ -1512,17 +1534,14 @@
                   <strong>Registrar perda</strong>
                   <small>Quebra, vencimento ou descarte</small>
                 </button>
-              </div>
-
-              <div class="managementactions">
-                <button id="newProduct" class="btn">+ Novo produto</button>
-                <button id="editProduct" class="btn">Editar produto</button>
-                <button id="adjustStock" class="btn">Ajustar inventário</button>
-                <button id="manageSuppliers" class="btn">Fornecedores</button>
+                <button id="newProduct" type="button" class="quickaction">
+                  <strong>+ Novo produto</strong>
+                  <small>Cadastrar no catálogo</small>
+                </button>
               </div>
             </div>
 
-            <section class="metrics">
+            <section class="metrics" aria-label="Resumo de estoque">
               <div class="metric">
                 <span>Estoque</span>
                 <b id="stock">—</b>
@@ -1548,12 +1567,29 @@
               </div>
             </section>
 
+            <details id="alertsPanel" class="alerts-panel overview-alerts hidden" data-tool>
+              <summary><strong>Atenção operacional</strong> <span id="alertCount" class="alerts-count">0 alertas</span></summary>
+              <p id="overviewFirstAlert"></p>
+              <div id="operationalAlerts" class="alerts-list"></div>
+            </details>
+
+            <div class="tools overview-tools" aria-label="Consultar estoque">
+              <details class="tool tool-search" data-tool>
+                <summary class="btn">Buscar produtos</summary>
+                <label class="field tool-content">Produto ou categoria
+                  <input id="overviewSearch" type="search" autocomplete="off" data-tool-focus>
+                </label>
+              </details>
+              <details id="overviewFilters" class="tool tool-filters" data-tool>
+                <summary class="btn">Atenção <span class="tool-count" id="overviewFilterBadge"></span></summary>
             <div class="attention-filters" role="group" aria-label="Filtrar atenção na visão geral">
               <button type="button" class="btn" data-attention="all" aria-pressed="true">Todos</button>
               <button type="button" class="btn" data-attention="minimum" aria-pressed="false">Abaixo do mínimo</button>
               <button type="button" class="btn" data-attention="replenish" aria-pressed="false">Repor geladeira</button>
               <button type="button" class="btn" data-attention="near" aria-pressed="false">Próximos do vencimento</button>
               <button type="button" class="btn" data-attention="expired" aria-pressed="false">Vencidos</button>
+            </div>
+              </details>
             </div>
             <p id="attentionFilterStatus" class="muted" role="status">Exibindo todos os produtos e lotes.</p>
             <section class="panel replenishment-panel" aria-labelledby="replenishmentTitle">
@@ -1563,18 +1599,7 @@
               </div>
               <div id="replenishmentList" class="replenishment-list"></div>
             </section>
-            <div id="alertsPanel" class="alerts-panel hidden">
-              <div class="alerts-head">
-                <div>
-                  <h2>Atenção operacional</h2>
-                  <div class="muted">Situações que podem precisar de ação.</div>
-                </div>
 
-                <span id="alertCount" class="alerts-count">0 alertas</span>
-              </div>
-
-              <div id="operationalAlerts" class="alerts-list"></div>
-            </div>
 
             <div class="section">
               <div class="panel">
@@ -1630,6 +1655,12 @@
                 </div>
               </div>
             </div>
+
+            <details class="tool panel overview-recent" data-tool>
+              <summary class="btn">Movimentações recentes</summary>
+              <ul id="overviewRecent" class="recent-movements"></ul>
+              <a href="#historico">Abrir histórico completo</a>
+            </details>
 
           </section>
           <section id="historyView" class="hidden" aria-label="Histórico de movimentações">

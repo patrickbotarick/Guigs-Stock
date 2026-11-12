@@ -69,6 +69,7 @@ function bridge(shopId){
     check(await page.isVisible('#reportsMessage'),'008 ausente não quebra carregamento');
     await page.click('#navOverview');await page.waitForSelector('#overviewView:not(.hidden)');check(await page.isVisible('#overviewView'),'Retorno à operação sem migrations novas');
    }else{
+    await page.click('#overviewManagement summary');
     await page.click('#adjustStock');await page.selectOption('#adjustLot',id(30),{force:true});await page.fill('#adjustQuantity','9');await page.fill('#adjustNote','Integração artificial B/C/D');await page.click('#saveAdjust');
     await page.waitForSelector('#operationConfirmDialog[open]');await page.click('#confirmOperation');await page.waitForSelector('#adjustDialog:not([open])',{state:'attached'});await page.waitForFunction(()=>!document.getElementById('refresh').disabled);
     check((await db.query("select sum(delta)::int as n from public.guigs_movements where lot_id=$1 and location='stock'",[id(30)])).rows[0].n===9,'Ajuste B confirma pelo mecanismo oficial');

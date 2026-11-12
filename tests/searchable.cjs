@@ -41,6 +41,7 @@ const server = http.createServer((req, res) => {
       const open = async id => {await click(page.locator(`#${id}Search`));};
       const rows = id => page.locator(`#${id}Options [role="option"]`);
       const filter = async (id, term) => {await open(id); await page.fill(`#${id}Search`,term);};
+      await click(page.locator('#overviewManagement summary'));
       await click(page.locator('#editProduct'));
       check(await page.locator('#editProductDialog label').allTextContents().then(labels => labels.filter(s => s==='Mínimo na geladeira').length===1), 'Rótulo mínimo sem duplicação');
       check(await page.locator('label[for="editTargetFridge"]').textContent()==='Meta na geladeira', 'Rótulo meta correto');

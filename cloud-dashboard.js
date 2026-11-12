@@ -4,6 +4,7 @@ import { createReportsUI } from './reports.js';
 import { createShoppingUI } from './shopping.js';
 
 const el = id => document.getElementById(id);
+const normalizeSearch = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
 
 // A viewport visual também encolhe quando o teclado sobrepõe a página no celular.
 function updateDialogViewport() {
@@ -88,7 +89,6 @@ function enhanceSearchableSelect(id) {
   let active = -1;
   let opened = false;
   let pointerOutside = false;
-  const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
   function sync() {
     input.value = select.selectedOptions[0]?.textContent || '';
     input.disabled = select.disabled;
@@ -123,7 +123,7 @@ function enhanceSearchableSelect(id) {
   }
   function render(term = '') {
     opened = true;
-    shown = [...select.options].filter(option => !option.disabled && !option.hidden && normalize(option.textContent).includes(normalize(term)));
+    shown = [...select.options].filter(option => !option.disabled && !option.hidden && normalizeSearch(option.textContent).includes(normalizeSearch(term)));
     list.replaceChildren();
     for (const [index, option] of shown.entries()) {
       const row = document.createElement('div');
@@ -731,6 +731,7 @@ async function bootstrap() {
 
   if (shop.role !== 'owner') {
 
+    el('overviewManagement').classList.add('hidden');
     el('newProduct')
       .classList
       .add('hidden');
@@ -1140,7 +1141,11 @@ function render() {
   el('criticalLots').textContent =
     criticalLots;
 
-  const visibleProducts = products.filter(product => matchesAttention(product, ps.get(product.id), lotList));
+  const term = normalizeSearch(el('overviewSearch').value.trim());
+  const visibleProducts = products.filter(product =>
+    normalizeSearch(product.name + ' ' + (product.category || '')).includes(term)
+    && matchesAttention(product, ps.get(product.id), lotList));
+  el('overviewFilterBadge').textContent = attentionFilter === 'all' ? '' : '1 ativo';
   const visibleIds = new Set(visibleProducts.map(product => product.id));
   const visibleLots = lotList.filter(lot => visibleIds.has(lot.product_id) &&
     (attentionFilter === 'expired' ? lot.days < 0 : attentionFilter === 'near' ? lot.days >= 0 && lot.days <= 30 : true));
@@ -1317,6 +1322,7 @@ function render() {
     }
 
 
+    el('overviewFirstAlert').textContent = (alerts.find(alert => alert.level === 'danger') || alerts[0]).title;
     el('alertCount').textContent =
       alerts.length
       +
@@ -1873,6 +1879,19 @@ p_date_to:
   }
 
 
+  if (historyPage === 0 && !historyProduct && !historyType && !historyActor && !historyDateFrom && !historyDateTo && !historyPartition && !query.trim()) {
+    const items = moves.slice(0, 4).map(move => {
+      const item = document.createElement('li');
+      item.textContent = timestamp(move.created_at) + ' · ' + (move.product_name || 'Produto') + ' · ' + (move.lot_code || 'Sem lote');
+      return item;
+    });
+    if (!items.length) {
+      const empty = document.createElement('li');
+      empty.textContent = 'Nenhuma movimentação registrada.';
+      items.push(empty);
+    }
+    el('overviewRecent').replaceChildren(...items);
+  }
   renderHistory();
 }
 
@@ -2807,6 +2826,7 @@ function updateAdjustImpact() {
 }
 
 el('adjustQuantity').addEventListener('input', updateAdjustImpact);
+el('overviewSearch').addEventListener('input', () => { if (shop) render(); });
 document.querySelectorAll('[data-attention]').forEach(button => button.addEventListener('click', () => {
   attentionFilter = button.dataset.attention;
   document.querySelectorAll('[data-attention]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
@@ -2848,7 +2868,7 @@ function applyView() {
   el('fridgesView').classList.toggle('hidden', !fridges);
   el('shoppingView').classList.toggle('hidden', !shopping);
   document.querySelector('.main').classList.toggle('history-view', history || inventory || reports || fridges || shopping);
-  el('viewTitle').textContent = shopping ? 'Lista de Compras' : fridges ? 'Mapa de Geladeiras' : reports ? 'Relatórios operacionais' : inventory ? 'Inventário físico' : history ? 'Histórico de movimentações' : 'Painel do estoque';
+  el('viewTitle').textContent = shopping ? 'Lista de Compras' : fridges ? 'Mapa de Geladeiras' : reports ? 'Relatórios operacionais' : inventory ? 'Inventário físico' : history ? 'Histórico de movimentações' : 'Visão geral';
   for (const [id, active] of [['navOverview', !history && !inventory && !reports && !fridges && !shopping], ['navHistory', history], ['navInventory',inventory], ['navReports',reports], ['navFridges',fridges],['navShopping',shopping]]) {
     if (active) el(id).setAttribute('aria-current', 'page');
     else el(id).removeAttribute('aria-current');
@@ -3259,39 +3279,25 @@ el('supplierForm').addEventListener('submit', saveSupplier);
 el('transferStock').addEventListener('click',()=>void openIntegratedTransfer());
 
 
-el('registerSale')
-  .addEventListener(
-    'click',
-    async () => {
+const openingOperations = new Set();
 
-      formMessage('saleMessage');
+async function openLotOperation(id, populate) {
+  const dialog = el(id + 'Dialog');
+  if (dialog.open || openingOperations.has(id) || !navigator.onLine) return;
+  openingOperations.add(id);
+  try {
+    formMessage(id + 'Message');
+    await refresh();
+    if (!shop || !navigator.onLine || dialog.open) return;
+    populate();
+    dialog.showModal();
+  } finally {
+    openingOperations.delete(id);
+  }
+}
 
-      await refresh();
-
-      populateSaleLots();
-
-      el('saleDialog')
-        .showModal();
-    }
-  );
-
-
-el('registerLoss')
-  .addEventListener(
-    'click',
-    async () => {
-
-      formMessage('lossMessage');
-
-      await refresh();
-
-      populateLossLots();
-
-      el('lossDialog')
-        .showModal();
-    }
-  );
-
+el('registerSale').addEventListener('click', () => void openLotOperation('sale', populateSaleLots));
+el('registerLoss').addEventListener('click', () => void openLotOperation('loss', populateLossLots));
 
 el('transferDirection')
   .addEventListener(
@@ -3353,22 +3359,7 @@ el('lossForm')
     registerLossOperation
   );
 
-el('adjustStock')
-  .addEventListener(
-    'click',
-    async () => {
-
-      formMessage('adjustMessage');
-
-      await refresh();
-
-      populateAdjustLots();
-
-      el('adjustDialog')
-        .showModal();
-    }
-  );
-
+el('adjustStock').addEventListener('click', () => void openLotOperation('adjust', populateAdjustLots));
 
 el('adjustLot')
   .addEventListener(
