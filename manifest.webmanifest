@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Guig's Stock",
   "short_name": "Guig's Stock",
-  "description": "Controle interno de estoque da Pizzaria Guig's.",
+  "description": "Controle interno de estoque da Pizzaria Guig's. Versão 1.9.0.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
