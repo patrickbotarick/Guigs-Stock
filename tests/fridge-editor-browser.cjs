@@ -281,6 +281,7 @@ function bridge({role,shop}){
     await authorized.page.waitForFunction(()=>document.querySelector('#fridgeMessage').textContent.startsWith('Layout salvo'));
     check(Number((await db.query('select width_ratio from public.guigs_fridge_slots where id=$1',[x])).rows[0].width_ratio)===.45,'Delegado salva proporção');
     const handle=authorized.page.getByRole('button',{name:'Redimensionar bloco',exact:true});
+    await authorized.page.locator('#fridgeSaveLayout:enabled').waitFor();
     await handle.scrollIntoViewIfNeeded();const box=await handle.boundingBox();await authorized.page.mouse.move(box.x+box.width/2,box.y+box.height/2);await authorized.page.mouse.down();await authorized.page.mouse.move(box.x+box.width/2+35,box.y+box.height/2,{steps:5});await authorized.page.mouse.up();
     check(Number(await authorized.page.inputValue('#fridgeField_width_ratio'))>45,'Handle redimensiona rascunho');
     check(Number((await db.query('select width_ratio from public.guigs_fridge_slots where id=$1',[x])).rows[0].width_ratio)===.45,'Arraste não persiste sem salvar');

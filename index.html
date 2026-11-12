@@ -1703,6 +1703,8 @@
       .shopping-need-metrics .shopping-need-priority { background: #fff0f1; border-color: #eacbd0; }
       .shopping-need-priority dd { color: var(--accent); }
       .shopping-need-details { border-block-start: 1px solid var(--line); }
+      #shoppingBoardStatus:empty, #inventoryOpenSummary:empty, #inventoryLastCompleted:empty { display:none; }
+      #fridgeDetailTitle:focus-visible, #inventoryDetailTitle:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
       .shopping-cards > .empty {
         grid-column: 1 / -1;
         margin: 0;
@@ -1775,6 +1777,7 @@
             <div class="operationbar">
               <div class="operationhead">
                 <h2>Operações de estoque</h2>
+                <button class="btn" type="button" data-section-target="overviewSearch">Buscar produto</button>
                 <details id="overviewManagement" class="tool" data-tool>
                   <summary class="btn">Gerenciar</summary>
                   <div class="managementactions tool-content">
@@ -2057,7 +2060,8 @@
               <details id="fridgeSearchTool" class="tool tool-search" data-tool>
                 <summary class="btn">Buscar</summary>
                 <label class="field tool-content fridge-popover">Produto ou posição
-                  <input id="fridgeMapSearch" type="search" autocomplete="off" placeholder="Produto, geladeira, prateleira ou bloco" data-tool-focus>
+                  <input id="fridgeMapSearch" type="search" autocomplete="off" placeholder="Produto, geladeira, prateleira ou bloco" aria-describedby="fridgeMapSearchHint" data-tool-focus>
+                  <small id="fridgeMapSearchHint" class="muted">Abra um bloco para ler o nome completo do produto.</small>
                 </label>
               </details>
               <details id="fridgeFilterTool" class="tool tool-filters" data-tool>
@@ -2127,7 +2131,7 @@
             </section>
           </section>
           <dialog id="fridgeDetailDialog" class="fridge-detail-dialog" aria-labelledby="fridgeDetailTitle" aria-describedby="fridgeDetailLocation">
-            <div class="fridge-detail-heading"><div><h2 id="fridgeDetailTitle"></h2><p id="fridgeDetailLocation"></p></div><button id="fridgeDetailClose" class="btn" type="button" autofocus aria-label="Fechar detalhes do bloco">✕</button></div>
+            <div class="fridge-detail-heading"><div><h2 id="fridgeDetailTitle" tabindex="-1"></h2><p id="fridgeDetailLocation"></p></div><button id="fridgeDetailClose" class="btn" type="button" autofocus aria-label="Fechar detalhes do bloco">✕</button></div>
             <p id="fridgeDetailOffline" class="notice hidden">Sem conexão. Dados da última leitura; ações bloqueadas.</p>
             <div class="fridge-detail-scroll">
               <div id="fridgeDetailBody"></div>
@@ -2169,12 +2173,11 @@
               <div class="panelhead"><div><h2>Inventários físicos</h2><p class="muted">Contar não altera estoque. Somente o proprietário pode fechar e aplicar divergências após revisão.</p></div>
                 <div class="inventory-actions"><button type="button" id="newSpatialInventory" class="btn green hidden" data-inventory-write>Inventário por posição</button><button type="button" id="newInventory" class="btn hidden" data-inventory-write>Novo inventário sem posições</button><button type="button" id="inventoryReload" class="btn">Atualizar inventários</button></div>
               </div>
-              <p id="inventoryOpenSummary"></p><p id="inventoryLastCompleted" class="muted"></p>
-              <h3>Histórico de inventários</h3><div id="inventoryList"></div>
-              <div class="inventory-actions"><button type="button" id="inventoryPrevious" class="btn">Anterior</button><span id="inventoryPage"></span><button type="button" id="inventoryNext" class="btn">Próxima</button></div>
+              <p id="inventoryOpenSummary"></p>
+              <button type="button" id="inventoryResume" class="btn primary hidden" data-inventory-open>Retomar contagem</button>
             </div>
             <section id="inventoryDetail" class="panel hidden" aria-labelledby="inventoryDetailTitle">
-              <h2 id="inventoryDetailTitle"></h2><p id="inventoryDetailInfo" class="muted"></p>
+              <h2 id="inventoryDetailTitle" tabindex="-1"></h2><p id="inventoryDetailInfo" class="muted"></p>
               <p id="inventoryTotals" tabindex="-1" role="status"></p>
               <div id="inventoryMovementWarning" class="notice danger hidden" role="status"></div>
               <div class="inventory-actions">
@@ -2209,9 +2212,14 @@
               </div>
               <details><summary>Auditoria das contagens e estados</summary><div id="inventoryAudit"></div></details>
             </section>
+            <section id="inventoryHistoryPanel" class="panel hidden" aria-labelledby="inventoryHistoryTitle">
+              <h2 id="inventoryHistoryTitle">Histórico de inventários</h2>
+              <p id="inventoryLastCompleted" class="muted"></p>
+              <div id="inventoryList"></div>
+              <div class="inventory-actions"><button type="button" id="inventoryPrevious" class="btn">Anterior</button><span id="inventoryPage"></span><button type="button" id="inventoryNext" class="btn">Próxima</button></div>
+            </section>
           </section>
           <section id="shoppingView" class="shopping-layout hidden" aria-label="Lista de Compras">
-            <div id="shoppingOffline" class="notice hidden" role="status">Sem conexão. As compras exibidas podem estar desatualizadas.</div>
             <p id="shoppingMessage" class="notice hidden" role="status" aria-live="polite"></p>
             <section class="panel">
               <div class="panelhead">
@@ -2232,6 +2240,8 @@
                   </div>
                 </details>
               </div>
+              <div id="shoppingOffline" class="notice hidden" role="status">Sem conexão. As compras exibidas podem estar desatualizadas.</div>
+              <p id="shoppingBoardStatus" class="muted" role="status"></p>
               <div id="shoppingNeeds" class="shopping-cards"></div>
             </section>
             <section class="panel">

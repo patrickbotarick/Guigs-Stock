@@ -439,7 +439,10 @@ export function createFridgesUI({getContext,refreshStock,confirmAction,openTrans
   function openDetail(id,showHistory=false,feedback=''){
     const slot=data?.slots.find(s=>s.id===id);if(!slot)return;
     detailSlotId=id;moves.resetHistory(id);renderDetail();
-    if(!el('fridgeDetailDialog').open)el('fridgeDetailDialog').showModal();
+    if(!el('fridgeDetailDialog').open){
+      el('fridgeDetailDialog').showModal();
+      el('fridgeDetailTitle').focus({preventScroll:true});
+    }
     if(feedback)el('fridgeDetailBody').prepend(Object.assign(node('p',feedback),{className:'notice good',role:'status'}));
     if(showHistory)el('fridgeSlotHistory').open=true;
     syncDetail();

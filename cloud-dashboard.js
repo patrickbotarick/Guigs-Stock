@@ -52,9 +52,11 @@ for (const tool of document.querySelectorAll('details[data-tool]')) {
 document.addEventListener('click', event => {
   const button = event.target.closest('[data-section-target]');
   if (!button) return;
-  const heading = el(button.dataset.sectionTarget);
-  heading.focus({preventScroll:true});
-  heading.scrollIntoView({block:'start'});
+  const target = el(button.dataset.sectionTarget);
+  const disclosure = target.closest('details');
+  if (disclosure) disclosure.open=true;
+  target.focus({preventScroll:true});
+  target.scrollIntoView({block:'start'});
 });
 
 // O select continua responsável pelo valor, pelas opções e pela validação.

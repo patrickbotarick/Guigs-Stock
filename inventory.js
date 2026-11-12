@@ -20,6 +20,7 @@ export function createInventoryUI({getContext, confirmAction, refreshStock}) {
   let detailLoading = 0;
   let page = 0;
   let total = 0;
+  let activeInventory = null;
   let loaded = false;
   let reviewApproved = false;
   let lotPage = 0;
@@ -73,6 +74,14 @@ export function createInventoryUI({getContext, confirmAction, refreshStock}) {
     const blocked = pending || !navigator.onLine;
     el('inventoryView').querySelectorAll('[data-inventory-write]').forEach(button => { button.disabled = blocked; });
     el('inventoryView').querySelectorAll('[data-inventory-open]').forEach(button => { button.disabled = pending; });
+    const resume=el('inventoryResume');
+    resume.classList.toggle('hidden',!activeInventory);
+    resume.disabled=pending||!navigator.onLine&&current?.id!==activeInventory?.id;
+    resume.textContent=activeInventory?.status==='review'?'Retomar revisão':'Retomar contagem';
+    el('inventoryOpenSummary').textContent=activeInventory
+      ? `Em andamento: #${activeInventory.id.slice(0,8)} · ${statusLabel[activeInventory.status]}`
+      : loaded&&!total?'Nenhum inventário registrado.':'';
+    el('inventoryHistoryPanel').classList.toggle('hidden',!total);
     el('inventoryView').querySelectorAll('.inventory-count-input').forEach(input => { input.disabled = blocked; });
     el('inventoryReload').disabled = blocked;
     el('inventoryCreateSubmit').disabled = blocked || !owner;
@@ -90,10 +99,10 @@ export function createInventoryUI({getContext, confirmAction, refreshStock}) {
     total = result.total;
     const list = el('inventoryList');
     list.replaceChildren();
-    const active = result.inventories.filter(inv => ['open','review'].includes(inv.status));
-    el('inventoryOpenSummary').textContent = active.length ? `Em andamento: ${active.map(inv=>`#${inv.id.slice(0,8)} · ${statusLabel[inv.status]}`).join(', ')}` : 'Nenhum inventário em andamento nesta página.';
+    const active = result.inventories.find(inv => ['open','review'].includes(inv.status));
+    if(page===0||active)activeInventory=active||null;
     el('inventoryLastCompleted').textContent = result.last_completed
-      ? `Último concluído: ${date(result.last_completed.completed_at)} · ${actor(result.last_completed.completed_by,result.last_completed.completed_by_label)}` : 'Nenhum inventário concluído.';
+      ? `Último concluído: ${date(result.last_completed.completed_at)} · ${actor(result.last_completed.completed_by,result.last_completed.completed_by_label)}` : '';
     for (const inv of result.inventories) {
       const entry = document.createElement('article');
       entry.className = 'inventory-history-card';
@@ -107,7 +116,6 @@ export function createInventoryUI({getContext, confirmAction, refreshStock}) {
       open.addEventListener('click', () => void readInventory(inv.id));
       entry.append(info,open); list.append(entry);
     }
-    if (!result.inventories.length) list.textContent = 'Nenhum inventário registrado.';
     el('inventoryPage').textContent = `Página ${page+1} · ${total} inventário(s)`;
     loaded = true;
     sync();
@@ -124,7 +132,12 @@ export function createInventoryUI({getContext, confirmAction, refreshStock}) {
       }
       if (data?.inventory.id !== result.inventory.id || data?.inventory.version !== result.inventory.version) reviewApproved = false;
       data = result;
+      if(activeInventory?.id===result.inventory.id) {
+        activeInventory=['open','review'].includes(result.inventory.status)?result.inventory:null;
+      }
       renderDetail();
+      sync();
+      return true;
     } catch (error) {
       if (propagate) throw error;
       message(error.message,true);
@@ -502,6 +515,13 @@ export function createInventoryUI({getContext, confirmAction, refreshStock}) {
     if (pending) return;
     try {await loadList();if(data)await readInventory(data.inventory.id,true);} catch(error){message(error.message,true);}sync();
   }
+  el('inventoryResume').addEventListener('click',async()=>{
+    if(!activeInventory||pending)return;
+    const opened=navigator.onLine?await readInventory(activeInventory.id):data?.inventory.id===activeInventory.id;
+    if(opened){
+      el('inventoryDetailTitle').focus();
+    }
+  });
   el('inventoryReload').addEventListener('click',()=>void reload());
   el('inventoryPrevious').addEventListener('click',()=>{page--;void reload();});
   el('inventoryNext').addEventListener('click',()=>{page++;void reload();});

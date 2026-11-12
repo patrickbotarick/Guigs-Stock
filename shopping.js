@@ -50,6 +50,7 @@ export function createShoppingUI({getContext,confirmAction,openReceipt}) {
   };
   let board=null, detail=null, draft=null, limits=null, page=0, busy=false, confirming=false, generation=0, boardTicket=0, detailTicket=0;
   const retries=new Map(), photos=new Map();
+  let boardLoading=false, boardError='';
   const owner=()=>getContext().shop?.role==='owner';
   const editable=order=>order.status==='draft'&&(owner()||order.created_by===getContext().shop?.user_id);
   const message=(text,error=false)=>{
@@ -74,10 +75,12 @@ export function createShoppingUI({getContext,confirmAction,openReceipt}) {
     const disabled=busy||confirming||!navigator.onLine;
     document.querySelectorAll('[data-shopping-write]').forEach(control=>{control.disabled=disabled;});
     el('shoppingDraftForm').querySelectorAll('input,select,textarea').forEach(control=>{control.disabled=disabled||control.dataset.fixed==='true';});
-    el('shoppingReload').disabled=disabled;
-    el('shoppingPrevious').disabled=disabled||page===0;
-    el('shoppingNext').disabled=disabled||!board||(page+1)*PAGE_SIZE>=board.order_counts.total;
+    el('shoppingReload').disabled=disabled||boardLoading;
+    el('shoppingPrevious').disabled=disabled||boardLoading||page===0;
+    el('shoppingNext').disabled=disabled||boardLoading||!board||(page+1)*PAGE_SIZE>=board.order_counts.total;
     el('shoppingOffline').classList.toggle('hidden',navigator.onLine);
+    el('shoppingNeeds').setAttribute('aria-busy',String(boardLoading));
+    el('shoppingBoardStatus').textContent=!navigator.onLine?'':boardLoading?'Carregando sugestões e pedidos…':boardError;
   }
 
   async function updatePhotos(targets) {
@@ -158,7 +161,7 @@ export function createShoppingUI({getContext,confirmAction,openReceipt}) {
       if(owner())actions.append(button('Editar mínimo e meta',()=>openLimits(item),true));
       card.append(actions,details);list.append(card);
     }
-    if(!shown.length)list.append(node('p','Nenhum produto para estes filtros.','empty'));
+    if(!shown.length)list.append(node('p',board.needs.length?'Nenhum produto para estes filtros.':'Nenhum produto disponível para compras.','empty'));
     void updatePhotos(targets);sync();
   }
 
@@ -184,14 +187,23 @@ export function createShoppingUI({getContext,confirmAction,openReceipt}) {
 
   async function loadBoard() {
     const ticket=++boardTicket;
-    const result=await rpc('guigs_get_shopping_board',{p_limit:PAGE_SIZE,p_offset:page*PAGE_SIZE});
-    if(ticket!==boardTicket)return;
-    board=result;renderBoard();
+    boardLoading=true;boardError='';sync();
+    try{
+      const result=await rpc('guigs_get_shopping_board',{p_limit:PAGE_SIZE,p_offset:page*PAGE_SIZE});
+      if(ticket!==boardTicket)return;
+      board=result;renderBoard();
+    }catch(error){
+      if(ticket!==boardTicket)return;
+      boardError='Não foi possível carregar Compras. '+error.message+(board?' Os dados anteriores continuam visíveis.':'');
+      throw error;
+    }finally{
+      if(ticket===boardTicket){boardLoading=false;sync();}
+    }
   }
 
   function refresh() {
     sync();
-    if(navigator.onLine&&getContext().shop)void loadBoard().catch(error=>message(error.message,true));
+    if(navigator.onLine&&getContext().shop)void loadBoard().catch(()=>{});
   }
 
   function showDetail() {
@@ -470,6 +482,7 @@ export function createShoppingUI({getContext,confirmAction,openReceipt}) {
 
   return {activate:refresh,reset(){
     generation++;boardTicket++;detailTicket++;board=null;detail=null;draft=null;limits=null;page=0;busy=false;confirming=false;
+    boardLoading=false;boardError='';sync();
     retries.clear();photos.clear();el('shoppingDetail').classList.add('hidden');
     for(const id of ['shoppingNeeds','shoppingOrders','shoppingMetrics','shoppingSavedItems','shoppingEvents','shoppingDraftItems'])el(id).replaceChildren();
     el('shoppingShareText').value='';el('shoppingShareDialog').close();el('shoppingLimitsDialog').close();message('');
